@@ -1,5 +1,5 @@
 // src/context/AuthContext.jsx
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext(null);
 
@@ -52,7 +52,7 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: data.error };
       }
     } catch (error) {
-      return { success: false, error: 'Login failed. Please try again.' };
+      return { success: false, error };
     }
   };
 
@@ -76,7 +76,7 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: data.error };
       }
     } catch (error) {
-      return { success: false, error: 'Registration failed. Please try again.' };
+      return { success: false, error};
     }
   };
 
@@ -105,10 +105,3 @@ export const AuthProvider = ({ children }) => {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
