@@ -1,0 +1,58 @@
+BUBBLE SORT - Algorithm Explanation
+====================================
+
+What is Bubble Sort?
+-----------------------
+Bubble Sort is one of the simplest sorting algorithms. It works by repeatedly "bubbling" the largest unsorted element to its correct position at the end of the array. Imagine bubbles rising to the surface - the largest values "bubble up" to the top!
+
+How It Works
+----------------
+1. Compare adjacent elements in the array
+2. If they're in the wrong order, swap them
+3. After each pass, the largest unsorted element "bubbles" to the end
+4. Repeat until no more swaps are needed
+
+Detailed Steps:
+• Pass 1: Compare all adjacent pairs, swap if needed. Largest element moves to the end.
+• Pass 2: Ignore the last element (already sorted). Repeat for remaining elements.
+• Pass 3+: Continue, ignoring more elements at the end each time.
+• Done when a full pass requires no swaps!
+
+Key Concepts
+----------------
+• Comparison-Based: Works by comparing pairs of elements
+• In-Place: Doesn't need extra memory for another array
+• Stable: Equal elements maintain their original relative order
+• Multiple Passes: Each pass moves at least one element to its final position
+• Early Termination: Can stop early if array becomes sorted before all passes complete
+
+Time Complexity
+-------------------
+• Best Case: O(n) - Array already sorted (with optimization)
+• Average Case: O(n²) - Random order
+• Worst Case: O(n²) - Array in reverse order
+• Space: O(1) - In-place sorting
+
+When to Use Bubble Sort?
+---------------------------
+Good for:
+• Teaching sorting concepts (very easy to understand)
+• Small datasets (< 10 elements)
+• Nearly sorted data (with optimization)
+• Simple implementations where performance isn't critical
+
+Avoid for:
+• Large datasets (very slow!)
+• Performance-critical applications
+• Production code (use Quick Sort, Merge Sort, or built-in sorts instead)
+
+Learning Value
+------------------
+While Bubble Sort is inefficient for large datasets, it's excellent for learning:
+• Basic algorithm concepts
+• Nested loops
+• Comparisons and swaps
+• Algorithm optimization
+• Time complexity analysis
+
+Most real-world applications use faster algorithms like Quick Sort or Merge Sort, but Bubble Sort remains a valuable teaching tool!

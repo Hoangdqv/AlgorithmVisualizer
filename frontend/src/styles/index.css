@@ -181,6 +181,7 @@ button:hover {
   height: 100%;
   overflow-y: auto;
   white-space: pre-wrap;
+  box-sizing: border-box;
 }
 .console-text {
   color: #4CAF50;
@@ -570,9 +571,10 @@ footer {
   align-items: center;
   justify-content: space-between;
   gap: 1.5rem;
+  padding: 0 1rem;
 }
 
-@container (max-width: 664px){
+@container (max-width: 700px){
 
    .visual-module-title-section{
       align-items: center;
@@ -646,31 +648,30 @@ footer {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  min-width: 250px;
+  max-width: 350px;
   flex-shrink: 0;
 }
 
 .visual-module-speed-label {
-  font-size: 0.875rem;
+  font-size: 1rem;
   color: #aaa;
 }
 
 .visual-module-speed-slider {
   flex: 1;
   cursor: pointer;
-  max-width: 150px;
+  min-width: 200px;
 }
 
 .visual-module-speed-value {
-  font-size: 0.875rem;
+  font-size: 1rem;
   color: #aaa;
-  width: 4rem;
 }
 
 .visual-module-controls {
   display: flex;
   gap: 0.5rem;
-  flex-wrap: wrap;
+  flex-wrap: auto;
 }
 
 .visual-module-button {
@@ -707,12 +708,12 @@ footer {
   margin: auto;
   background-color: #2d2d2d;
   border-radius: 99px;
-  height: 0.5rem;
+  height: 0.65rem;
 }
 
 .visual-module-progress-fill {
   background-color: #4167ff;
-  height: 0.5rem;
+  height: 0.65rem;
   border-radius: 9999px;
   transition: width 0.3s;
 }

@@ -51,17 +51,19 @@ ALGORITHM_MAP = {
             'python': [
                 {
                     'key': 'bubblesort',
-                    'file': 'Sorting/python/bbsort.py',
+                    'file': 'Sorting/bubblesort/python/bbsort.py',
                     'name': 'Bubble Sort',
-                    'description': 'Sort an array using bubble sort algorithm'
+                    'description': 'Sort an array using bubble sort algorithm',
+                    'explanation_file': 'Sorting/bubblesort/explanation.txt'
                 }
             ],
             'javascript': [
                 {
                     'key': 'bubblesort',
-                    'file': 'Sorting/javascript/bbsort.js',
+                    'file': 'Sorting/bubblesort/javascript/bbsort.js',
                     'name': 'Bubble Sort',
-                    'description': 'Sort an array using bubble sort algorithm'
+                    'description': 'Sort an array using bubble sort algorithm',
+                    'explanation_file': 'Sorting/bubblesort/explanation.txt'
                 }
             ]
         }
@@ -72,29 +74,33 @@ ALGORITHM_MAP = {
             'python': [
                 {
                     'key': 'bfs',
-                    'file': 'Graphs/python/bfs.py',
+                    'file': 'Graphs/bfs/python/bfs.py',
                     'name': 'Breadth-First Search',
-                    'description': 'BFS traversal using adjacency matrix'
+                    'description': 'BFS traversal using adjacency matrix',
+                    'explanation_file': 'Graphs/bfs/explanation.txt'
                 },
                 {
                     'key': 'dfs',
-                    'file': 'Graphs/python/dfs.py',
+                    'file': 'Graphs/dfs/python/dfs.py',
                     'name': 'Depth-First Search',
-                    'description': 'DFS traversal using adjacency matrix'
+                    'description': 'DFS traversal using adjacency matrix',
+                    'explanation_file': 'Graphs/dfs/explanation.txt'
                 }
             ],
             'javascript': [
                 {
                     'key': 'bfs',
-                    'file': 'Graphs/javascript/bfs.js',
+                    'file': 'Graphs/bfs/javascript/bfs.js',
                     'name': 'Breadth-First Search',
-                    'description': 'BFS traversal using adjacency matrix'
+                    'description': 'BFS traversal using adjacency matrix',
+                    'explanation_file': 'Graphs/bfs/explanation.txt'
                 },
                 {
                     'key': 'dfs',
-                    'file': 'Graphs/javascript/dfs.js',
+                    'file': 'Graphs/dfs/javascript/dfs.js',
                     'name': 'Depth-First Search',
-                    'description': 'DFS traversal using adjacency matrix'
+                    'description': 'DFS traversal using adjacency matrix',
+                    'explanation_file': 'Graphs/dfs/explanation.txt'
                 }
             ]
         }

@@ -196,11 +196,22 @@ def get_category_algorithm_code(category, language, algorithm_key):
         with open(filepath, 'r') as f:
             code = f.read()
         
+        # Try to read explanation file if it exists
+        explanation = None
+        if 'explanation_file' in algorithm:
+            explanation_filepath = os.path.join(SAMPLE_ALGORITHMS_DIR, algorithm['explanation_file'])
+            try:
+                with open(explanation_filepath, 'r', encoding='utf-8') as f:
+                    explanation = f.read()
+            except FileNotFoundError:
+                pass  # Explanation is optional
+        
         return jsonify({
             'code': code,
             'language': language,
             'name': algorithm['name'],
-            'description': algorithm['description']
+            'description': algorithm['description'],
+            'explanation': explanation
         })
     except FileNotFoundError:
         return jsonify({'error': 'Algorithm code file not found'}), 404

@@ -1,0 +1,52 @@
+BREADTH-FIRST SEARCH (BFS) - Algorithm Explanation
+====================================================
+
+📚 What is BFS?
+---------------
+Breadth-First Search (BFS) is a graph traversal algorithm that explores nodes level by level. Think of it like ripples spreading out in water - you visit all nodes at distance 1 from the starting point, then all nodes at distance 2, and so on.
+
+🎯 How It Works
+----------------
+1. Start at a chosen node (the "root" or starting point)
+2. Visit all neighbors of that node first
+3. Then visit all neighbors of those neighbors
+4. Continue this pattern until all reachable nodes are visited
+
+The key to BFS is using a QUEUE (First-In-First-Out) data structure:
+- Add the starting node to the queue
+- While the queue is not empty:
+  * Remove the front node from the queue
+  * Mark it as visited
+  * Add all its unvisited neighbors to the back of the queue
+
+💡 Key Concepts
+----------------
+• Queue: Ensures we process nodes in the order we discover them
+• Visited Array: Keeps track of which nodes we've already seen (prevents infinite loops)
+• Adjacency Matrix: Represents the graph - matrix[i][j] = 1 means there's an edge from node i to node j
+
+🎨 Visualization States
+-----------------------
+• Gray node: Currently being processed
+• Yellow border: Node is in the queue (discovered but not yet processed)
+• Green node: Already visited and fully processed
+• Orange node: Neighbor being discovered
+
+⏱️ Time Complexity
+-------------------
+O(V + E) where V = number of vertices (nodes) and E = number of edges
+
+🔍 Use Cases
+-------------
+• Finding shortest path in unweighted graphs
+• Social network connections (friends within N degrees)
+• Web crawlers
+• Network broadcasting
+• GPS navigation systems
+• Finding all connected components
+
+💭 BFS vs DFS
+--------------
+• BFS uses a Queue → explores breadth-first (level by level)
+• DFS uses a Stack → explores depth-first (goes as deep as possible first)
+• BFS finds shortest paths; DFS uses less memory for deep graphs

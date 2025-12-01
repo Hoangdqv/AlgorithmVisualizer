@@ -10,7 +10,8 @@ const AlgorithmSelect = () => {
   const [selectedLanguage, setSelectedLanguage] = useState('Python');
   const [output, setOutput] = useState('Select an algorithm to run...');
   const [code, setCode] = useState('// Loading algorithms...');
-  const [tracerData, setTracerData] = useState(null); // Store tracer states for visualization
+  const [explanation, setExplanation] = useState(''); // Store algorithm explanation
+  const [tracerData, setTracerData] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -35,6 +36,12 @@ const AlgorithmSelect = () => {
       if (data.code) {
         setCode(data.code);
         setOutput('');
+        // Set explanation if available
+        if (data.explanation) {
+          setExplanation(data.explanation);
+        } else {
+          setExplanation('');
+        }
       } else {
         console.error('Error loading algorithm code:', data.error);
         setCode(`// Error loading algorithm code`);
@@ -111,8 +118,8 @@ const AlgorithmSelect = () => {
   const runCode = async () => {
     setIsRunning(true);
     setOutput('Running...');
-    setTracerData(null); // Clear previous visualization
-
+    setTracerData(null);
+    
     try {
       const response = await fetch(`http://localhost:5000/api/execute/algorithm`, {
         method: 'POST',
@@ -165,6 +172,7 @@ const AlgorithmSelect = () => {
       runCode={runCode}
       isRunning={isRunning}
       output={output}
+      explanation={explanation}
       samplesCache={samplesCache}
       handleFileSelect={handleFileSelect}
       sidebarLanguageKey={`${category}_${selectedLanguage}`}

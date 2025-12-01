@@ -1,0 +1,56 @@
+DEPTH-FIRST SEARCH (DFS) - Algorithm Explanation
+=================================================
+
+What is DFS?
+---------------
+Depth-First Search (DFS) is a graph traversal algorithm that explores as far as possible along each branch before backtracking. Think of it like exploring a maze - you follow one path all the way to the end, then come back and try another path.
+
+How It Works
+----------------
+1. Start at a chosen node (the "root" or starting point)
+2. Explore as deep as possible along one branch
+3. When you reach a dead end (all neighbors visited), backtrack
+4. Continue exploring unvisited branches until all reachable nodes are visited
+
+The key to DFS is using a STACK (Last-In-First-Out) data structure:
+- Push the starting node onto the stack
+- While the stack is not empty:
+  * Pop a node from the stack
+  * If not visited, mark it as visited
+  * Push all its unvisited neighbors onto the stack
+
+Key Concepts
+----------------
+• Stack: Ensures we explore depth-first (LIFO - Last In, First Out)
+• Visited Array: Keeps track of which nodes we've already seen (prevents infinite loops)
+• Adjacency Matrix: Represents the graph - matrix[i][j] = 1 means there's an edge from node i to node j
+• Backtracking: When we reach a dead end, we automatically backtrack by popping from the stack
+
+Visualization States
+-----------------------
+• Orange node: Currently being processed
+• Yellow border: Node is in the stack (discovered but not yet processed)
+• Green node: Already visited and fully processed
+• Lime green node: Neighbor being discovered
+
+Time Complexity
+-------------------
+O(V + E) where V = number of vertices (nodes) and E = number of edges
+
+Use Cases
+-------------
+• Detecting cycles in graphs
+• Finding connected components
+• Solving puzzles (Sudoku, mazes)
+• Pathfinding in games
+
+💭 DFS vs BFS
+--------------
+• DFS uses a Stack → explores depth-first (goes as deep as possible first)
+• BFS uses a Queue → explores breadth-first (level by level)
+• DFS uses less memory for wide graphs; BFS finds shortest paths
+• DFS is often implemented recursively; BFS is typically iterative
+
+🧠 Recursion Note
+------------------
+While this implementation uses an explicit stack, DFS is naturally recursive. The stack mimics what happens with recursive function calls - each recursive call is like pushing onto the stack, and returning is like popping!
