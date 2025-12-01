@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 
 const SignInForm = ({email, password, onChangeEmail, onChangePassword, onForgotPassword, onSubmit}) => {
   return (
-    <form>
+    <form onSubmit={onSubmit}>
           <div>
             <label htmlFor="email">Email:</label>
             <input 
@@ -28,7 +28,7 @@ const SignInForm = ({email, password, onChangeEmail, onChangePassword, onForgotP
           <div className='sign-in-redirect'>
             <a href="#" onClick={onForgotPassword}>Forgot password?</a>
           </div>
-          <button type="submit" onSubmit={onSubmit}>Sign In</button>
+          <button type="submit">Sign In</button>
           <div className='redirect-link'>Don't have an account? <Link to="/signup">Sign Up</Link></div>
 
         </form>

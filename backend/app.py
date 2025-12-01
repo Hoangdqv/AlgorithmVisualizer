@@ -1,13 +1,26 @@
 # app.py
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 import requests
 from config import LANGUAGE_MAP, ALGORITHM_MAP, SAMPLE_CODE_DIR, SAMPLE_ALGORITHMS_DIR
 from containerHandler import ContainerHandler
+from database import db, init_db
 import os
 
 app = Flask(__name__)
-CORS(app)
+
+# Configuration
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///algorithm_visualizer.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = 'your-secret-key-change-this-in-production'  # Change this!
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
+
+# Initialize database
+init_db(app)
+
+# CORS configuration to allow credentials
+CORS(app, supports_credentials=True, origins=['http://localhost:5173'])
 
 PISTON_API_URL = "https://emkc.org/api/v2/piston"
 container_handler = ContainerHandler()
@@ -325,6 +338,373 @@ def process_json():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ============================================
+# AUTHENTICATION ROUTES
+# ============================================
+
+@app.route('/api/auth/register', methods=['POST'])
+def register():
+    """Register a new user"""
+    from models import User
+    
+    data = request.get_json()
+    username = data.get('username')
+    email = data.get('email')
+    password = data.get('password')
+    
+    # Validation
+    if not username or not email or not password:
+        return jsonify({'error': 'Username, email, and password are required'}), 400
+    
+    if len(password) < 6:
+        return jsonify({'error': 'Password must be at least 6 characters'}), 400
+    
+    # Check if user already exists
+    if User.query.filter_by(username=username).first():
+        return jsonify({'error': 'Username already exists'}), 400
+    
+    if User.query.filter_by(email=email).first():
+        return jsonify({'error': 'Email already exists'}), 400
+    
+    # Create new user
+    user = User(username=username, email=email)
+    user.set_password(password)
+    
+    try:
+        db.session.add(user)
+        db.session.commit()
+        
+        # Log user in automatically
+        session['user_id'] = user.id
+        session['username'] = user.username
+        
+        return jsonify({
+            'message': 'Registration successful',
+            'user': user.to_dict()
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Registration failed'}), 500
+
+
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    """Login user with email or username"""
+    from models import User
+    from datetime import datetime
+    
+    data = request.get_json()
+    identifier = data.get('username')  # Can be email or username
+    password = data.get('password')
+    
+    if not identifier or not password:
+        return jsonify({'error': 'Email/username and password are required'}), 400
+    
+    # Try to find user by email or username
+    user = User.query.filter(
+        (User.username == identifier) | (User.email == identifier)
+    ).first()
+    
+    if not user or not user.check_password(password):
+        return jsonify({'error': 'Invalid email/username or password'}), 401
+    
+    # Update last login
+    user.last_login = datetime.utcnow()
+    db.session.commit()
+    
+    # Set session
+    session['user_id'] = user.id
+    session['username'] = user.username
+    
+    return jsonify({
+        'message': 'Login successful',
+        'user': user.to_dict()
+    }), 200
+
+
+@app.route('/api/auth/logout', methods=['POST'])
+def logout():
+    """Logout user"""
+    session.clear()
+    return jsonify({'message': 'Logout successful'}), 200
+
+
+@app.route('/api/auth/me', methods=['GET'])
+def get_current_user():
+    """Get current logged-in user"""
+    from models import User
+    
+    user_id = session.get('user_id')
+    
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    user = User.query.get(user_id)
+    
+    if not user:
+        session.clear()
+        return jsonify({'error': 'User not found'}), 404
+    
+    return jsonify({'user': user.to_dict()}), 200
+
+
+@app.route('/api/auth/update-profile', methods=['PUT'])
+def update_profile():
+    """Update user profile (username, profile picture)"""
+    from models import User
+    
+    user_id = session.get('user_id')
+    
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    user = User.query.get(user_id)
+    
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    
+    data = request.get_json()
+    
+    # Update username if provided
+    if 'username' in data and data['username'] != user.username:
+        # Check if new username already exists
+        existing = User.query.filter_by(username=data['username']).first()
+        if existing:
+            return jsonify({'error': 'Username already taken'}), 400
+        user.username = data['username']
+        session['username'] = data['username']
+    
+    # Update profile picture if provided
+    if 'profile_picture' in data:
+        user.profile_picture = data['profile_picture']
+    
+    try:
+        db.session.commit()
+        return jsonify({
+            'message': 'Profile updated successfully',
+            'user': user.to_dict()
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Update failed'}), 500
+
+
+@app.route('/api/auth/forgot-password', methods=['POST'])
+def forgot_password():
+    """Request password reset (placeholder for now)"""
+    from models import User
+    
+    data = request.get_json()
+    email = data.get('email')
+    
+    if not email:
+        return jsonify({'error': 'Email is required'}), 400
+    
+    user = User.query.filter_by(email=email).first()
+    
+    # Always return success to prevent email enumeration
+    if user:
+        # TODO: Generate reset token and send email
+        # For now, just log it
+        print(f"Password reset requested for {email}")
+    
+    return jsonify({
+        'message': 'If an account exists with that email, a password reset link will be sent.'
+    }), 200
+
+
+# ============================================
+# USER CODE ROUTES
+# ============================================
+
+@app.route('/api/user/saved-code', methods=['GET'])
+def get_saved_codes():
+    """Get all saved code for current user"""
+    from models import SavedCode
+    
+    user_id = session.get('user_id')
+    
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    codes = SavedCode.query.filter_by(user_id=user_id).order_by(SavedCode.updated_at.desc()).all()
+    
+    return jsonify({
+        'saved_codes': [code.to_dict() for code in codes]
+    }), 200
+
+
+@app.route('/api/user/saved-code/<algorithm_key>/<language>', methods=['GET'])
+def get_saved_code(algorithm_key, language):
+    """Get specific saved code"""
+    from models import SavedCode
+    
+    user_id = session.get('user_id')
+    
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    code = SavedCode.query.filter_by(
+        user_id=user_id,
+        algorithm_key=algorithm_key,
+        language=language
+    ).first()
+    
+    if not code:
+        return jsonify({'error': 'Saved code not found'}), 404
+    
+    return jsonify({'saved_code': code.to_dict()}), 200
+
+
+@app.route('/api/user/saved-code', methods=['POST'])
+def save_code():
+    """Save or update user's code"""
+    from models import SavedCode
+    
+    user_id = session.get('user_id')
+    
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    data = request.get_json()
+    algorithm_key = data.get('algorithm_key')
+    category = data.get('category')
+    language = data.get('language')
+    code = data.get('code')
+    
+    if not all([algorithm_key, category, language, code]):
+        return jsonify({'error': 'Missing required fields'}), 400
+    
+    # Check if code already exists
+    existing_code = SavedCode.query.filter_by(
+        user_id=user_id,
+        algorithm_key=algorithm_key,
+        language=language
+    ).first()
+    
+    try:
+        if existing_code:
+            # Update existing
+            existing_code.code = code
+            existing_code.category = category
+            from datetime import datetime
+            existing_code.updated_at = datetime.utcnow()
+            message = 'Code updated successfully'
+        else:
+            # Create new
+            new_code = SavedCode(
+                user_id=user_id,
+                algorithm_key=algorithm_key,
+                category=category,
+                language=language,
+                code=code
+            )
+            db.session.add(new_code)
+            message = 'Code saved successfully'
+        
+        db.session.commit()
+        
+        return jsonify({'message': message}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Failed to save code'}), 500
+
+
+@app.route('/api/user/saved-code/<int:code_id>', methods=['DELETE'])
+def delete_saved_code(code_id):
+    """Delete saved code"""
+    from models import SavedCode
+    
+    user_id = session.get('user_id')
+    
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    code = SavedCode.query.filter_by(id=code_id, user_id=user_id).first()
+    
+    if not code:
+        return jsonify({'error': 'Code not found'}), 404
+    
+    try:
+        db.session.delete(code)
+        db.session.commit()
+        return jsonify({'message': 'Code deleted successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Failed to delete code'}), 500
+
+
+# ============================================
+# USER PROGRESS ROUTES
+# ============================================
+
+@app.route('/api/user/progress', methods=['GET'])
+def get_user_progress():
+    """Get all progress for current user"""
+    from models import UserProgress
+    
+    user_id = session.get('user_id')
+    
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    progress = UserProgress.query.filter_by(user_id=user_id).all()
+    
+    return jsonify({
+        'progress': [p.to_dict() for p in progress]
+    }), 200
+
+
+@app.route('/api/user/progress/<algorithm_key>', methods=['POST'])
+def mark_algorithm_complete(algorithm_key):
+    """Mark an algorithm as completed"""
+    from models import UserProgress
+    from datetime import datetime
+    
+    user_id = session.get('user_id')
+    
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    data = request.get_json()
+    category = data.get('category')
+    
+    if not category:
+        return jsonify({'error': 'Category is required'}), 400
+    
+    # Check if progress already exists
+    progress = UserProgress.query.filter_by(
+        user_id=user_id,
+        algorithm_key=algorithm_key
+    ).first()
+    
+    try:
+        if progress:
+            # Update existing
+            progress.completed = True
+            progress.completed_at = datetime.utcnow()
+        else:
+            # Create new
+            progress = UserProgress(
+                user_id=user_id,
+                algorithm_key=algorithm_key,
+                category=category,
+                completed=True,
+                completed_at=datetime.utcnow()
+            )
+            db.session.add(progress)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Progress updated',
+            'progress': progress.to_dict()
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Failed to update progress'}), 500
 
 
 if __name__ == '__main__':

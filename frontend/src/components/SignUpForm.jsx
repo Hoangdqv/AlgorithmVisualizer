@@ -1,8 +1,19 @@
 import { Link } from "react-router-dom";
 
-const SignUpForm = ({email, password, passwordRetype, onChangeEmail, onChangePassword, onRetypePassword, onSubmit}) => {
+const SignUpForm = ({username, email, password, passwordRetype, onChangeUsername, onChangeEmail, onChangePassword, onRetypePassword, onSubmit}) => {
     return (
-        <form>
+        <form onSubmit={onSubmit}>
+          <div>
+            <label htmlFor="username">Username:</label>
+            <input 
+                className='input-margin-bottom' 
+                type="text" 
+                id="username" 
+                value={username}
+                name="username" 
+                onChange={(e) => onChangeUsername(e.target.value)}
+                required />
+          </div>
           <div>
             <label htmlFor="email">Email:</label>
             <input 
@@ -36,7 +47,7 @@ const SignUpForm = ({email, password, passwordRetype, onChangeEmail, onChangePas
                 onChange={(e) => onRetypePassword(e.target.value)}
                 required />
           </div>
-          <button type="submit" onSubmit={onSubmit}>Sign Up</button>
+          <button type="submit">Sign Up</button>
           <div className='redirect-link'>Already have an account? <Link to="/login">Sign In</Link></div>
         </form>
     )
