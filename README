@@ -1,0 +1,10 @@
+29-30/10: Getting started with Docker, tested tracer class with simple algorithm and successfully converted into valid JSON format
+          for the Flask API to handle
+
+22/11: Succesfully fixed the frontend bug where the Editor failed to render. This is because Monaco Editor hasn't fully support the
+          newest React version (19.0.0). Downgrade was necessary.
+
+Work:
+- React usestates
+- Expand algorithm
+- Continue to modularlize components for adapability with other algorithm with complex structure like trees and graphs

@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "d3-drag": "^3.0.0",
+    "lodash.debounce": "^4.0.8"
+  }
+}
