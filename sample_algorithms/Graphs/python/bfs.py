@@ -80,7 +80,7 @@ if __name__ == "__main__":
     ]
     
     start = 0
-    result, tracer = bfs(adjacency_matrix, start, trc.Tracer(category='graphs'))
+    result, tracer = bfs(adjacency_matrix, start, trc.Tracer(category='graphs', data_structure='queue', data_structure_label='Queue'))
     
     print(f'BFS Traversal starting from node {start}:')
     print(f'Visit order: {result}')

@@ -79,7 +79,7 @@ if __name__ == '__main__':
     ]
     
     start = 0
-    tracer = trc.Tracer(category='graphs')
+    tracer = trc.Tracer(category='graphs', data_structure='stack', data_structure_label='Stack')
     result = dfs(adjacency_matrix, start, tracer)
     
     print(f"DFS Traversal starting from node {start}:")

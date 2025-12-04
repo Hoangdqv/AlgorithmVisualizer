@@ -1,7 +1,7 @@
 import React from 'react'
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import SignInForm from '../SignInForm';
 import { isEmailEmpty, validateEmail } from '../../utils/credentialsValidation';
 
@@ -36,7 +36,7 @@ export default function SignIn() {
             const data = await response.json();
             alert(data.message || 'Password reset link will be sent to your email.');
         } catch (error) {
-            alert('Failed to process request. Please try again.');
+            alert(error, 'Failed to process request. Please try again.');
         }
     };
     

@@ -21,6 +21,7 @@ const EditorComponent = ({
   runCode, 
   isRunning, 
   handleFileSelect, 
+  handleUserFileSelect,
   samplesCache, 
   code, 
   handleEditorChange, 
@@ -28,7 +29,9 @@ const EditorComponent = ({
   explanation, 
   sidebarLanguageKey, 
   tracerData, 
-  onBack
+  onBack,
+  currentFile,
+  autoSaving
 }) => (
   <div className="layout-editor">
     <div className='topnav'>
@@ -59,6 +62,11 @@ const EditorComponent = ({
         runCode={runCode}
         isRunning={isRunning}
         loading={loading} />
+      {currentFile && (
+        <div className="autosave-indicator">
+          {autoSaving && <span style={{ color: '#4CAF50' }}>Saving in progress...</span>}
+        </div>
+      )}
     </div>
 
     <div className="editor-container">
@@ -69,6 +77,7 @@ const EditorComponent = ({
             <Panel minSize={15} maxSize={20} className='panel-border-white' id='sidebar-panel' order={1}>
               <Sidebar
                 onFileSelect={handleFileSelect}
+                onUserFileSelect={handleUserFileSelect}
                 selectedLanguage={sidebarLanguageKey || selectedLanguage}
                 samplesCache={samplesCache} />
             </Panel>

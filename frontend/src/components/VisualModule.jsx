@@ -76,6 +76,13 @@ const VisualModule = ({ tracerData, isRunning, selectedLanguage }) => {
     setIsPlaying(!isPlaying);
   };
 
+  const handleStepJump = (stepIndex) => {
+    setCurrentStep(stepIndex);
+    setIsPlaying(false);
+  };
+
+
+
   if (isRunning) {
     return (
       <div className="visual-module-empty">
@@ -97,7 +104,7 @@ const VisualModule = ({ tracerData, isRunning, selectedLanguage }) => {
 
   const renderVisualization = () => {
     if (category === 'graphs') {
-      return <GraphVisualization ref={graphVisualizationRef} currentState={currentState} />;
+      return <GraphVisualization ref={graphVisualizationRef} currentState={currentState} tracerData={displayData} />;
     } else if (category === 'sorting') {
       return <SortingVisualization currentState={currentState} />;
     }
@@ -153,6 +160,9 @@ const VisualModule = ({ tracerData, isRunning, selectedLanguage }) => {
                     value={speedMultiplier}
                     onChange={(e) => setSpeedMultiplier(Number(e.target.value))}
                     className="visual-module-speed-slider"
+                      style={{
+                        background: `linear-gradient(to right, #4167ff 0%, #4167ff ${((speedMultiplier - 0.5) / (2 - 0.5)) * 100}%, #3a3a3a ${((speedMultiplier - 0.5) / (2 - 0.5)) * 100}%, #3a3a3a 100%)`
+                      }}
                     />
                     <span className="visual-module-speed-value">
                     {speedMultiplier.toFixed(2)}x
@@ -162,16 +172,24 @@ const VisualModule = ({ tracerData, isRunning, selectedLanguage }) => {
           </div>   
         </div>
         
-        {/* Progress Bar */}
+        {/* Progress Bar - Slider with Snap Points */}
         <p className="visual-module-step-info">
           Step {currentStep + 1} of {displayTotalSteps}
         </p>
         <div className="visual-module-progress">
-          <div className="visual-module-progress-bar">
-            <div
-              className="visual-module-progress-fill"
-              style={{ width: `${((currentStep + 1) / displayTotalSteps) * 100}%` }}
-            ></div>
+          <div className="visual-module-progress-container">
+            {/* Slider input */}
+            <input
+              type="range"
+              min="0"
+              max={displayTotalSteps - 1}
+              value={currentStep}
+              onChange={(e) => handleStepJump(Number(e.target.value))}
+              className="visual-module-progress-slider"
+              style={{
+                background: `linear-gradient(to right, #4167ff 0%, #4167ff ${(currentStep / (displayTotalSteps - 1)) * 100}%, #3a3a3a ${(currentStep / (displayTotalSteps - 1)) * 100}%, #3a3a3a 100%)`
+              }}
+            />
           </div>
         </div>
       </div>

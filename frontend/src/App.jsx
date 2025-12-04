@@ -17,7 +17,7 @@ export default function App() {
         <NavBar />
         <div className='container'>
           <Routes>
-            <Route path="/" element={<Home />} />
+            <Route path="/home" element={<Home />} />
             <Route path="/algorithms" element={<AlgorithmGrid />} />
             <Route path="/playground" element={<CodeEditor />} />
             <Route path="/editor" element={<AlgorithmSelect />} />

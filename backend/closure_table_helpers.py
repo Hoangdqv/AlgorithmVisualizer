@@ -1,9 +1,10 @@
 # closure_table_helpers.py
 """Helper functions for closure table operations"""
+from datetime import datetime
 from database import db
 from models import Folder, ClosureTable
 
-def create_folder_with_closure(folder_name, path, user_id, parent_folder_id=None, folder_type='user-defined'):
+def create_folder_with_closure(folder_name, path, user_id, parent_folder_id=None, folder_type='user-defined', created_at=datetime.now()):
     """
     Create a new folder and update closure table.
     
@@ -21,19 +22,30 @@ def create_folder_with_closure(folder_name, path, user_id, parent_folder_id=None
     new_folder = Folder(
         folder_name=folder_name,
         path=path,
-        folder_type=folder_type
+        folder_type=folder_type,
+        created_at=created_at,
+        user_id=user_id,
+        parent_folder_id=parent_folder_id
     )
     db.session.add(new_folder)
     db.session.flush()  # Get the folder_id
     
-    # Insert self-reference (depth=0)
-    self_ref = ClosureTable(
+    # Check if self-reference already exists
+    existing_self_ref = ClosureTable.query.filter_by(
         ancestor=new_folder.folder_id,
         descendant=new_folder.folder_id,
-        depth=0,
         user_account_id=user_id
-    )
-    db.session.add(self_ref)
+    ).first()
+    
+    # Insert self-reference (depth=0) only if it doesn't exist
+    if not existing_self_ref:
+        self_ref = ClosureTable(
+            ancestor=new_folder.folder_id,
+            descendant=new_folder.folder_id,
+            depth=0,
+            user_account_id=user_id
+        )
+        db.session.add(self_ref)
     
     # If has parent, copy all parent's ancestors
     if parent_folder_id:
@@ -167,78 +179,10 @@ def delete_folder_cascade(folder_id, user_id):
     return deleted_count
 
 
-def move_folder(folder_id, new_parent_id, user_id):
-    """
-    Move a folder to a new parent.
-    This is complex as it requires updating closure table relationships.
-    
-    Args:
-        folder_id: ID of folder to move
-        new_parent_id: ID of new parent folder (None for root)
-        user_id: ID of the user
-    
-    Returns:
-        Boolean success
-    """
-    # Verify not moving to its own descendant
-    if new_parent_id and is_descendant(folder_id, new_parent_id, user_id):
-        raise ValueError("Cannot move folder into its own descendant")
-    
-    # Get all descendants of moving folder (including self)
-    moving_subtree = get_all_descendants(folder_id, user_id)
-    moving_subtree.append(folder_id)
-    
-    # Delete old relationships (except self-references and internal subtree relationships)
-    ClosureTable.query.filter(
-        ClosureTable.descendant.in_(moving_subtree),
-        ClosureTable.user_account_id == user_id,
-        ~ClosureTable.ancestor.in_(moving_subtree)
-    ).delete(synchronize_session=False)
-    
-    # Add new relationships
-    if new_parent_id:
-        # Get all ancestors of new parent
-        new_ancestors = ClosureTable.query.filter_by(
-            descendant=new_parent_id,
-            user_account_id=user_id
-        ).all()
-        
-        # For each node in moving subtree
-        for moving_node_id in moving_subtree:
-            # Get depth of this node relative to folder_id
-            node_depth_query = ClosureTable.query.filter_by(
-                ancestor=folder_id,
-                descendant=moving_node_id,
-                user_account_id=user_id
-            ).first()
-            node_relative_depth = node_depth_query.depth if node_depth_query else 0
-            
-            # Add relationship to each ancestor of new parent
-            for ancestor_entry in new_ancestors:
-                new_entry = ClosureTable(
-                    ancestor=ancestor_entry.ancestor,
-                    descendant=moving_node_id,
-                    depth=ancestor_entry.depth + 1 + node_relative_depth,
-                    user_account_id=user_id
-                )
-                db.session.add(new_entry)
-    
-    # Update folder path
-    folder = Folder.query.get(folder_id)
-    if new_parent_id:
-        parent = Folder.query.get(new_parent_id)
-        folder.path = f"{parent.path}/{folder.folder_name}"
-    else:
-        folder.path = f"/{folder.folder_name}"
-    
-    db.session.commit()
-    return True
-
-
 def get_root_folders(user_id, folder_type='user-defined'):
     """
     Get all root-level folders for a user.
-    Root folders have depth=0 in closure table and no parent.
+    Root folders have no parent (parent_folder_id IS NULL).
     
     Args:
         user_id: ID of the user
@@ -247,15 +191,11 @@ def get_root_folders(user_id, folder_type='user-defined'):
     Returns:
         List of Folder objects
     """
-    # Find folders that are only descendants of themselves (depth=0, self-reference only)
-    root_folders = db.session.query(Folder).join(
-        ClosureTable, Folder.folder_id == ClosureTable.descendant
-    ).filter(
-        ClosureTable.user_account_id == user_id,
-        ClosureTable.depth == 0,
-        Folder.folder_type == folder_type
-    ).group_by(Folder.folder_id).having(
-        db.func.count(ClosureTable.ancestor) == 1
+    # Simply query folders with no parent
+    root_folders = Folder.query.filter_by(
+        user_id=user_id,
+        folder_type=folder_type,
+        parent_folder_id=None
     ).all()
     
     return root_folders

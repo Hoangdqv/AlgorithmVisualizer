@@ -44,13 +44,13 @@ Use Cases
 • Solving puzzles (Sudoku, mazes)
 • Pathfinding in games
 
-💭 DFS vs BFS
+DFS vs BFS
 --------------
 • DFS uses a Stack → explores depth-first (goes as deep as possible first)
 • BFS uses a Queue → explores breadth-first (level by level)
 • DFS uses less memory for wide graphs; BFS finds shortest paths
 • DFS is often implemented recursively; BFS is typically iterative
 
-🧠 Recursion Note
+Recursion Note
 ------------------
 While this implementation uses an explicit stack, DFS is naturally recursive. The stack mimics what happens with recursive function calls - each recursive call is like pushing onto the stack, and returning is like popping!

@@ -1,11 +1,14 @@
 # app.py
 from flask import Flask, request, jsonify, session
 from flask_cors import CORS
+from datetime import datetime
 import requests
 from config import LANGUAGE_MAP, ALGORITHM_MAP, SAMPLE_CODE_DIR, SAMPLE_ALGORITHMS_DIR
 from containerHandler import ContainerHandler
 from database import db, init_db
 import os
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 
 app = Flask(__name__)
 
@@ -15,6 +18,13 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = 'your-secret-key-change-this-in-production'  # Change this!
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
+
+# Enable foreign key constraints for SQLite
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_conn, connection_record):
+    cursor = dbapi_conn.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 # Initialize database
 init_db(app)
@@ -304,14 +314,6 @@ def execute_algorithm():
         print(f"[API] EXCEPTION: {str(e)}\n")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-
-@app.route('/api/<language>/<search>', methods=['GET'])
-def get_searchResults(language, search):
-    query = request.args.get('q', '').lower()
-    lang_config = LANGUAGE_MAP.get(language.lower())
-    return [item for item in lang_config['samples'] if query in item['name'].lower()]
-
-
 @app.route('/process', methods=['POST'])
 def process_json():
     data = request.get_json()
@@ -411,7 +413,7 @@ def login():
         return jsonify({'error': 'Invalid email/username or password'}), 401
     
     # Update last login
-    user.last_login = datetime.utcnow()
+    user.last_login = datetime.now()
     db.session.commit()
     
     # Set session
@@ -449,48 +451,6 @@ def get_current_user():
     
     return jsonify({'user': user.to_dict()}), 200
 
-
-@app.route('/api/auth/update-profile', methods=['PUT'])
-def update_profile():
-    """Update user profile (username, profile picture)"""
-    from models import User
-    
-    user_id = session.get('user_id')
-    
-    if not user_id:
-        return jsonify({'error': 'Not authenticated'}), 401
-    
-    user = User.query.get(user_id)
-    
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
-    
-    data = request.get_json()
-    
-    # Update username if provided
-    if 'username' in data and data['username'] != user.username:
-        # Check if new username already exists
-        existing = User.query.filter_by(username=data['username']).first()
-        if existing:
-            return jsonify({'error': 'Username already taken'}), 400
-        user.username = data['username']
-        session['username'] = data['username']
-    
-    # Update profile picture if provided
-    if 'profile_picture' in data:
-        user.profile_picture = data['profile_picture']
-    
-    try:
-        db.session.commit()
-        return jsonify({
-            'message': 'Profile updated successfully',
-            'user': user.to_dict()
-        }), 200
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': 'Update failed'}), 500
-
-
 @app.route('/api/auth/forgot-password', methods=['POST'])
 def forgot_password():
     """Request password reset (placeholder for now)"""
@@ -514,197 +474,494 @@ def forgot_password():
         'message': 'If an account exists with that email, a password reset link will be sent.'
     }), 200
 
-
 # ============================================
-# USER CODE ROUTES
+# FILE SYSTEM ROUTES
 # ============================================
 
-@app.route('/api/user/saved-code', methods=['GET'])
-def get_saved_codes():
-    """Get all saved code for current user"""
-    from models import SavedCode
+@app.route('/api/languages', methods=['GET'])
+def get_languages():
+    """Get all available programming languages"""
+    from models import Language
+    
+    try:
+        languages = Language.query.all()
+        return jsonify({
+            'languages': [{
+                'lang_id': lang.lang_id,
+                'language': lang.language,
+                'docker_img': lang.docker_image,
+                'run_cmd': lang.run_cmd
+            } for lang in languages]
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/user/folders', methods=['GET'])
+def get_user_folders():
+    """Get all root folders for current user"""
+    from models import Folder
+    from closure_table_helpers import get_root_folders
     
     user_id = session.get('user_id')
-    
     if not user_id:
         return jsonify({'error': 'Not authenticated'}), 401
     
-    codes = SavedCode.query.filter_by(user_id=user_id).order_by(SavedCode.updated_at.desc()).all()
-    
-    return jsonify({
-        'saved_codes': [code.to_dict() for code in codes]
-    }), 200
+    try:
+        root_folders = get_root_folders(user_id, 'user-defined')
+        return jsonify({
+            'folders': [f.to_dict() for f in root_folders]
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/user/saved-code/<algorithm_key>/<language>', methods=['GET'])
-def get_saved_code(algorithm_key, language):
-    """Get specific saved code"""
-    from models import SavedCode
+@app.route('/api/user/folders/<int:folder_id>', methods=['GET'])
+def get_folder_details(folder_id):
+    """Get folder details including files"""
+    from models import Folder
     
     user_id = session.get('user_id')
-    
     if not user_id:
         return jsonify({'error': 'Not authenticated'}), 401
     
-    code = SavedCode.query.filter_by(
-        user_id=user_id,
-        algorithm_key=algorithm_key,
-        language=language
-    ).first()
+    folder = Folder.query.get(folder_id)
+    if not folder:
+        return jsonify({'error': 'Folder not found'}), 404
     
-    if not code:
-        return jsonify({'error': 'Saved code not found'}), 404
-    
-    return jsonify({'saved_code': code.to_dict()}), 200
+    return jsonify({'folder': folder.to_dict(include_files=True)}), 200
 
 
-@app.route('/api/user/saved-code', methods=['POST'])
-def save_code():
-    """Save or update user's code"""
-    from models import SavedCode
+@app.route('/api/user/folders/<int:folder_id>/tree', methods=['GET'])
+def get_folder_tree_route(folder_id):
+    """Get entire folder tree from specified folder"""
+    from models import Folder, File
+    from closure_table_helpers import get_folder_tree
     
     user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
     
+    try:
+        tree_data = get_folder_tree(folder_id, user_id)
+        
+        # Build hierarchical structure
+        result = []
+        for folder, depth in tree_data:
+            folder_dict = folder.to_dict(include_files=False)
+            folder_dict['depth'] = depth
+            folder_dict['files'] = [f.to_dict(include_content=False) for f in folder.files]
+            result.append(folder_dict)
+        
+        return jsonify({'tree': result}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/user/folders', methods=['POST'])
+def create_folder():
+    """Create a new folder"""
+    from closure_table_helpers import create_folder_with_closure
+    from models import Folder
+    from models import ClosureTable
+
+    
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'User not authenticated'}), 401
+    
+    data = request.get_json()
+    folder_name = data.get('folder_name')
+    parent_folder_id = data.get('parent_folder_id')  # None for root
+    
+    if not folder_name:
+        return jsonify({'error': 'Folder name is required'}), 400
+    
+    try:
+        # Check for duplicate folder name in the same parent
+        if parent_folder_id:
+            # Check siblings in parent folder
+            existing = Folder.query.filter_by(
+                folder_name=folder_name,
+                user_id=user_id
+            ).join(
+                ClosureTable,
+                ClosureTable.descendant == Folder.folder_id
+            ).filter(
+                ClosureTable.ancestor == parent_folder_id,
+                ClosureTable.depth == 1
+            ).first()
+            
+            if existing:
+                return jsonify({'error': f'A folder named "{folder_name}" already exists in this location'}), 409
+        else:
+            # Check root level folders
+            existing = Folder.query.filter_by(
+                folder_name=folder_name,
+                user_id=user_id
+            ).outerjoin(
+                ClosureTable,
+                ClosureTable.descendant == Folder.folder_id
+            ).filter(
+                ClosureTable.ancestor == None
+            ).first()
+            
+            if existing:
+                return jsonify({'error': f'A folder named "{folder_name}" already exists at root level'}), 409
+        
+        # Build path
+        if parent_folder_id:
+            from models import Folder
+            parent = Folder.query.get(parent_folder_id)
+            if not parent:
+                return jsonify({'error': 'Parent folder not found'}), 404
+            if parent.user_id != user_id:
+                return jsonify({'error': 'Access denied'}), 403
+            path = f"{parent.path}/{folder_name}"
+        else:
+            path = f"/{folder_name}"
+        
+        # Create folder with closure table
+        new_folder = create_folder_with_closure(
+            folder_name=folder_name,
+            path=path,
+            folder_type='user-defined',
+            created_at=datetime.now(),
+            user_id=user_id,
+            parent_folder_id=parent_folder_id,
+        )
+        
+        return jsonify({
+            'message': 'Folder created successfully',
+            'folder': new_folder.to_dict()
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/user/folders/<int:folder_id>', methods=['PUT'])
+def update_folder(folder_id):
+    """Rename a folder"""
+    from models import Folder
+    
+    user_id = session.get('user_id')
     if not user_id:
         return jsonify({'error': 'Not authenticated'}), 401
     
     data = request.get_json()
-    algorithm_key = data.get('algorithm_key')
-    category = data.get('category')
-    language = data.get('language')
-    code = data.get('code')
+    print(data)
+    new_name = data.get('folder_name')
     
-    if not all([algorithm_key, category, language, code]):
-        return jsonify({'error': 'Missing required fields'}), 400
+    if not new_name:
+        return jsonify({'error': 'Folder name is required'}), 400
     
-    # Check if code already exists
-    existing_code = SavedCode.query.filter_by(
-        user_id=user_id,
-        algorithm_key=algorithm_key,
-        language=language
-    ).first()
+    folder = Folder.query.get(folder_id)
+    if not folder:
+        return jsonify({'error': 'Folder not found'}), 404
     
     try:
-        if existing_code:
-            # Update existing
-            existing_code.code = code
-            existing_code.category = category
-            from datetime import datetime
-            existing_code.updated_at = datetime.utcnow()
-            message = 'Code updated successfully'
-        else:
-            # Create new
-            new_code = SavedCode(
-                user_id=user_id,
-                algorithm_key=algorithm_key,
-                category=category,
-                language=language,
-                code=code
-            )
-            db.session.add(new_code)
-            message = 'Code saved successfully'
+        # Update folder name and path
+        old_path = folder.path
+        folder.folder_name = new_name
         
-        db.session.commit()
-        
-        return jsonify({'message': message}), 200
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': 'Failed to save code'}), 500
-
-
-@app.route('/api/user/saved-code/<int:code_id>', methods=['DELETE'])
-def delete_saved_code(code_id):
-    """Delete saved code"""
-    from models import SavedCode
-    
-    user_id = session.get('user_id')
-    
-    if not user_id:
-        return jsonify({'error': 'Not authenticated'}), 401
-    
-    code = SavedCode.query.filter_by(id=code_id, user_id=user_id).first()
-    
-    if not code:
-        return jsonify({'error': 'Code not found'}), 404
-    
-    try:
-        db.session.delete(code)
-        db.session.commit()
-        return jsonify({'message': 'Code deleted successfully'}), 200
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': 'Failed to delete code'}), 500
-
-
-# ============================================
-# USER PROGRESS ROUTES
-# ============================================
-
-@app.route('/api/user/progress', methods=['GET'])
-def get_user_progress():
-    """Get all progress for current user"""
-    from models import UserProgress
-    
-    user_id = session.get('user_id')
-    
-    if not user_id:
-        return jsonify({'error': 'Not authenticated'}), 401
-    
-    progress = UserProgress.query.filter_by(user_id=user_id).all()
-    
-    return jsonify({
-        'progress': [p.to_dict() for p in progress]
-    }), 200
-
-
-@app.route('/api/user/progress/<algorithm_key>', methods=['POST'])
-def mark_algorithm_complete(algorithm_key):
-    """Mark an algorithm as completed"""
-    from models import UserProgress
-    from datetime import datetime
-    
-    user_id = session.get('user_id')
-    
-    if not user_id:
-        return jsonify({'error': 'Not authenticated'}), 401
-    
-    data = request.get_json()
-    category = data.get('category')
-    
-    if not category:
-        return jsonify({'error': 'Category is required'}), 400
-    
-    # Check if progress already exists
-    progress = UserProgress.query.filter_by(
-        user_id=user_id,
-        algorithm_key=algorithm_key
-    ).first()
-    
-    try:
-        if progress:
-            # Update existing
-            progress.completed = True
-            progress.completed_at = datetime.utcnow()
+        # Update path
+        path_parts = old_path.rsplit('/', 1)
+        if len(path_parts) > 1:
+            folder.path = f"{path_parts[0]}/{new_name}"
         else:
-            # Create new
-            progress = UserProgress(
-                user_id=user_id,
-                algorithm_key=algorithm_key,
-                category=category,
-                completed=True,
-                completed_at=datetime.utcnow()
-            )
-            db.session.add(progress)
+            folder.path = f"/{new_name}"
         
         db.session.commit()
         
         return jsonify({
-            'message': 'Progress updated',
-            'progress': progress.to_dict()
+            'message': 'Folder renamed successfully',
+            'folder': folder.to_dict()
         }), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': 'Failed to update progress'}), 500
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/user/folders/<int:folder_id>', methods=['DELETE'])
+def delete_folder(folder_id):
+    """Delete a folder and all its contents"""
+    from closure_table_helpers import delete_folder_cascade
+    
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    try:
+        deleted_count = delete_folder_cascade(folder_id, user_id)
+        return jsonify({
+            'message': f'Deleted {deleted_count} folder(s) successfully'
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/user/folders/<int:folder_id>/move', methods=['POST'])
+def move_folder(folder_id):
+    """Move folder to a new parent"""
+    from closure_table_helpers import move_folder as move_folder_helper
+    
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    data = request.get_json()
+    new_parent_id = data.get('new_parent_id')  # None for root
+    
+    try:
+        success = move_folder_helper(folder_id, new_parent_id, user_id)
+        
+        if success:
+            return jsonify({'message': 'Folder moved successfully'}), 200
+        else:
+            return jsonify({'error': 'Failed to move folder'}), 500
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================
+# FILE ROUTES
+# ============================================
+
+@app.route('/api/user/files', methods=['GET'])
+def get_user_files():
+    """Get all files for current user"""
+    from models import File
+    
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    folder_id = request.args.get('folder_id', type=int)
+    
+    try:
+        if folder_id:
+            # Get files in specific folder
+            files = File.query.filter_by(
+                user_account_id=user_id,
+                folder_id=folder_id,
+                file_type='user-defined'
+            ).all()
+        else:
+            # Get all user files
+            files = File.query.filter_by(
+                user_account_id=user_id,
+                file_type='user-defined'
+            ).order_by(File.last_updated.desc()).all()
+        
+        return jsonify({
+            'files': [f.to_dict(include_content=False) for f in files]
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/user/files/<int:file_id>', methods=['GET'])
+def get_file(file_id):
+    """Get file content"""
+    from models import File
+    
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    file = File.query.filter_by(
+        file_id=file_id,
+        user_account_id=user_id
+    ).first()
+    
+    if not file:
+        return jsonify({'error': 'File not found'}), 404
+    
+    return jsonify({'file': file.to_dict(include_content=True)}), 200
+
+
+@app.route('/api/user/files', methods=['POST'])
+def create_file():
+    """Create a new file"""
+    from models import File, Language, Folder
+    from datetime import datetime
+    
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    data = request.get_json()
+    print(data)
+    file_name = data.get('file_name')
+    folder_id = data.get('folder_id')  # None for root level
+    language_id = data.get('language_id')
+    content = data.get('content', '')
+    
+    if not file_name:
+        return jsonify({'error': 'File name is required'}), 400
+    
+    try:
+        # Check for duplicate file name in the same folder
+        if folder_id:
+            existing = File.query.filter_by(
+                file_name=file_name,
+                folder_id=folder_id,
+                user_account_id=user_id
+            ).first()
+        else:
+            existing = File.query.filter_by(
+                file_name=file_name,
+                folder_id=None,
+                user_account_id=user_id
+            ).first()
+        
+        if existing:
+            return jsonify({'error': f'A file named "{file_name}" already exists in this location'}), 409
+        
+        
+        # Build path
+        if folder_id:
+            folder = Folder.query.get(folder_id)
+            if not folder:
+                return jsonify({'error': 'Folder not found'}), 404
+            if folder.user_id != user_id:
+                return jsonify({'error': 'Access denied'}), 403
+            path = f"{folder.path}/{file_name}"
+        else:
+            path = f"/{file_name}"
+        
+        # Create file
+        new_file = File(
+            file_name=file_name,
+            folder_id=folder_id,
+            path=path,
+            file_type='user-defined',
+            user_account_id=user_id,
+            content=content,
+            lang_id=language_id,
+            created_at=datetime.now(),
+            last_updated=datetime.now()
+        )   
+        
+        db.session.add(new_file)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'File created successfully',
+            'file': new_file.to_dict()
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/user/files/<int:file_id>', methods=['PUT'])
+def update_file(file_id):
+    """Update file content or rename file"""
+    from models import File, Folder
+    from datetime import datetime
+    
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    data = request.get_json()
+    
+    file = File.query.filter_by(
+        file_id=file_id,
+        user_account_id=user_id
+    ).first()
+    
+    if not file:
+        return jsonify({'error': 'File not found'}), 404
+    
+    try:
+        # Update content if provided
+        if 'content' in data:
+            file.content = data['content']
+        
+        # Update file name if provided
+        if 'file_name' in data:
+            old_name = file.file_name
+            new_name = data['file_name']
+            file.file_name = new_name
+            
+            # Update path
+            file.path = file.path.replace(old_name, new_name)
+        
+        file.last_updated = datetime.now()
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'File updated successfully',
+            'file': file.to_dict()
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/user/files/<int:file_id>', methods=['DELETE'])
+def delete_file(file_id):
+    """Delete a file"""
+    from models import File
+    
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    file = File.query.filter_by(
+        file_id=file_id,
+        user_account_id=user_id
+    ).first()
+    
+    if not file:
+        return jsonify({'error': 'File not found'}), 404
+    
+    try:
+        db.session.delete(file)
+        db.session.commit()
+        return jsonify({'message': 'File deleted successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================
+# SAMPLE FILES ROUTES (READ-ONLY)
+# ============================================
+
+@app.route('/api/samples/folders', methods=['GET'])
+def get_sample_folders():
+    """Get sample folder tree (read-only)"""
+    from models import Folder
+    
+    try:
+        sample_folders = Folder.query.filter_by(folder_type='sample').all()
+        return jsonify({
+            'folders': [f.to_dict(include_files=True) for f in sample_folders]
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/samples/files/<int:file_id>', methods=['GET'])
+def get_sample_file(file_id):
+    """Get sample file content (read-only)"""
+    from models import File
+    
+    file = File.query.filter_by(
+        file_id=file_id,
+        file_type='sample'
+    ).first()
+    
+    if not file:
+        return jsonify({'error': 'Sample file not found'}), 404
+    
+    return jsonify({'file': file.to_dict(include_content=True)}), 200
 
 
 if __name__ == '__main__':

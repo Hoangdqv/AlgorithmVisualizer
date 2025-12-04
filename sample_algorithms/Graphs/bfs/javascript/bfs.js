@@ -78,7 +78,7 @@ if (require.main === module) {
     ];
     
     const start = 0;
-    const tracer = new Tracer('graphs');
+    const tracer = new Tracer('graphs', 'queue', 'Queue');
     const { visitedOrder } = bfs(adjacencyMatrix, start, tracer);
     
     console.log(`BFS Traversal starting from node ${start}:`);

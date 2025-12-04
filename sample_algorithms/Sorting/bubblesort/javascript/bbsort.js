@@ -5,13 +5,12 @@ function bubbleSort(arr, tracer) {
     const n = arr.length;
     
     for (let i = 0; i < n; i++) {
-        tracer.addState([...arr]);  // Track state
-        let swapped = false;
-        
+        let swapped = false;  
         for (let j = 0; j < n - i - 1; j++) {
+            tracer.addState([...arr], { comparing: [j, j + 1] });  // Track state
             if (arr[j] > arr[j + 1]) {
                 [arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];
-                tracer.addState([...arr]);  // Track state
+                tracer.addState([...arr], { swapped: [j, j + 1] });  // Track state
                 swapped = true;
             }
         }
@@ -20,7 +19,7 @@ function bubbleSort(arr, tracer) {
             break;
         }
     }
-    
+    tracer.addState([...arr]); // Complete state
     return [arr, tracer];
 }
 

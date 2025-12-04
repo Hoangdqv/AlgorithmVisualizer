@@ -1,12 +1,16 @@
 import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef, useCallback } from 'react';
 
-const GraphVisualization = forwardRef(({ currentState }, ref) => {
+const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
   const graphData = currentState?.graph || [];
   const visited = currentState?.visited || [];
   const queue = currentState?.queue || [];
   const stack = currentState?.stack || [];
   const processingNode = currentState?.processing;
   const discoveredNode = currentState?.discovered;
+
+  // Get data structure info from metadata
+  const dataStructureType = tracerData?.metadata?.dataStructure || 'queue';
+  const dataStructureLabel = tracerData?.metadata?.dataStructureLabel || 'Queue';
 
   const [nodePositions, setNodePositions] = useState([]);
   const [dragState, setDragState] = useState({ nodeIndex: null, offset: [0, 0] });
@@ -136,7 +140,7 @@ const GraphVisualization = forwardRef(({ currentState }, ref) => {
       <svg 
         ref={svgRef}
         className="graph-svg" 
-        viewBox="0 0 400 400" 
+        viewBox="-100 0 500 400" 
         preserveAspectRatio="xMidYMid meet"
       >
         {graphData.map((row, i) =>
@@ -196,9 +200,9 @@ const GraphVisualization = forwardRef(({ currentState }, ref) => {
             <div className="graph-info-section">
               <h3 className="graph-info-title">Algorithm State</h3>
               <div className="graph-info-item">
-                <div className="graph-info-label">{queue.length > 0 ? 'Queue' : 'Stack'}:</div>
+                <div className="graph-info-label">{dataStructureLabel}:</div>
                 <div className="graph-info-value">
-                  [{(queue.length > 0 ? queue : stack).length > 0 ? (queue.length > 0 ? queue : stack).join(', ') : 'empty'}]
+                  [{(dataStructureType === 'queue' ? queue : stack).length > 0 ? (dataStructureType === 'queue' ? queue : stack).join(', ') : 'empty'}]
                 </div>
               </div>
               <div className="graph-info-item">
@@ -233,7 +237,7 @@ const GraphVisualization = forwardRef(({ currentState }, ref) => {
             <span className="graph-legend-color graph-node-visited"></span> Visited
           </div>
           <div className="graph-legend-item">
-            <span className="graph-legend-color graph-node-queued"></span> {queue.length > 0 ? 'In Queue' : 'In Stack'}
+            <span className="graph-legend-color graph-node-queued"></span> In {dataStructureLabel}
           </div>
         </div>
       </div>

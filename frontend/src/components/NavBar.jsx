@@ -1,6 +1,6 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 
 export default function NavBar() {
   const { user, logout, loading } = useAuth();
@@ -15,7 +15,7 @@ export default function NavBar() {
         <h1>My Application</h1>
       </header>
       <ul>
-        <Link to='/'><li>Home</li></Link>
+        <Link to='/home'><li>Home</li></Link>
         <Link to='/algorithms'><li>Algorithms</li></Link>
         <Link to='/playground'><li>Code Editor</li></Link>
         <Link to='/about'><li>About</li></Link>

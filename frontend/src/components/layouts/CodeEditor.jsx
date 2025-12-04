@@ -9,14 +9,38 @@ const CodeEditor = () => {
   const [output, setOutput] = useState('Loading console...');
   const [isRunning, setIsRunning] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [currentFile, setCurrentFile] = useState(null); // Track currently opened user file
+  const [autoSaving, setAutoSaving] = useState(false);
+  const [languages, setLanguages] = useState(['Python', 'JavaScript']); // Default fallback
 
   const samplesCache = useRef({});
-
-  const languages = ['Python', 'JavaScript'];
+  const autoSaveTimeout = useRef(null);
 
   useEffect(() => {
+    const fetchLanguages = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/languages', {
+          credentials: 'include'
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const langNames = data.languages.map(lang => {
+            const name = lang.language;
+            return name.charAt(0).toUpperCase() + name.slice(1);
+          });
+          setLanguages(langNames);
+        }
+      } catch (error) {
+        console.error('Error fetching languages:', error);
+      }
+    };
+    fetchLanguages();
+  }, []);
+
+  useEffect(() => {
+    if (currentFile) return;
     loadSampleCode(selectedLanguage);
-  }, [selectedLanguage]);
+  }, [selectedLanguage, currentFile]);
 
   const loadSampleCode = async (language) => {
     setLoading(true);
@@ -78,6 +102,51 @@ const CodeEditor = () => {
 
   const handleEditorChange = (value) => {
     setCode(value || '');
+    // Auto-save for user files
+    if (currentFile) {
+      if (autoSaveTimeout.current) {
+        clearTimeout(autoSaveTimeout.current);
+      }
+      
+      autoSaveTimeout.current = setTimeout(() => {
+        saveUserFile(value || '');
+      }, 2000); // Auto-save after 2 seconds of no typing
+    }
+  };
+
+  const saveUserFile = async (content) => {
+    if (!currentFile) return;
+    
+    setAutoSaving(true);
+    try {
+      const response = await fetch(`http://localhost:5000/api/user/files/${currentFile.file_id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ content })
+      });
+      
+      if (response.ok) {
+        console.log('File auto-saved');
+      }
+    } catch (error) {
+      console.error('Error auto-saving file:', error);
+    } finally {
+      setTimeout(() => setAutoSaving(false), 1500);
+    }
+  };
+
+  const handleUserFileSelect = (file) => {
+    setCurrentFile(file);
+    setCode(file.content || '');
+    setOutput('');
+    
+    const langMap = {
+      1: 'Python',
+      2: 'JavaScript'
+    };
+    const fileLang = langMap[file.lang_id] || 'Python';
+    setSelectedLanguage(fileLang);
   };
 
   const toggleDropdown = () => {
@@ -94,6 +163,7 @@ const CodeEditor = () => {
   };
 
   const handleFileSelect = async (sampleKey) => {
+    setCurrentFile(null); // Clear current user file when selecting a sample
     setLoading(true);
     try {
       const response = await fetch(
@@ -138,6 +208,9 @@ const CodeEditor = () => {
       output={output}
       samplesCache={samplesCache}
       handleFileSelect={handleFileSelect}
+      handleUserFileSelect={handleUserFileSelect}
+      currentFile={currentFile}
+      autoSaving={autoSaving}
     />
   );
 };

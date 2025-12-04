@@ -1,8 +1,10 @@
 class Tracer {
-    constructor(category = null) {
+    constructor(category = null, dataStructure = null, dataStructureLabel = null) {
         this.states = [];
         this.step = 0;
         this.category = category;
+        this.dataStructure = dataStructure;
+        this.dataStructureLabel = dataStructureLabel || (dataStructure ? dataStructure.charAt(0).toUpperCase() + dataStructure.slice(1) : null);
     }
 
     addState(data, metadata = {}) {
@@ -15,7 +17,14 @@ class Tracer {
     }
 
     getStates() {
-        return { states: this.states };
+        const result = { states: this.states };
+        if (this.dataStructure) {
+            result.metadata = {
+                dataStructure: this.dataStructure,
+                dataStructureLabel: this.dataStructureLabel
+            };
+        }
+        return result;
     }
 
     finalize() {

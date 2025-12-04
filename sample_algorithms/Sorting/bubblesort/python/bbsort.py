@@ -4,7 +4,6 @@ import tracers.tracer as trc
 def bubble_sort(arr, tracer):
     n = len(arr)
     for i in range(n):
-        tracer.add_state(arr.copy())  # Track state
         swapped = False
         for j in range(0, n - i - 1):
             # Show comparison (yellow)
@@ -16,6 +15,7 @@ def bubble_sort(arr, tracer):
                 swapped = True
         if not swapped:
             break
+    tracer.add_state(arr.copy()) #Complete state
     return arr, tracer
 
 # [TEST]

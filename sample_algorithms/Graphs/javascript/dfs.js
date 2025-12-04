@@ -82,7 +82,7 @@ if (require.main === module) {
     ];
     
     const start = 0;
-    const tracer = new Tracer('graphs');
+    const tracer = new Tracer('graphs', 'stack', 'Stack');
     const { visitedOrder } = dfs(adjacencyMatrix, start, tracer);
     
     console.log(`DFS Traversal starting from node ${start}:`);
