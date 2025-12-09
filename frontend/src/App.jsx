@@ -1,12 +1,12 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import CodeEditor from './components/layouts/CodeEditor';
 import NavBar from './components/NavBar';
 import Home from './components/layouts/Home';
 import Error from './components/layouts/Error';
-import Terminal from './components/Terminal';
 import SignIn from './components/layouts/SignIn';
 import SignUp from './components/layouts/SignUp';
+import ResetPassword from './components/layouts/ResetPassword';
 import AlgorithmGrid from './components/layouts/CategoryGrid';
 import AlgorithmSelect from './components/layouts/AlgorithmSelect';
 
@@ -17,14 +17,15 @@ export default function App() {
         <NavBar />
         <div className='container'>
           <Routes>
-            <Route path="/home" element={<Home />} />
+            <Route path="/" element={<Navigate replace to="/home" />} />
+            <Route path="/home" element={<Home />} /> 
             <Route path="/algorithms" element={<AlgorithmGrid />} />
-            <Route path="/playground" element={<CodeEditor />} />
             <Route path="/editor" element={<AlgorithmSelect />} />
-            <Route path="/terminal" element={<Terminal />} />
+            <Route path="/playground" element={<CodeEditor />} />
             <Route path="/login" element={<SignIn />} />
             <Route path="/signin" element={<SignIn />} />
             <Route path="/signup" element={<SignUp />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/*" element={<Error />} />
           </Routes>
         </div>

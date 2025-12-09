@@ -160,3 +160,25 @@ class ClosureTable(db.Model):
             'depth': self.depth,
             'user_account_id': self.user_account_id
         }
+
+
+class ResetTokens(db.Model):
+    __tablename__ = 'reset_tokens'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user_account.id', ondelete='CASCADE'), nullable=False)
+    token = db.Column(db.String(255), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now(), nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    
+    user = db.relationship('User', backref='reset_tokens')
+    
+    def to_dict(self):
+        """Return reset token as dictionary"""
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'token': self.token,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'expires_at': self.expires_at.isoformat() if self.expires_at else None
+        }

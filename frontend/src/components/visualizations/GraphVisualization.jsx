@@ -85,7 +85,7 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
     let newX = svgCoords.x - dragState.offset[0];
     let newY = svgCoords.y - dragState.offset[1];
     
-    // Constrain to viewBox boundaries (0-400 with padding for node radius of 25)
+    // ViewBox boundary constraints
     const nodeRadius = 25;
     const minBound = nodeRadius;
     const maxBound = 400 - nodeRadius;
@@ -140,7 +140,7 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
       <svg 
         ref={svgRef}
         className="graph-svg" 
-        viewBox="-100 0 500 400" 
+        viewBox="0 0 400 400" 
         preserveAspectRatio="xMidYMid meet"
       >
         {graphData.map((row, i) =>
@@ -170,7 +170,7 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
             <circle
               cx={pos.x}
               cy={pos.y}
-              r={25}
+              r={20}
               className={getNodeClass(i)}
             />
             <text

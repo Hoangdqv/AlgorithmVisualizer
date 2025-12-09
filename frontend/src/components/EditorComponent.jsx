@@ -122,7 +122,7 @@ const EditorComponent = ({
                   {explanation ? (
                     <>
                       <div className='console-text'>
-                        📚 Algorithm Explanation:
+                        Algorithm Explanation:
                       </div>
                       <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', margin: 0 }}>
                         {explanation}

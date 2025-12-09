@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/useAuth';
-import { validateEmail, validatePasswordMatch } from '../../utils/credentialsValidation';
+import { validateEmail, isUsernameEmpty,validatePassword, validatePasswordMatch } from '../../utils/credentialsValidation';
 import SignUpForm from '../SignUpForm';
 
 export default function SignUp() {
@@ -14,6 +14,8 @@ export default function SignUp() {
     const navigate = useNavigate();
 
     const emailIsValid = validateEmail(email);
+    const usernameIsEmpty = isUsernameEmpty(username);
+    const passwordIsValid = validatePassword(password);
     const passwordMatch = validatePasswordMatch(password, passwordRetype);
 
     const handleUserSignUp = async (e) => {
@@ -28,11 +30,11 @@ export default function SignUp() {
             setError('Your passwords do not match. Please try again.');
             return;
         }
-        if (password.length < 6) {
-            setError('Password must be at least 6 characters.');
+        if (!passwordIsValid) {
+            setError('Password must be at least 8 characters.');
             return;
         }
-        if (!username.trim()) {
+        if (usernameIsEmpty) {
             setError('Username is required.');
             return;
         }
@@ -48,7 +50,7 @@ export default function SignUp() {
     
     
   return (
-    <div className='sign-in-container'>
+    <div className='auth-container'>
         <h2>Sign Up</h2>
         {error && <div className="error">{error}</div>}
         <SignUpForm

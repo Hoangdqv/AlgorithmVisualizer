@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
 
 export default function NavBar() {
-  const { user, logout, loading } = useAuth();
+  const { user, logout } = useAuth();
 
   const handleLogout = async () => {
     await logout();
@@ -21,7 +21,6 @@ export default function NavBar() {
         <Link to='/about'><li>About</li></Link>
       </ul>
       
-      {!loading && (
         <>
           {user ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -29,13 +28,12 @@ export default function NavBar() {
               <button onClick={handleLogout}>Logout</button>
             </div>
           ) : (
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <Link to='/login'><button>Login</button></Link>
-              <Link to='/signup'><button>Sign Up</button></Link>
+            <div style={{ display: 'flex', gap: '2rem' }}>
+              <Link to='/login' className='sign-in-btn'>Login</Link>
+              <Link to='/signup' className='sign-up-btn'>Sign Up</Link>
             </div>
           )}
         </>
-      )}
     </div>
   )
 }

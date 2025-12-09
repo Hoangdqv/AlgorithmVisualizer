@@ -113,17 +113,8 @@ main{
 
 
 button {
-  border-radius: 8px;
-  padding: 0.6em 1.2em;
   font-size: 1em;
-  font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
 }
 .autosave-indicator{
   font-size: 1rem; 
@@ -132,12 +123,16 @@ button:hover {
   align-items: center;
   gap: 0.5rem;
 }
-
-.layout-editor {
-  width: 100%;
+.layout-editor{
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
 }
 .layout-editor .topnav{
+  margin-top: 1.5rem;
   margin-bottom: 0.5rem;
+  margin-left: 0.3rem;
   padding-bottom: 0.5rem;
   display: flex;
   align-items: center;
@@ -190,10 +185,7 @@ button:hover {
 }
 
 .editor-container{
-  flex: 1;
-  width: 100%;
-  height: 80vh;
-  margin: 0 0;
+  flex: 1 0;
 }
 .code-editor {
   height: 100%;
@@ -329,7 +321,7 @@ button:hover {
 
 /* Sidebar.css */
 /* Login */
-.sign-in-container {
+.auth-container {
   max-width: 350px;
   height: auto;
   display: flex;
@@ -344,19 +336,19 @@ button:hover {
   border: 1px solid rgb(139, 139, 139);
 }
 
-.sign-in-container h2 {
+.auth-container h2 {
   color: white;
   text-align: center;
   margin-bottom: 1.5rem;
 }
 
-.sign-in-container label {
+.auth-container label {
   display: block;
   margin-bottom: 0.5rem;
   color: #ccc;
 }
 
-.sign-in-container input {
+.auth-container input {
   width: 100%; 
   box-sizing: border-box;
   padding: 0.5rem;
@@ -368,7 +360,7 @@ button:hover {
   -moz-box-sizing: border-box;
 }
 
-.sign-in-container .input-margin-bottom {
+.auth-container .input-margin-bottom {
   margin-bottom: 1rem;
 }
 
@@ -376,7 +368,7 @@ button:hover {
   margin-bottom: 1.5rem;
 }
 
-.sign-in-container button {
+.auth-container button {
   width: 100%;
   padding: 0.75rem;
   background-color: #646cff;
@@ -388,13 +380,18 @@ button:hover {
   transition: background-color 0.3s;
 }
 
-.sign-in-container button:hover {
+.auth-container button:hover {
   background-color: #535bf2;
 }
-.sign-in-container .redirect-link,
+.auth-container .redirect-link,
 .sign-up-container .redirect-link {
   margin-top: 1rem;
   text-align: center;
+}
+.reset-password-form .loading, .reset-password-form .loading p{
+  display: flex;
+  align-items: center;
+  flex-direction: column;
 }
 
 /* DROPDOWN STYLES */
@@ -442,7 +439,7 @@ button:hover {
   margin: 10px 0 0;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
   max-height: 200px;
-  z-index: 1;
+  z-index: 1000;
 }
 .hidden {
   display: none;
@@ -477,6 +474,17 @@ button:hover {
   font-weight: bold;
   text-align: center;
   margin-top: 2rem;
+}
+
+.error-alert {
+  color: #ff5c5c;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  text-align: left;
+}
+
+.center {
+  text-align: center;
 }
 
 /* FILE EXPLORER STYLES */
@@ -1184,7 +1192,7 @@ footer {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  height: 90vh;
   color: #aaa;
 }
 
@@ -1559,11 +1567,12 @@ footer {
   color: rgba(255, 255, 255, 0.7);
   margin: 0;
 }
-
-.home-cta-button {
-  display: inline-block;
+.home-cta-button{
   margin-top: 1rem;
-  padding: 0.75rem 2rem;
+}
+.home-cta-button, .sign-in-btn, .sign-up-btn {
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   text-decoration: none;
@@ -1572,7 +1581,7 @@ footer {
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.home-cta-button:hover {
+.home-cta-button:hover, .sign-in-btn:hover, .sign-up-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
   color: white;

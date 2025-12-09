@@ -1,5 +1,5 @@
 // Sidebar.jsx
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../context/useAuth';
 import SearchBar from './SearchBar';
 import FileTree from './FileTree';
@@ -38,26 +38,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
     loadLanguages();
   }, []);
 
-  // Load samples when on samples tab
-  useEffect(() => {
-    if (activeTab === 'samples') {
-      if (samplesCache.current[selectedLanguage]) {
-        setSamples(samplesCache.current[selectedLanguage]);
-        setOpenDropdowns({ 'samples': true });
-        return;
-      }
-      loadSamples();
-    }
-  }, [selectedLanguage, activeTab]);
-
-  // Load user files when on myfiles tab
-  useEffect(() => {
-    if (activeTab === 'myfiles' && user) {
-      loadUserFiles();
-    }
-  }, [activeTab, user]);
-
-  const loadSamples = async () => {
+  const loadSamples = useCallback(async () => {
     setLoading(true);
     try {
       const isCategoryRequest = selectedLanguage.includes('_');
@@ -66,7 +47,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
       if (isCategoryRequest) {
         const [category, language] = selectedLanguage.split('_');
         response = await fetch(
-          `http://localhost:5000/api/category/${category}/algorithms/${language}`
+          `http://localhost:5000/api/algorithms/${category}/${language}`
         );
       } else {
         response = await fetch(
@@ -91,9 +72,9 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedLanguage, samplesCache]);
 
-  const loadUserFiles = async () => {
+  const loadUserFiles = useCallback(async () => {
     setLoading(true);
     try {
       // Load all folders
@@ -147,8 +128,27 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
+    // Load samples when on samples tab
+  useEffect(() => {
+    if (activeTab === 'samples') {
+      if (samplesCache.current[selectedLanguage]) {
+        setSamples(samplesCache.current[selectedLanguage]);
+        setOpenDropdowns({ 'samples': true });
+        return;
+      }
+      loadSamples();
+    }
+  }, [selectedLanguage, activeTab, loadSamples, samplesCache]);
+
+  // Load user files when on myfiles tab
+  useEffect(() => {
+    if (activeTab === 'myfiles' && user) {
+      loadUserFiles();
+    }
+  }, [activeTab, user, loadUserFiles]);
+  
   const buildFolderHierarchy = (treeNodes) => {
     if (!treeNodes || treeNodes.length === 0) return null;
     

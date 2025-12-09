@@ -1,4 +1,4 @@
-#Fibonacci program in JavaScript using recursion
+#Fibonacci program in Python using recursion
 def Fibonacci(n):
     if (n <= 1 ):
         return n

@@ -1,4 +1,8 @@
 {
+  "scripts": {
+    "frontend": "cd frontend && npm run dev",
+    "backend": "cd backend && flask run --debug"
+  },
   "dependencies": {
     "d3-drag": "^3.0.0",
     "lodash.debounce": "^4.0.8"

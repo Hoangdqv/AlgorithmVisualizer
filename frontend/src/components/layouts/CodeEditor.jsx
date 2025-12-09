@@ -45,10 +45,26 @@ const CodeEditor = () => {
   const loadSampleCode = async (language) => {
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/sample-code/${language.toLowerCase()}`);
+      // Get list of samples first
+      const listResponse = await fetch(`http://localhost:5000/api/samples/${language.toLowerCase()}`);
+      
+      if (!listResponse.ok) {
+        throw new Error(`Failed to fetch samples: ${listResponse.status}`);
+      }
+      
+      const listData = await listResponse.json();
+      const firstSampleKey = listData.samples?.[0]?.key;
+      
+      if (!firstSampleKey) {
+        setCode('// No samples available');
+        return;
+      }
+      
+      // Get the first sample code
+      const response = await fetch(`http://localhost:5000/api/samples/${language.toLowerCase()}/${firstSampleKey}`);
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`Failed to fetch sample code: ${response.status}`);
       }
       
       const data = await response.json();
@@ -167,7 +183,7 @@ const CodeEditor = () => {
     setLoading(true);
     try {
       const response = await fetch(
-        `http://localhost:5000/api/sample-code/${selectedLanguage.toLowerCase()}/${sampleKey}`
+        `http://localhost:5000/api/samples/${selectedLanguage.toLowerCase()}/${sampleKey}`
       );
       
       if (!response.ok) {

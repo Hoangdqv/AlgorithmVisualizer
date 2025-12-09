@@ -1,19 +1,19 @@
 import { Link } from 'react-router-dom';
 
-const SignInForm = ({email, password, onChangeEmail, onChangePassword, onForgotPassword, onSubmit}) => {
+const SignInForm = ({email, password, onChangeEmail, onChangePassword, onForgotPassword, onSubmit, onError, loading}) => {
   return (
     <form onSubmit={onSubmit}>
           <div>
             <label htmlFor="email">Email:</label>
             <input 
                 className='input-margin-bottom' 
-                type="email" 
                 id="email" 
                 value={email}
                 name="email" 
                 onChange={(e) => onChangeEmail(e.target.value)}
                 required />
           </div>
+          {onError && <div className="error-alert">{onError}</div>}
           <div>
             <label htmlFor="password">Password:</label>
             <input 
@@ -23,15 +23,17 @@ const SignInForm = ({email, password, onChangeEmail, onChangePassword, onForgotP
                 value={password}
                 name="password" 
                 onChange={(e) => onChangePassword(e.target.value)}
+                autoComplete='off'
                 required />
           </div>
           <div className='sign-in-redirect'>
-            <a href="#" onClick={onForgotPassword}>Forgot password?</a>
+            <a href="#"  onClick={onForgotPassword}>Forgot password?</a>
           </div>
-          <button type="submit">Sign In</button>
+          <button type="submit" className="submit-button" disabled={loading}>
+            {loading ? 'Signing In...' : 'Sign In'}
+          </button>
           <div className='redirect-link'>Don't have an account? <Link to="/signup">Sign Up</Link></div>
-
-        </form>
+    </form>
   )
 };
 export default SignInForm;

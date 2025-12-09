@@ -1,23 +1,38 @@
 # app.py
 from flask import Flask, request, jsonify, session
 from flask_cors import CORS
-from datetime import datetime
+from flask_mail import Mail, Message
+from datetime import datetime, timedelta
 import requests
 from config import LANGUAGE_MAP, ALGORITHM_MAP, SAMPLE_CODE_DIR, SAMPLE_ALGORITHMS_DIR
 from containerHandler import ContainerHandler
 from database import db, init_db
 import os
+import secrets
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
+
 
 app = Flask(__name__)
 
 # Configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///algorithm_visualizer.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = 'your-secret-key-change-this-in-production'  # Change this!
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+
+# Email Configuration
+app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
+app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'true').lower() == 'true'
+app.config['MAIL_USE_SSL'] = os.environ.get('MAIL_USE_SSL', 'false').lower() == 'true'
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')  # Your email
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')  # Your app password
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', os.environ.get('MAIL_USERNAME'))
+
+# Initialize Flask-Mail
+mail = Mail(app)
 
 # Enable foreign key constraints for SQLite
 @event.listens_for(Engine, "connect")
@@ -60,9 +75,31 @@ def strip_docker_json_output(code):
     
     return '\n'.join(filtered_lines)
 
-# Get list of samples for a language
+# ============================================
+# SIMPLE CODE SAMPLES ROUTES
+# ============================================
+
+@app.route('/api/samples', methods=['GET'])
+def get_all_samples():
+    """Get all languages with their samples"""
+    result = {}
+    for lang_key, lang_config in LANGUAGE_MAP.items():
+        result[lang_key] = {
+            'display_name': lang_config['display_name'],
+            'samples': [
+                {
+                    'key': key,
+                    'name': sample['name'],
+                    'description': sample['description']
+                }
+                for key, sample in lang_config['samples'].items()
+            ]
+        }
+    return jsonify({'languages': result})
+
 @app.route('/api/samples/<language>', methods=['GET'])
 def get_samples(language):
+    """Get list of samples for a specific language"""
     lang_config = LANGUAGE_MAP.get(language.lower())
     
     if not lang_config:
@@ -79,55 +116,9 @@ def get_samples(language):
     
     return jsonify({'samples': samples})
 
-#Get default sample algorithms
-@app.route('/api/sample-algorithms/<language>', methods=['GET'])
-def get_sample_algorithms(language):
-    lang_config = ALGORITHM_MAP.get(language.lower())
-    
-    if not lang_config:
-        return jsonify({'error': 'Language not supported'}), 404
-    
-    algorithms = [
-        {
-            'key': key,
-            'name': sample['name'],
-            'description': sample['description']
-        }
-        for key, sample in lang_config['samples'].items()
-    ]
-    
-    return jsonify({'algorithms': algorithms})
-
-
-# Get default sample code 
-@app.route('/api/sample-code/<language>', methods=['GET'])
-def get_default_sample(language):
-    lang_config = LANGUAGE_MAP.get(language.lower())
-    
-    if not lang_config:
-        return jsonify({'error': 'Language not supported'}), 404
-    
-    # Get first sample as default
-    first_sample_key = list(lang_config['samples'].keys())[0]
-    sample = lang_config['samples'][first_sample_key]
-    filepath = os.path.join(SAMPLE_CODE_DIR, sample['file'])
-    
-    try:
-        with open(filepath, 'r') as f:
-            code = f.read()
-        
-        return jsonify({
-            'code': code,
-            'language': language,
-            'name': sample['name'],
-            'description': sample['description']
-        })
-    except FileNotFoundError:
-        return jsonify({'error': 'Sample code file not found'}), 404
-
-# Get specific sample code
-@app.route('/api/sample-code/<language>/<sample_key>', methods=['GET'])
+@app.route('/api/samples/<language>/<sample_key>', methods=['GET'])
 def get_sample_code(language, sample_key):
+    """Get specific sample code"""
     lang_config = LANGUAGE_MAP.get(language.lower())
     
     if not lang_config:
@@ -154,38 +145,39 @@ def get_sample_code(language, sample_key):
     except FileNotFoundError:
         return jsonify({'error': 'Sample code file not found'}), 404
 
-#Get specific sample algorithm code
-@app.route('/api/sample-algorithm/<language>/<algorithm_key>', methods=['GET'])
-def get_sample_algorithm_code(language, algorithm_key):
-    lang_config = ALGORITHM_MAP.get(language.lower())
-    
-    if not lang_config:
-        return jsonify({'error': 'Language not supported'}), 404
-    
-    algorithm = lang_config['algorithms'].get(algorithm_key)
-    if not algorithm:
-        return jsonify({'error': 'Algorithm not found'}), 404
-    
-    filepath = os.path.join(SAMPLE_ALGORITHMS_DIR, algorithm['file'])
-    
-    try:
-        with open(filepath, 'r') as f:
-            code = f.read()
-        
-        clean_code = strip_docker_json_output(code)
-        
-        return jsonify({
-            'code': clean_code,
-            'language': language,
-            'name': algorithm['name'],
-            'description': algorithm['description']
-        })
-    except FileNotFoundError:
-        return jsonify({'error': 'Algorithm code file not found'}), 404
+# ============================================
+# EDUCATIONAL ALGORITHMS ROUTES
+# ============================================
 
-# Get algorithms by category and language
-@app.route('/api/category/<category>/algorithms/<language>', methods=['GET'])
+@app.route('/api/algorithms', methods=['GET'])
+def get_all_algorithm_categories():
+    """Get all algorithm categories"""
+    categories = [
+        {
+            'key': key,
+            'name': config['display_name'],
+            'languages': list(config['algorithms'].keys())
+        }
+        for key, config in ALGORITHM_MAP.items()
+    ]
+    return jsonify({'categories': categories})
+
+# Get algorithms by category and languagemethods=['GET'])
+def get_category_info(category):
+    """Get category info with all algorithms across all languages"""
+    category_config = ALGORITHM_MAP.get(category.lower())
+    
+    if not category_config:
+        return jsonify({'error': 'Category not found'}), 404
+    
+    return jsonify({
+        'category': category_config['display_name'],
+        'algorithms': category_config['algorithms']
+    })
+
+@app.route('/api/algorithms/<category>/<language>', methods=['GET'])
 def get_category_algorithms(category, language):
+    """Get algorithms for a specific category and language"""
     category_config = ALGORITHM_MAP.get(category.lower())
     
     if not category_config:
@@ -199,9 +191,9 @@ def get_category_algorithms(category, language):
         'algorithms': algorithms
     })
 
-# Get specific algorithm code by category
-@app.route('/api/category/<category>/algorithm/<language>/<algorithm_key>', methods=['GET'])
-def get_category_algorithm_code(category, language, algorithm_key):
+@app.route('/api/algorithms/<category>/<language>/<algorithm_key>', methods=['GET'])
+def get_algorithm_code(category, language, algorithm_key):
+    """Get specific algorithm code with explanation"""
     category_config = ALGORITHM_MAP.get(category.lower())
     
     if not category_config:
@@ -356,13 +348,6 @@ def register():
     email = data.get('email')
     password = data.get('password')
     
-    # Validation
-    if not username or not email or not password:
-        return jsonify({'error': 'Username, email, and password are required'}), 400
-    
-    if len(password) < 6:
-        return jsonify({'error': 'Password must be at least 6 characters'}), 400
-    
     # Check if user already exists
     if User.query.filter_by(username=username).first():
         return jsonify({'error': 'Username already exists'}), 400
@@ -433,6 +418,25 @@ def logout():
     return jsonify({'message': 'Logout successful'}), 200
 
 
+@app.route('/api/auth/check', methods=['GET'])
+def check_session():
+    """Check if user has active session (returns 200 regardless)"""
+    from models import User
+    
+    user_id = session.get('user_id')
+    
+    if not user_id:
+        return jsonify({'authenticated': False}), 200
+    
+    user = User.query.get(user_id)
+    
+    if not user:
+        session.clear()
+        return jsonify({'authenticated': False}), 200
+    
+    return jsonify({'authenticated': True, 'user': user.to_dict()}), 200
+
+
 @app.route('/api/auth/me', methods=['GET'])
 def get_current_user():
     """Get current logged-in user"""
@@ -451,10 +455,59 @@ def get_current_user():
     
     return jsonify({'user': user.to_dict()}), 200
 
+
+# ============================================
+# PASSWORD RESET ROUTES
+# ============================================
+def send_reset_email(email, token):
+    """Send password reset email"""
+    try:
+        reset_link = f"http://localhost:5173/reset-password?token={token}"
+        
+        msg = Message(
+            subject="Password Reset Request",
+            recipients=[email],
+            html=f"""
+            <html>
+                <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                        <h2 style="color: #667eea;">Password Reset Request</h2>
+                        <p>You requested to reset your password for your Algorithm Visualizer account.</p>
+                        <p>Click the button below to reset your password:</p>
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="{reset_link}" 
+                               style="background-color: #667eea; 
+                                      color: white; 
+                                      padding: 12px 30px; 
+                                      text-decoration: none; 
+                                      border-radius: 5px;
+                                      display: inline-block;">
+                                Reset Password
+                            </a>
+                        </div>
+                        <p>Or copy and paste this link in your browser:</p>
+                        <p style="word-break: break-all; color: #667eea;">{reset_link}</p>
+                        <p style="color: #666; font-size: 14px;">
+                            This link will expire in 1 hour.
+                        </p>
+                        <p style="color: #666; font-size: 14px;">
+                            If you didn't request this, please ignore this email.
+                        </p>
+                    </div>
+                </body>
+            </html>
+            """
+        )
+        
+        mail.send(msg)
+        return True
+    except Exception as e:
+        print(f"Error sending email: {str(e)}")
+        return False
 @app.route('/api/auth/forgot-password', methods=['POST'])
 def forgot_password():
-    """Request password reset (placeholder for now)"""
-    from models import User
+    """Request password reset - generates token"""
+    from models import User, ResetTokens
     
     data = request.get_json()
     email = data.get('email')
@@ -464,15 +517,107 @@ def forgot_password():
     
     user = User.query.filter_by(email=email).first()
     
-    # Always return success to prevent email enumeration
-    if user:
-        # TODO: Generate reset token and send email
-        # For now, just log it
-        print(f"Password reset requested for {email}")
+    if not user:
+        return jsonify({
+            'message': f'If an account with {email} exists, a password reset link has been sent.'
+        }), 200
+    
+    # Generate secure random token
+    token = secrets.token_urlsafe(32)
+    
+    # Delete any existing tokens for this user
+    ResetTokens.query.filter_by(user_id=user.id).delete()
+    
+    # Create new reset token
+    reset_token = ResetTokens(
+        user_id=user.id,
+        token=token,
+        expires_at=datetime.now() + timedelta(minutes=30)
+    )
+    
+    db.session.add(reset_token)
+    db.session.commit()
+    
+    # Send email
+    email_sent = send_reset_email(user.email, token)
+    
+    if not email_sent:
+        return jsonify({'error': 'An error has occured'}), 500
     
     return jsonify({
-        'message': 'If an account exists with that email, a password reset link will be sent.'
+        'message': f'A password reset link has been sent to {email}.'
+
     }), 200
+
+
+@app.route('/api/auth/verify-reset-token', methods=['POST'])
+def verify_reset_token():
+    """Verify if a reset token is valid"""
+    from models import ResetTokens
+    
+    data = request.get_json()
+    token = data.get('token')
+    
+    if not token:
+        return jsonify({'error': 'Token is required'}), 400
+    
+    reset_token = ResetTokens.query.filter_by(token=token).first()
+    
+    if not reset_token:
+        return jsonify({'error': 'Invalid or expired token'}), 400
+    
+    # Check if token is expired
+    if datetime.now() > reset_token.expires_at:
+        db.session.delete(reset_token)
+        db.session.commit()
+        return jsonify({'error': 'Token has expired'}), 400
+    
+    return jsonify({
+        'valid': True,
+        'message': 'Token is valid'
+    }), 200
+
+
+@app.route('/api/auth/reset-password', methods=['POST'])
+def reset_password():
+    """Reset password using valid token"""
+    from models import User, ResetTokens
+    
+    data = request.get_json()
+    token = data.get('token')
+    new_password = data.get('password')
+    
+    if not token or not new_password:
+        return jsonify({'error': 'Token and new password are required'}), 400
+    
+    # Find valid token
+    reset_token = ResetTokens.query.filter_by(token=token).first()
+    
+    if not reset_token:
+        return jsonify({'error': 'Invalid or expired token'}), 400
+    
+    if datetime.now() > reset_token.expires_at:
+        db.session.delete(reset_token)
+        db.session.commit()
+        return jsonify({'error': 'Token has expired'}), 400
+    
+    # Get user and update password
+    user = User.query.get(reset_token.user_id)
+    
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    
+    # Update password
+    user.set_password(new_password)
+    
+    # Delete the used token
+    db.session.delete(reset_token)
+    db.session.commit()
+    
+    return jsonify({
+        'message': 'Password has been reset successfully'
+    }), 200
+
 
 # ============================================
 # FILE SYSTEM ROUTES

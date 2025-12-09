@@ -24,7 +24,7 @@ const AlgorithmSelect = () => {
     setLoading(true);
     try {
       const response = await fetch(
-        `http://localhost:5000/api/category/${category}/algorithm/${selectedLanguage}/${algorithmKey}`
+        `http://localhost:5000/api/algorithms/${category}/${selectedLanguage}/${algorithmKey}`
       );
 
       if (!response.ok) {
@@ -69,7 +69,7 @@ const AlgorithmSelect = () => {
     setLoading(true);
     try {
       const response = await fetch(
-        `http://localhost:5000/api/category/${category}/algorithms/${selectedLanguage}`
+        `http://localhost:5000/api/algorithms/${category}/${selectedLanguage}`
       );
 
       if (!response.ok) {
