@@ -1,10 +1,10 @@
 // Sidebar.jsx
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useAuth } from '../context/useAuth';
-import SearchBar from './SearchBar';
-import FileTree from './FileTree';
-import FileContextMenu from './FileContextMenu';
-import NewItemModal from './NewItemModal';
+import { useAuth } from '../../context/useAuth';
+import SearchBar from '../SearchBar';
+import FileTree from '../FileTree';
+import FileContextMenu from '../FileContextMenu';
+import NewItemModal from '../NewItemModal';
 
 const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelect }) => {
   const { user } = useAuth();
@@ -14,17 +14,24 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
   const [userFolders, setUserFolders] = useState([]);
   const [userFiles, setUserFiles] = useState([]);
   const [selectedFileId, setSelectedFileId] = useState(null);
+  const [selectedSampleKey, setSelectedSampleKey] = useState(null);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [contextMenu, setContextMenu] = useState(null);
   const [modal, setModal] = useState(null);
   const [languages, setLanguages] = useState([]);
+  
+  // Cache for user files and folders
+  const [userFilesCache, setUserFilesCache] = useState({
+    folders: null,
+    files: null,
+  });
 
   // Load available languages
   useEffect(() => {
     const loadLanguages = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/languages', {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/languages`, {
           credentials: 'include'
         });
         if (response.ok) {
@@ -47,11 +54,11 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
       if (isCategoryRequest) {
         const [category, language] = selectedLanguage.split('_');
         response = await fetch(
-          `http://localhost:5000/api/algorithms/${category}/${language}`
+          `${import.meta.env.VITE_API_URL}/algorithms/${category}/${language}`
         );
       } else {
         response = await fetch(
-          `http://localhost:5000/api/samples/${selectedLanguage.toLowerCase()}`
+          `${import.meta.env.VITE_API_URL}/samples/${selectedLanguage.toLowerCase()}`
         );
       }
       
@@ -74,11 +81,18 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
     }
   }, [selectedLanguage, samplesCache]);
 
-  const loadUserFiles = useCallback(async () => {
+  const loadUserFiles = useCallback(async (forceReload = false) => {
+    // Check cache first (unless force reload)
+    if (!forceReload && userFilesCache.folders && userFilesCache.files) {
+      setUserFolders(userFilesCache.folders);
+      setUserFiles(userFilesCache.files);
+      return;
+    }
+    
     setLoading(true);
     try {
       // Load all folders
-      const foldersResponse = await fetch('http://localhost:5000/api/user/folders', {
+      const foldersResponse = await fetch(`${import.meta.env.VITE_API_URL}/user/folders`, {
         credentials: 'include'
       });
       
@@ -92,7 +106,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
           rootFolders.map(async (folder) => {
             try {
               const treeResponse = await fetch(
-                `http://localhost:5000/api/user/folders/${folder.folder_id}/tree`,
+                `${import.meta.env.VITE_API_URL}/user/folders/${folder.folder_id}/tree`,
                 { credentials: 'include' }
               );
               
@@ -107,28 +121,35 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
             }
           })
         );
-        
-        // Filter out null values and flatten into array
+
         allFolders = trees.filter(t => t !== null);
       }
       
       setUserFolders(allFolders);
 
       // Load all files
-      const filesResponse = await fetch('http://localhost:5000/api/user/files', {
+      const filesResponse = await fetch(`${import.meta.env.VITE_API_URL}/user/files`, {
         credentials: 'include'
       });
       
+      let allFiles = [];
       if (filesResponse.ok) {
         const filesData = await filesResponse.json();
-        setUserFiles(filesData.files || []);
+        allFiles = filesData.files || [];
+        setUserFiles(allFiles);
       }
+      
+      // Update cache
+      setUserFilesCache({
+        folders: allFolders,
+        files: allFiles,
+      });
     } catch (error) {
       console.error('Error loading user files:', error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userFilesCache]);
 
     // Load samples when on samples tab
   useEffect(() => {
@@ -256,6 +277,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
   };
 
   const handleFileClick = (sampleKey) => {
+    setSelectedSampleKey(sampleKey);
     if (onFileSelect) {
       onFileSelect(sampleKey);
     }
@@ -264,7 +286,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
   const handleUserFileClick = async (fileId) => {
     setSelectedFileId(fileId);
     try {
-      const response = await fetch(`http://localhost:5000/api/user/files/${fileId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/user/files/${fileId}`, {
         credentials: 'include'
       });
       
@@ -315,7 +337,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/user/folders', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/user/folders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -326,7 +348,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
       });
       
       if (response.ok) {
-        loadUserFiles();
+        loadUserFiles(true); // Force reload after creating
         setModal(null);
       } else {
         const data = await response.json();
@@ -350,7 +372,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/user/files', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/user/files`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -363,7 +385,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
       });
       
       if (response.ok) {
-        loadUserFiles();
+        loadUserFiles(true); // Force reload after creating
         setModal(null);
       }
     } catch (error) {
@@ -376,8 +398,8 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
     
     try {
       const endpoint = contextMenu.type === 'folder'
-        ? `http://localhost:5000/api/user/folders/${contextMenu.item.folder_id}`
-        : `http://localhost:5000/api/user/files/${contextMenu.item.file_id}`;
+        ? `${import.meta.env.VITE_API_URL}/user/folders/${contextMenu.item.folder_id}`
+        : `${import.meta.env.VITE_API_URL}/user/files/${contextMenu.item.file_id}`;
       
       const response = await fetch(endpoint, {
         method: 'DELETE',
@@ -385,7 +407,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
       });
       
       if (response.ok) {
-        loadUserFiles();
+        loadUserFiles(true); // Force reload after deleting
         setContextMenu(null);
       }
     } catch (error) {
@@ -403,8 +425,8 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
     
     try {
       const endpoint = itemType === 'folder'
-        ? `http://localhost:5000/api/user/folders/${item.folder_id}`
-        : `http://localhost:5000/api/user/files/${item.file_id}`;
+        ? `${import.meta.env.VITE_API_URL}/user/folders/${item.folder_id}`
+        : `${import.meta.env.VITE_API_URL}/user/files/${item.file_id}`;
       
       const body = itemType === 'folder'
         ? { folder_name: newName }
@@ -424,7 +446,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
       if (response.ok) {
         const data = await response.json();
         console.log('Rename success:', data);
-        loadUserFiles();
+        loadUserFiles(true); // Force reload after renaming
         setModal(null);
       } else {
         const errorData = await response.json();
@@ -510,7 +532,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
                         <button
                           key={sample.key}
                           onClick={() => handleFileClick(sample.key)}
-                          className='file-button'
+                          className={`file-button ${selectedSampleKey === sample.key ? 'selected' : ''}`}
                           title={sample.description}
                         >
                           <div>📄 {sample.name}</div>

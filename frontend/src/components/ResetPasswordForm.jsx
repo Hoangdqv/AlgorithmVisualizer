@@ -13,7 +13,7 @@ if (verifying) {
     return (
       <div className="auth-container">
         <div className="reset-password-form">
-          <p className="error-alert">{error}</p>
+          <p className="error-alert center">{error}</p>
           <h2> Please make a new request</h2>
           <button onClick={() => navigate('/login')} className="submit-button">
             Back to Login

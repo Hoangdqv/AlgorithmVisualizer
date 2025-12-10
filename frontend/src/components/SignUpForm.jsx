@@ -34,6 +34,7 @@ const SignUpForm = ({username, email, password, passwordRetype, onChangeUsername
                 value={password}
                 name="password" 
                 onChange={(e) => onChangePassword(e.target.value)}
+                autoComplete="off"
                 required />
           </div>
           <div>
@@ -45,6 +46,7 @@ const SignUpForm = ({username, email, password, passwordRetype, onChangeUsername
                 value={passwordRetype}
                 name="password-retype" 
                 onChange={(e) => onRetypePassword(e.target.value)}
+                autoComplete="off"
                 required />
           </div>
           <button type="submit">Sign Up</button>

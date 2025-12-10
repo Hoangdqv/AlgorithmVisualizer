@@ -1,6 +1,6 @@
-import React from 'react'
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../../context/useAuth';
 import SignInForm from '../SignInForm';
 import { isEmailEmpty, validateEmail } from '../../utils/credentialsValidation';
@@ -25,7 +25,7 @@ export default function SignIn() {
         }
         
         try {
-            const response = await fetch('http://localhost:5000/api/auth/forgot-password', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/forgot-password`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -62,20 +62,91 @@ export default function SignIn() {
             setError(result.error || 'Login failed. Please try again.');
         }
     };
+
+    const handleGoogleSuccess = async (credentialResponse) => {
+        setLoading(true);
+        setError('');
+        
+        try {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/google`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                    credential: credentialResponse.credential
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                // Manually update auth context
+                window.location.href = '/algorithms';  // Force reload to update auth state
+            } else {
+                setError(data.error || 'Google login failed');
+                setLoading(false);
+            }
+        } catch (error) {
+            console.error('Google login error:', error);
+            setError('An error occurred during Google login');
+            setLoading(false);
+        }
+    };
+
+    const handleGoogleError = () => {
+        setError('Google login failed. Please try again.');
+    };
+    
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
     
   return (
-    <div className='auth-container'>
-        <h2>Sign In</h2>
-        <SignInForm
-            email={email}
-            password={password}
-            onChangeEmail={setEmail}
-            onChangePassword={setPassword}
-            onForgotPassword={handleForgotPassword}
-            onSubmit={handleUserSignIn}
-            onError={error}
-            loading={loading}
-        />
-    </div>
+    <GoogleOAuthProvider clientId={googleClientId || ''}>
+      <div className='auth-container'>
+          <h2>Sign In</h2>
+          
+          {/* Google Sign In */}
+          {googleClientId && (
+            <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'center', colorScheme: 'light'}}>
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={handleGoogleError}
+                size="large"
+                text="continue_with"
+                shape="rectangular"
+                width="300"
+                locale='en'
+              />
+            </div>
+          )}
+          
+          {/* Divider */}
+          {googleClientId && (
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              margin: '0.5rem 0',
+              color: '#666'
+            }}>
+              <div style={{ flex: 1, height: '1px', background: '#ddd' }}></div>
+              <span style={{ padding: '0 1rem', fontSize: '0.9rem' }}>or</span>
+              <div style={{ flex: 1, height: '1px', background: '#ddd' }}></div>
+            </div>
+          )}
+          
+          {/* Traditional Login */}
+          <SignInForm
+              email={email}
+              password={password}
+              onChangeEmail={setEmail}
+              onChangePassword={setPassword}
+              onForgotPassword={handleForgotPassword}
+              onSubmit={handleUserSignIn}
+              onError={error}
+              loading={loading}
+          />
+      </div>
+    </GoogleOAuthProvider>
   )
 }

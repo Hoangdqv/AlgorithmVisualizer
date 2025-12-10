@@ -19,7 +19,7 @@ const CodeEditor = () => {
   useEffect(() => {
     const fetchLanguages = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/languages', {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/languages`, {
           credentials: 'include'
         });
         if (response.ok) {
@@ -46,7 +46,7 @@ const CodeEditor = () => {
     setLoading(true);
     try {
       // Get list of samples first
-      const listResponse = await fetch(`http://localhost:5000/api/samples/${language.toLowerCase()}`);
+      const listResponse = await fetch(`${import.meta.env.VITE_API_URL}/samples/${language.toLowerCase()}`);
       
       if (!listResponse.ok) {
         throw new Error(`Failed to fetch samples: ${listResponse.status}`);
@@ -61,7 +61,7 @@ const CodeEditor = () => {
       }
       
       // Get the first sample code
-      const response = await fetch(`http://localhost:5000/api/samples/${language.toLowerCase()}/${firstSampleKey}`);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/samples/${language.toLowerCase()}/${firstSampleKey}`);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch sample code: ${response.status}`);
@@ -89,7 +89,7 @@ const CodeEditor = () => {
     setOutput('Running...');
     
     try {
-      const response = await fetch('http://localhost:5000/api/execute', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/execute`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -135,7 +135,7 @@ const CodeEditor = () => {
     
     setAutoSaving(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/user/files/${currentFile.file_id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/user/files/${currentFile.file_id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -183,7 +183,7 @@ const CodeEditor = () => {
     setLoading(true);
     try {
       const response = await fetch(
-        `http://localhost:5000/api/samples/${selectedLanguage.toLowerCase()}/${sampleKey}`
+        `${import.meta.env.VITE_API_URL}/samples/${selectedLanguage.toLowerCase()}/${sampleKey}`
       );
       
       if (!response.ok) {

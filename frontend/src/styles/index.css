@@ -91,14 +91,6 @@ main{
   padding: 0;
 }
 
-.login-btn{
-  padding: 10px 20px;
-  color: white;
-  border-radius: 10px;
-  cursor: pointer;
-}
-
-
 .navbar ul li{
   display: inline-block;
   font-size: 1.2rem;
@@ -253,8 +245,19 @@ button {
   border: none;
   text-align: left;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, color 0.2s;
   font-size: 14px;
+  border-radius: 3px;
+}
+
+.sidebar .file-explorer .file-button:hover {
+  background-color: #2a2d2e;
+  color: #ffffff;
+}
+
+.sidebar .file-explorer .file-button.selected {
+  background-color: #37373d;
+  color: #ffffff;
 }
 
 .file-explorer span {
@@ -388,7 +391,10 @@ button {
   margin-top: 1rem;
   text-align: center;
 }
-.reset-password-form .loading, .reset-password-form .loading p{
+
+.reset-password-form p,
+.reset-password-form .loading, 
+.reset-password-form .loading p{
   display: flex;
   align-items: center;
   flex-direction: column;
@@ -397,6 +403,7 @@ button {
 /* DROPDOWN STYLES */
 .selected-value {
   color: #000000;
+  font-weight: 500;
 }
 .select-menu {
   position: relative;
@@ -500,6 +507,7 @@ button {
   border-bottom: 1px solid #333;
   background-color: #1e1e1e;
   margin-bottom: 1rem;
+  border-radius: 0.25rem;
 }
 
 .tab-button {
@@ -513,7 +521,7 @@ button {
   cursor: pointer;
   font-size: 14px;
   transition: all 0.2s;
-  border-radius: none;
+  border-radius: 0.25rem;
 }
 
 .tab-button:hover {
@@ -523,6 +531,7 @@ button {
 
 .tab-button.active {
   color: black;
+  border-radius: 0.25rem;
   background-color: #f8d775;
 }
 
@@ -538,7 +547,7 @@ button {
   color: #ccc;
   cursor: pointer;
   padding: 0.25rem 0.5rem;
-  font-size: 14px;
+  font-size: 0.9rem;
   border-radius: 4px;
   transition: none;
 }
@@ -915,7 +924,8 @@ footer {
 
 .category-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: 1fr 1fr 1fr;
+  /* grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); */
   gap: 1.5rem;
 }
 
@@ -974,13 +984,13 @@ footer {
 /* VISUAL MODULE STYLES */
 .visual-module-container {
   display: flex;
-  flex-direction: column;
   height: 100%;
+  flex-direction: column;
   background-color: #1e1e1e;
   color: white;
   padding: 1.5rem;
-  gap: 1rem;
-  justify-content: space-evenly;
+  justify-content: space-between;
+  box-sizing: border-box;
   container-type: inline-size;
 }
 
@@ -988,6 +998,7 @@ footer {
 .visual-module-header {
   display: flex;
   flex-direction: column;
+  margin-top: 1.5rem;
   gap: 1.5rem;
 }
 
@@ -1057,7 +1068,6 @@ footer {
   border-radius: 0.25rem;
   display: flex;
   flex-direction: column;
-  margin-bottom: 1vh;
 }
 
 .visual-module-array-label {
@@ -1200,6 +1210,7 @@ footer {
 .visual-module-blocks {
   display: inline-flex;
   gap: 0.5rem;
+  padding: 1rem;
   flex-wrap: wrap;
   justify-content: center;
   box-sizing: border-box;
@@ -1570,7 +1581,7 @@ footer {
 .home-cta-button{
   margin-top: 1rem;
 }
-.home-cta-button, .sign-in-btn, .sign-up-btn {
+.home-cta-button, .sign-in-btn, .sign-up-btn, .logout-btn {
   display: inline-block;
   padding: 0.75rem 1.5rem;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -1581,7 +1592,7 @@ footer {
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.home-cta-button:hover, .sign-in-btn:hover, .sign-up-btn:hover {
+.home-cta-button:hover, .sign-in-btn:hover, .sign-up-btn:hover, .logout-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
   color: white;

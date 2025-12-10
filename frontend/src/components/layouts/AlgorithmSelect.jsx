@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import EditorComponent from '../EditorComponent';
-
 const AlgorithmSelect = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -24,7 +23,7 @@ const AlgorithmSelect = () => {
     setLoading(true);
     try {
       const response = await fetch(
-        `http://localhost:5000/api/algorithms/${category}/${selectedLanguage}/${algorithmKey}`
+        `${import.meta.env.VITE_API_URL}/algorithms/${category}/${selectedLanguage}/${algorithmKey}`
       );
 
       if (!response.ok) {
@@ -69,7 +68,7 @@ const AlgorithmSelect = () => {
     setLoading(true);
     try {
       const response = await fetch(
-        `http://localhost:5000/api/algorithms/${category}/${selectedLanguage}`
+        `${import.meta.env.VITE_API_URL}/algorithms/${category}/${selectedLanguage}`
       );
 
       if (!response.ok) {
@@ -121,7 +120,7 @@ const AlgorithmSelect = () => {
     setTracerData(null);
     
     try {
-      const response = await fetch(`http://localhost:5000/api/execute/algorithm`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/execute/algorithm`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

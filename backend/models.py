@@ -8,7 +8,9 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(255), nullable=False)
+    password_hash = db.Column(db.String(255), nullable=True)  # Nullable for OAuth users
+    oauth_provider = db.Column(db.String(50), nullable=True)  # 'google', 'github', etc.
+    oauth_id = db.Column(db.String(255), nullable=True)  # Provider's user ID
     created_at = db.Column(db.DateTime, default=datetime.now(), nullable=False)
     last_login = db.Column(db.DateTime, nullable=True)
     
@@ -22,6 +24,8 @@ class User(db.Model):
     
     def check_password(self, password):
         """Verify password against hash"""
+        if not self.password_hash:
+            return False  # OAuth users don't have password
         return bcrypt.checkpw(password.encode('utf-8'), self.password_hash.encode('utf-8'))
     
     def to_dict(self):

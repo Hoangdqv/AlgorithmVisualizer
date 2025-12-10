@@ -50,7 +50,6 @@ const FileTree = ({
     return lang ? lang.language.toLowerCase() : null;
   }
 
-
   const indent = depth * 16;
 
   return (

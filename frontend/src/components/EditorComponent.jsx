@@ -1,13 +1,13 @@
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import Editor from '@monaco-editor/react';
-import Sidebar from './Sidebar';
+import Sidebar from './layouts/Sidebar';
 import VisualModule from './VisualModule';
 import 'monaco-editor/esm/vs/editor/contrib/hover/browser/hoverContribution.js';
 import 'monaco-editor/esm/vs/editor/editor.api';
-import CompileBtn from './CompileBtn';
+import CompileBtn from './buttons/CompileBtn';
 import ToggleDropdownBtn from './ToggleDropdownBtn';
-import ToggleSideBarBtn from './ToggleSideBarBtn';
-import BackBtn from './BackBtn';
+import ToggleSideBarBtn from './buttons/ToggleSideBarBtn';
+import BackBtn from './buttons/BackBtn';
 
 const EditorComponent = ({
   toggleSidebar, 

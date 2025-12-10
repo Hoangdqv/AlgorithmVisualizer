@@ -23,9 +23,11 @@ export default function NavBar() {
       
         <>
           {user ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <span style={{ color: 'white' }}>Welcome, {user.username}!</span>
-              <button onClick={handleLogout}>Logout</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem'}}>
+              <div>
+                <span style={{ borderRadius: '5px', boxSizing: 'border-box'}}>Welcome, {user.username}!</span>
+              </div>
+                <a className="logout-btn" href='javascript:void(0)' onClick={handleLogout}>Logout</a>
             </div>
           ) : (
             <div style={{ display: 'flex', gap: '2rem' }}>

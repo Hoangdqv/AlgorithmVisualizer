@@ -418,6 +418,91 @@ def logout():
     return jsonify({'message': 'Logout successful'}), 200
 
 
+@app.route('/api/auth/google', methods=['POST'])
+def google_login():
+    """Login or register user via Google OAuth"""
+    from models import User
+    from google.oauth2 import id_token
+    from google.auth.transport import requests as google_requests
+    
+    data = request.get_json()
+    token = data.get('credential')
+    
+    if not token:
+        return jsonify({'error': 'No credential provided'}), 400
+    
+    try:
+        # Verify the Google token
+        client_id = os.environ.get('GOOGLE_CLIENT_ID')
+        if not client_id:
+            return jsonify({'error': 'Google OAuth not configured'}), 500
+        
+        idinfo = id_token.verify_oauth2_token(
+            token, 
+            google_requests.Request(), 
+            client_id
+        )
+        print(f"Google ID info: {idinfo}")
+        # Extract user info from Google token
+        google_id = idinfo['sub']
+        email = idinfo.get('email')
+        name = idinfo.get('name')
+        
+        if not email:
+            return jsonify({'error': 'No email provided by Google'}), 400
+        
+        # Check if user exists with this Google ID
+        user = User.query.filter_by(oauth_provider='google', oauth_id=google_id).first()
+        
+        if not user:
+            # Check if user exists with this email (link accounts)
+            user = User.query.filter_by(email=email).first()
+            
+            if user:
+                # Link existing account to Google
+                user.oauth_provider = 'google'
+                user.oauth_id = google_id
+            else:
+                # Create new user
+                base_username = email.split('@')[0]
+                username = base_username
+                
+                # Add random string if username already exists (better than counter for privacy)
+                while User.query.filter_by(username=username).first():
+                    random_suffix = secrets.token_hex(3)  # 6 random hex chars
+                    username = f"{base_username}_{random_suffix}"
+                
+                user = User(
+                    username=username,
+                    email=email,
+                    oauth_provider='google',
+                    oauth_id=google_id,
+                    password_hash=None  # OAuth users don't have password
+                )
+                db.session.add(user)
+        
+        # Update last login
+        user.last_login = datetime.now()
+        db.session.commit()
+        
+        # Set session
+        session['user_id'] = user.id
+        session['username'] = user.username
+        
+        return jsonify({
+            'message': 'Login successful',
+            'user': user.to_dict()
+        }), 200
+        
+    except ValueError as e:
+        # Invalid token
+        return jsonify({'error': 'Invalid Google token'}), 401
+    except Exception as e:
+        db.session.rollback()
+        print(f"Google OAuth error: {str(e)}")
+        return jsonify({'error': 'Authentication failed'}), 500
+
+
 @app.route('/api/auth/check', methods=['GET'])
 def check_session():
     """Check if user has active session (returns 200 regardless)"""

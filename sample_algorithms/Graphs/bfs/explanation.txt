@@ -23,14 +23,14 @@ Key Concepts
 ----------------
 • Queue: Ensures we process nodes in the order we discover them
 • Visited Array: Keeps track of which nodes we've already seen (prevents infinite loops)
-• Adjacency Matrix: Represents the graph - matrix[i][j] = 1 means there's an edge from node i to node j
+• Adjacency Matrix: A 2D array representing the graph where matrix[i][j] = 1 means there's an edge from node i to node j, and 0 means no edge exists. This representation provides O(1) time to check if an edge exists between any two nodes, making it ideal for dense graphs where most nodes connect to each other. The trade-off is O(n²) space usage.
 
 Visualization States
 -----------------------
-• Gray node: Currently being processed
-• Yellow border: Node is in the queue (discovered but not yet processed)
+• Orange node: Currently being processed
+• Yellow border: Node is in the stack (discovered but not yet processed)
 • Green node: Already visited and fully processed
-• Orange node: Neighbor being discovered
+• Lime green node: Neighbor being discovered
 
 Time Complexity
 -------------------
