@@ -1,5 +1,3 @@
-import React from 'react';
-
 const SearchBar = ({ value, onChange, placeholder = "Search samples..." }) => {
   return (
     <div className="search-bar-container">

@@ -13,6 +13,10 @@ const FileTree = ({
 }) => {
 
   const [expandedFolders, setExpandedFolders] = useState({});
+  const suffix = {
+    'python': 'py',
+    'javascript': 'js'
+  }
 
   const toggleFolder = (folderId, e) => {
     e.stopPropagation();
@@ -47,7 +51,7 @@ const FileTree = ({
   const handleLanguages = (file) => {
     if (!languages) return null;
     const lang = languages.find(lang => lang.lang_id === file.lang_id);
-    return lang ? lang.language.toLowerCase() : null;
+    return lang ? suffix[lang.language.toLowerCase()] : null;
   }
 
   const indent = depth * 16;
@@ -76,7 +80,7 @@ const FileTree = ({
           {expandedFolders[folder.folder_id] && folder.children && (
             <FileTree
               folders={folder.children}
-              files={folder.files || []}
+              files={[]}
               onFileClick={onFileClick}
               onFolderClick={onFolderClick}
               onContextMenu={onContextMenu}

@@ -63,7 +63,7 @@ const NewItemModal = ({
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={(type === 'file' || type === 'create-file') ? 'example.py' : 'My Folder'}
+              placeholder={(type === 'file' || type === 'create-file') ? `example.${language === 'javascript' ? 'js' : 'py'}` : 'My Folder'}
               className="modal-input"
             />
           </div>
