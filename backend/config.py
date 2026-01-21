@@ -40,8 +40,8 @@ LANGUAGE_MAP = {
     }
 }
 
-SAMPLE_CODE_DIR = 'C:\\Users\\dqvth\\Desktop\\vsc\\testingproject\\sample_code'
-SAMPLE_ALGORITHMS_DIR = 'C:\\Users\\dqvth\\Desktop\\vsc\\testingproject\\sample_algorithms'
+SAMPLE_CODE_DIR = 'C:\\Users\\dqvth\\Desktop\\vsc\\ThesisProject\\sample_code'
+SAMPLE_ALGORITHMS_DIR = 'C:\\Users\\dqvth\\Desktop\\vsc\\ThesisProject\\sample_algorithms'
 
 # Category-based algorithm organization
 ALGORITHM_MAP = {
