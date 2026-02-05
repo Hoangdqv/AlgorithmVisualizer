@@ -1,4 +1,4 @@
-import tracers.tracer as trc
+import tracers.tracer as service
 from collections import deque
 
 # [ALGORITHM]
@@ -80,7 +80,7 @@ if __name__ == "__main__":
     ]
     
     start = 0
-    result, tracer = bfs(adjacency_matrix, start, trc.Tracer(category='graphs', data_structure='queue', data_structure_label='Queue'))
+    result, tracer = bfs(adjacency_matrix, start, service.Tracer('graphs', 'queue', 'Queue'))
     
     print(f'BFS Traversal starting from node {start}:')
     print(f'Visit order: {result}')

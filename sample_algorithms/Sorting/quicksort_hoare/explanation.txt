@@ -1,0 +1,70 @@
+QUICK SORT (Hoare Partition) - Algorithm Explanation
+====================================================
+
+What is Hoare Partition Quick Sort?
+-----------------------------------
+This is a variant of Quick Sort using the Hoare partition scheme, developed by C.A.R. Hoare. Instead of using a single pointer, it uses two pointers moving towards each other from both ends, typically resulting in fewer swaps and better performance than the Lomuto partition scheme.
+
+How It Works
+-----------
+1. Choose a pivot element (typically the first element)
+2. Initialize two pointers: left at the start, right at the end
+3. Move left pointer right until finding an element >= pivot
+4. Move right pointer left until finding an element <= pivot
+5. Swap elements at left and right pointers
+6. Repeat until pointers meet
+7. Recursively sort the left and right partitions
+
+Detailed Steps:
+• Initialize: left = start, right = end, pivot = arr[left]
+• Scan left: Move left right while arr[left] < pivot
+• Scan right: Move right left while arr[right] > pivot
+• Swap: If left < right, swap arr[left] and arr[right]
+• Continue: Repeat until left and right pointers cross
+• Recurse: Sort left and right partitions
+
+Key Differences from Lomuto
+---------------------------
+• Two-pointer approach: Pointers move from both ends towards center
+• Fewer swaps: Typically 3x fewer swaps than Lomuto partition
+• Faster in practice: Better performance for large datasets
+• More efficient: Especially good with duplicate elements
+• Slightly harder to visualize: Complex pointer movements
+
+Time Complexity
+---------------
+• Best Case: O(n log n) - Balanced partitions (pivot divides array evenly)
+• Average Case: O(n log n) - Random distributions
+• Worst Case: O(n²) - Poor pivot choices (pivot is always smallest/largest)
+• Space: O(log n) - Recursive call stack depth
+
+Advantages Over Lomuto
+-----------------------
+• Fewer comparisons: About half the comparisons of Lomuto
+• Fewer swaps: About 1/3 the swaps of Lomuto
+• Better cache locality: Reduces memory access patterns
+• Superior performance: Especially on real-world data
+
+When to Use Hoare Partition
+----------------------------
+Good for:
+• Production code and real-world applications
+• Large datasets where performance matters
+• Data with many duplicate elements
+• Performance-critical sorting operations
+
+Interesting Facts
+-----------------
+• Developed by C.A.R. Hoare (creator of Quick Sort)
+• More complex than Lomuto but significantly faster
+• Used in many production sorting implementations
+• Better "average case" performance in practice
+• Excellent for teaching algorithm optimization
+
+Visualization Notes
+-------------------
+Watch how the two pointers move toward each other and cross, creating the partition boundary. This is fundamentally different from the single-pointer approach and explains why it's more efficient.
+
+Learning Value
+--------------
+Hoare partitioning demonstrates how algorithm engineering can improve basic algorithms. Understanding the difference between Lomuto and Hoare partitions teaches about optimization, cache efficiency, and practical algorithm design.

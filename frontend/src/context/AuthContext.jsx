@@ -5,6 +5,7 @@ import { AuthContext } from './useAuth';
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [permission, setPermission] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -15,7 +16,7 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuth = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/auth/check', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/check`, {
         credentials: 'include',
       });
 
@@ -23,15 +24,19 @@ export const AuthProvider = ({ children }) => {
         const data = await response.json();
         if (data.authenticated) {
           setUser(data.user);
+          setPermission(data.user.role);
         } else {
           setUser(null);
+          setPermission(null);
         }
       } else {
         setUser(null);
+        setPermission(null);
       }
     } catch (error) {
       console.error('Auth check failed:', error);
       setUser(null);
+      setPermission(null);
     } finally {
       setLoading(false);
     }
@@ -39,7 +44,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (username, password) => {
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -52,6 +57,7 @@ export const AuthProvider = ({ children }) => {
 
       if (response.ok) {
         setUser(data.user);
+        setPermission(data.user.role);
         return { success: true };
       } else {
         return { success: false, error: data.error };
@@ -63,7 +69,7 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (username, email, password) => {
     try {
-      const response = await fetch('http://localhost:5000/api/auth/register', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -76,6 +82,7 @@ export const AuthProvider = ({ children }) => {
 
       if (response.ok) {
         setUser(data.user);
+        setPermission(data.user.role);
         return { success: true };
       } else {
         return { success: false, error: data.error };
@@ -87,7 +94,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await fetch('http://localhost:5000/api/auth/logout', {
+      await fetch(`${import.meta.env.VITE_API_URL}/auth/logout`, {
         method: 'POST',
         credentials: 'include',
       });
@@ -96,11 +103,13 @@ export const AuthProvider = ({ children }) => {
       console.error('Logout failed:', error);
     } finally {
       setUser(null);
+      setPermission(null);
     }
   };
 
   const value = {
     user,
+    permission,
     loading,
     login,
     register,

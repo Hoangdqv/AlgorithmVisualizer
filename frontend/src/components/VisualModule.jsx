@@ -1,19 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react';
 import SortingVisualization from './visualizations/SortingVisualization';
 import GraphVisualization from './visualizations/GraphVisualization';
+import TreeVisualization from './visualizations/TreeVisualization';
 
 const VisualModule = ({ tracerData, isRunning, selectedLanguage }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [speedMultiplier, setSpeedMultiplier] = useState(1); // 0.5x to 5x
+  const [speedMultiplier, setSpeedMultiplier] = useState(1); // 0.5x to 2x
   const graphVisualizationRef = useRef(null);
 
   const [displayData, setDisplayData] = useState(tracerData);
   const displayStates = displayData?.states || [];
   const displayTotalSteps = displayStates.length;
   
-  // Convert speed multiplier
-  const playSpeed = 1000 / speedMultiplier;
+  // Calculate play speed based on total steps
+  // Scale duration based on step count to account for rendering overhead
+  // Small operations: 10s | Medium: 15s | Large (1000+): 20s | Very Large (5000+): 25s
+  let baseDuration = 10000; // Default 10s
+  if (displayTotalSteps > 5000) baseDuration = 25000;      // Very large: 25s
+  else if (displayTotalSteps > 1000) baseDuration = 20000; // Large: 20s
+  else if (displayTotalSteps > 500) baseDuration = 15000;  // Medium: 15s
+  
+  const playSpeed = displayTotalSteps > 100 
+    ? (baseDuration / displayTotalSteps) / speedMultiplier // Scale duration by steps, adjusted by multiplier
+    : 1000 / speedMultiplier; // Traditional: 1s per step, adjusted by multiplier
 
   useEffect(() => {
     // Reset visualization when language changes
@@ -25,6 +35,11 @@ const VisualModule = ({ tracerData, isRunning, selectedLanguage }) => {
   useEffect(() => {
       if (tracerData && tracerData.states && tracerData.states.length > 0) {
         setDisplayData(tracerData);
+        setCurrentStep(0);
+        setIsPlaying(false);
+      } else if (!tracerData || (tracerData && (!tracerData.states || tracerData.states.length === 0))) {
+        // Clear display data when tracerData is empty/null
+        setDisplayData(null);
         setCurrentStep(0);
         setIsPlaying(false);
       }
@@ -107,6 +122,8 @@ const VisualModule = ({ tracerData, isRunning, selectedLanguage }) => {
       return <GraphVisualization ref={graphVisualizationRef} currentState={currentState} tracerData={displayData} />;
     } else if (category === 'sorting') {
       return <SortingVisualization currentState={currentState} />;
+    } else if (category === 'trees') {
+      return <TreeVisualization ref={graphVisualizationRef} currentState={currentState} tracerData={displayData} />;
     }
     // Default
     return <SortingVisualization currentState={currentState} />;

@@ -2,8 +2,10 @@
 from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 from flask_mail import Mail, Message
+from flask_migrate import Migrate
 from datetime import datetime, timedelta
 import requests
+from functools import wraps
 from config import LANGUAGE_MAP, ALGORITHM_MAP, SAMPLE_CODE_DIR, SAMPLE_ALGORITHMS_DIR
 from containerHandler import ContainerHandler
 from database import db, init_db
@@ -44,11 +46,45 @@ def set_sqlite_pragma(dbapi_conn, connection_record):
 # Initialize database
 init_db(app)
 
+# Initialize Flask-Migrate
+migrate = Migrate(app, db)
+
 # CORS configuration to allow credentials
 CORS(app, supports_credentials=True, origins=['http://localhost:5173'])
 
 PISTON_API_URL = "https://emkc.org/api/v2/piston"
 container_handler = ContainerHandler()
+
+# ============================================
+# RBAC DECORATORS
+# ============================================
+
+def login_required(f):
+    """Require user to be logged in"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'error': 'Authentication required'}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
+def admin_required(f):
+    """Require user to be admin"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        from models import User
+        
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        user = User.query.get(user_id)
+        if not user or user.role != 'admin':
+            return jsonify({'error': 'Admin access required'}), 403
+        
+        return f(*args, **kwargs)
+    return decorated_function
 
 def strip_docker_json_output(code):
     """Remove JSON output markers and content for display purposes."""
@@ -547,7 +583,7 @@ def get_current_user():
 def send_reset_email(email, token):
     """Send password reset email"""
     try:
-        reset_link = f"http://localhost:5173/reset-password?token={token}"
+        reset_link = f"http://localhost:5173/confirm-reset?token={token}"
         
         msg = Message(
             subject="Password Reset Request",
@@ -570,8 +606,6 @@ def send_reset_email(email, token):
                                 Reset Password
                             </a>
                         </div>
-                        <p>Or copy and paste this link in your browser:</p>
-                        <p style="word-break: break-all; color: #667eea;">{reset_link}</p>
                         <p style="color: #666; font-size: 14px;">
                             This link will expire in 1 hour.
                         </p>
@@ -635,10 +669,11 @@ def forgot_password():
     }), 200
 
 
-@app.route('/api/auth/verify-reset-token', methods=['POST'])
-def verify_reset_token():
-    """Verify if a reset token is valid"""
+@app.route('/api/auth/confirm-reset', methods=['POST'])
+def confirm_reset():
+    """Confirm reset token, create session, and return redirect info"""
     from models import ResetTokens
+    import uuid
     
     data = request.get_json()
     token = data.get('token')
@@ -657,51 +692,149 @@ def verify_reset_token():
         db.session.commit()
         return jsonify({'error': 'Token has expired'}), 400
     
-    return jsonify({
+    # Token is valid - create a reset session
+    reset_session_id = str(uuid.uuid4())
+    
+    reset_session = {
+        'user_id': reset_token.user_id,
+        'created_at': datetime.now(),
+        'expires_at': datetime.now() + timedelta(minutes=15)
+    }
+    
+    # Store in Flask session
+    session[f'reset_{reset_session_id}'] = reset_session
+    
+    # Delete the token immediately after verification (single use)
+    db.session.delete(reset_token)
+    db.session.commit()
+    
+    # Return confirmation
+    response = jsonify({
         'valid': True,
-        'message': 'Token is valid'
-    }), 200
+        'message': 'Token verified. Redirecting to reset password page...'
+    })
+    
+    # Set secure session cookie
+    response.set_cookie(
+        'reset_session',
+        reset_session_id,
+        max_age=900,  # 15 minutes
+        secure=True,  # Only send over HTTPS
+        httponly=True,  # Not accessible via JavaScript
+        samesite='Lax'
+    )
+    
+    return response, 200
 
 
-@app.route('/api/auth/reset-password', methods=['POST'])
-def reset_password():
-    """Reset password using valid token"""
-    from models import User, ResetTokens
+@app.route('/api/auth/verify-reset-token', methods=['POST'])
+def verify_reset_token():
+    """Verify reset token and create a reset session"""
+    from models import ResetTokens
+    import uuid
     
     data = request.get_json()
     token = data.get('token')
-    new_password = data.get('password')
     
-    if not token or not new_password:
-        return jsonify({'error': 'Token and new password are required'}), 400
+    if not token:
+        return jsonify({'error': 'Token is required'}), 400
     
-    # Find valid token
     reset_token = ResetTokens.query.filter_by(token=token).first()
     
     if not reset_token:
         return jsonify({'error': 'Invalid or expired token'}), 400
     
+    # Check if token is expired
     if datetime.now() > reset_token.expires_at:
         db.session.delete(reset_token)
         db.session.commit()
         return jsonify({'error': 'Token has expired'}), 400
     
-    # Get user and update password
-    user = User.query.get(reset_token.user_id)
+    # Token is valid - create a reset session
+    # Generate session ID for this reset attempt
+    reset_session_id = str(uuid.uuid4())
+    
+    # Store session data (valid for 15 minutes)
+    reset_session = {
+        'user_id': reset_token.user_id,
+        'created_at': datetime.now(),
+        'expires_at': datetime.now() + timedelta(minutes=15)
+    }
+    
+    # Store in Flask session
+    session[f'reset_{reset_session_id}'] = reset_session
+    
+    # Delete the token immediately after verification (single use)
+    db.session.delete(reset_token)
+    db.session.commit()
+    
+    # Return session ID (not the token)
+    response = jsonify({
+        'valid': True,
+        'message': 'Token verified. You can now reset your password.',
+        'session_id': reset_session_id
+    })
+    
+    # Set secure session cookie
+    response.set_cookie(
+        'reset_session',
+        reset_session_id,
+        max_age=900,  # 15 minutes
+        secure=True,  # Only send over HTTPS
+        httponly=True,  # Not accessible via JavaScript
+        samesite='Lax'
+    )
+    
+    return response, 200
+
+
+@app.route('/api/auth/reset-password', methods=['POST'])
+def reset_password():
+    """Reset password using valid reset session (from HttpOnly cookie)"""
+    from models import User
+    
+    data = request.get_json()
+    new_password = data.get('password')
+    
+    # Get session ID from HttpOnly cookie
+    session_id = request.cookies.get('reset_session')
+    
+    if not session_id or not new_password:
+        return jsonify({'error': 'Session and password are required'}), 400
+    
+    # Validate reset session
+    reset_session_key = f'reset_{session_id}'
+    reset_session = session.get(reset_session_key)
+    
+    if not reset_session:
+        return jsonify({'error': 'Invalid or expired reset session'}), 400
+    
+    # Check if session is expired
+    if datetime.now() > reset_session.get('expires_at'):
+        session.pop(reset_session_key, None)
+        return jsonify({'error': 'Reset session has expired'}), 400
+    
+    # Get user from session
+    user_id = reset_session.get('user_id')
+    user = User.query.get(user_id)
     
     if not user:
         return jsonify({'error': 'User not found'}), 404
     
     # Update password
     user.set_password(new_password)
-    
-    # Delete the used token
-    db.session.delete(reset_token)
     db.session.commit()
     
-    return jsonify({
+    # Delete the used session
+    session.pop(reset_session_key, None)
+    
+    # Clear reset session cookie
+    response = jsonify({
         'message': 'Password has been reset successfully'
-    }), 200
+    })
+    response.set_cookie('reset_session', '', max_age=0)  # Delete cookie
+    
+    return response, 200
 
 
 # ============================================

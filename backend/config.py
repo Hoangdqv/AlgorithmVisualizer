@@ -55,6 +55,34 @@ ALGORITHM_MAP = {
                     'name': 'Bubble Sort',
                     'description': 'Sort an array using bubble sort algorithm',
                     'explanation_file': 'Sorting/bubblesort/explanation.txt'
+                },
+                {
+                    'key': 'selectionsort',
+                    'file': 'Sorting/selectionsort/python/selectionsort.py',
+                    'name': 'Selection Sort',
+                    'description': 'Sort an array using selection sort algorithm',
+                    'explanation_file': 'Sorting/selectionsort/explanation.txt'
+                },
+                {
+                    'key': 'insertionsort',
+                    'file': 'Sorting/insertionsort/python/insertionsort.py',
+                    'name': 'Insertion Sort',
+                    'description': 'Sort an array using insertion sort algorithm',
+                    'explanation_file': 'Sorting/insertionsort/explanation.txt'
+                },
+                {
+                    'key': 'quicksort',
+                    'file': 'Sorting/quicksort/python/quicksort.py',
+                    'name': 'Quick Sort',
+                    'description': 'Sort an array using quick sort algorithm (divide-and-conquer)',
+                    'explanation_file': 'Sorting/quicksort/explanation.txt'
+                },
+                {
+                    'key': 'quicksort_hoare',
+                    'file': 'Sorting/quicksort_hoare/python/quicksort_hoare.py',
+                    'name': 'Quick Sort (Hoare Partition)',
+                    'description': 'Quick sort using Hoare partition scheme - typically faster with fewer swaps',
+                    'explanation_file': 'Sorting/quicksort_hoare/explanation.txt'
                 }
             ],
             'javascript': [
@@ -64,6 +92,34 @@ ALGORITHM_MAP = {
                     'name': 'Bubble Sort',
                     'description': 'Sort an array using bubble sort algorithm',
                     'explanation_file': 'Sorting/bubblesort/explanation.txt'
+                },
+                {
+                    'key': 'selectionsort',
+                    'file': 'Sorting/selectionsort/javascript/selectionsort.js',
+                    'name': 'Selection Sort',
+                    'description': 'Sort an array using selection sort algorithm',
+                    'explanation_file': 'Sorting/selectionsort/explanation.txt'
+                },
+                {
+                    'key': 'insertionsort',
+                    'file': 'Sorting/insertionsort/javascript/insertionsort.js',
+                    'name': 'Insertion Sort',
+                    'description': 'Sort an array using insertion sort algorithm',
+                    'explanation_file': 'Sorting/insertionsort/explanation.txt'
+                },
+                {
+                    'key': 'quicksort',
+                    'file': 'Sorting/quicksort/javascript/quicksort.js',
+                    'name': 'Quick Sort',
+                    'description': 'Sort an array using quick sort algorithm (divide-and-conquer)',
+                    'explanation_file': 'Sorting/quicksort/explanation.txt'
+                },
+                {
+                    'key': 'quicksort_hoare',
+                    'file': 'Sorting/quicksort_hoare/javascript/quicksort_hoare.js',
+                    'name': 'Quick Sort (Hoare Partition)',
+                    'description': 'Quick sort using Hoare partition scheme - typically faster with fewer swaps',
+                    'explanation_file': 'Sorting/quicksort_hoare/explanation.txt'
                 }
             ]
         }
@@ -108,8 +164,24 @@ ALGORITHM_MAP = {
     'trees': {
         'display_name': 'Trees',
         'algorithms': {
-            'python': [],
-            'javascript': []
+            'python': [
+                {
+                    'key': 'bst_inorder',
+                    'file': 'Trees/bst_traversal/python/bst_inorder.py',
+                    'name': 'BST In-Order Traversal',
+                    'description': 'In-order traversal of a Binary Search Tree',
+                    'explanation_file': 'Trees/bst_traversal/explanation.txt'
+                }
+            ],
+            'javascript': [
+                {
+                    'key': 'bst_inorder',
+                    'file': 'Trees/bst_traversal/javascript/bst_inorder.js',
+                    'name': 'BST In-Order Traversal',
+                    'description': 'In-order traversal of a Binary Search Tree',
+                    'explanation_file': 'Trees/bst_traversal/explanation.txt'
+                }
+            ]
         }
     }
 }

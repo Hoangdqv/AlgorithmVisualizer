@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useImperativeHandle, forwardRef, useCallback, useMemo } from 'react';
 
 const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
-  const graphData = currentState?.graph || [];
+  const graphData = useMemo(() => currentState?.graph || [], [currentState?.graph]);
   const visited = currentState?.visited || [];
   const queue = currentState?.queue || [];
   const stack = currentState?.stack || [];
@@ -14,17 +14,29 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
 
   const [nodePositions, setNodePositions] = useState([]);
   const [dragState, setDragState] = useState({ nodeIndex: null, offset: [0, 0] });
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
   const svgRef = useRef(null);
   const isDraggingRef = useRef(false);
+  const isPanningRef = useRef(false);
+
+  const radius = 150;
+  const centerX = 200; // Center of 400x400 viewBox
+  const centerY = 200;
+
+  const viewBox = useMemo(() => ({
+    minX: 0,
+    minY: 0,
+    width: 400,
+    height: 400
+  }), []);
 
   // Function to calculate initial positions
   const calculateInitialPositions = (nodeCount) => {
     if (nodeCount === 0) return [];
 
-    const radius = 150;
-    const centerX = 200;
-    const centerY = 200;
-    
     const positions = [];
     for (let i = 0; i < nodeCount; i++) {
       const angle = (i * 2 * Math.PI) / nodeCount - Math.PI / 2;
@@ -40,6 +52,8 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
     resetPositions: () => {
       const nodeCount = graphData.length;
       setNodePositions(calculateInitialPositions(nodeCount));
+      setPanOffset({ x: 0, y: 0 });
+      setZoom(1);
     }
   }));
 
@@ -67,12 +81,13 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
 
   const onMouseDown = (e, nodeIndex) => {
     e.preventDefault();
+    e.stopPropagation();
     isDraggingRef.current = true;
     
     const svgCoords = getSVGCoordinates(e);
     const offset = [
-      svgCoords.x - nodePositions[nodeIndex].x,
-      svgCoords.y - nodePositions[nodeIndex].y
+      (svgCoords.x - panOffset.x) / zoom - nodePositions[nodeIndex].x,
+      (svgCoords.y - panOffset.y) / zoom - nodePositions[nodeIndex].y
     ];
     
     setDragState({ nodeIndex, offset });
@@ -82,23 +97,25 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
     if (!isDraggingRef.current || dragState.nodeIndex === null) return;
     
     const svgCoords = getSVGCoordinates(e);
-    let newX = svgCoords.x - dragState.offset[0];
-    let newY = svgCoords.y - dragState.offset[1];
+    let newX = (svgCoords.x - panOffset.x) / zoom - dragState.offset[0];
+    let newY = (svgCoords.y - panOffset.y) / zoom - dragState.offset[1];
     
-    // ViewBox boundary constraints
-    const nodeRadius = 25;
-    const minBound = nodeRadius;
-    const maxBound = 400 - nodeRadius;
+    // Constrain nodes within viewBox bounds (accounting for zoom and pan)
+    const nodeRadius = 20 * zoom;
+    const minBoundX = (viewBox.minX + nodeRadius - panOffset.x) / zoom;
+    const maxBoundX = (viewBox.width - nodeRadius - panOffset.x) / zoom;
+    const minBoundY = (viewBox.minY + nodeRadius - panOffset.y) / zoom;
+    const maxBoundY = (viewBox.height - nodeRadius - panOffset.y) / zoom;
     
-    newX = Math.max(minBound, Math.min(maxBound, newX));
-    newY = Math.max(minBound, Math.min(maxBound, newY));
+    newX = Math.max(minBoundX, Math.min(maxBoundX, newX));
+    newY = Math.max(minBoundY, Math.min(maxBoundY, newY));
     
     setNodePositions(prev => {
       const newPositions = [...prev];
       newPositions[dragState.nodeIndex] = { x: newX, y: newY };
       return newPositions;
     });
-  }, [dragState.nodeIndex, dragState.offset]);
+  }, [viewBox, dragState.nodeIndex, dragState.offset, panOffset.x, panOffset.y, zoom]);
 
   const onMouseUp = useCallback(() => {
     isDraggingRef.current = false;
@@ -115,6 +132,115 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
       };
     }
   }, [dragState.nodeIndex, onMouseMove, onMouseUp]);
+
+  // Pan handlers
+  const onPanStart = (e) => {
+    if (e.target.classList.contains('graph-svg') || 
+        e.target.classList.contains('graph-edge')) {
+      isPanningRef.current = true;
+      setIsPanning(true);
+      const svgCoords = getSVGCoordinates(e);
+      setPanStart({ 
+        x: svgCoords.x - panOffset.x, 
+        y: svgCoords.y - panOffset.y 
+      });
+    }
+  };
+
+  const onPanMove = useCallback((e) => {
+    if (!isPanningRef.current) return;
+    
+    const svgCoords = getSVGCoordinates(e);
+    setPanOffset({
+      x: svgCoords.x - panStart.x,
+      y: svgCoords.y - panStart.y
+    });
+  }, [panStart.x, panStart.y]);
+
+  const onPanEnd = useCallback(() => {
+    isPanningRef.current = false;
+    setIsPanning(false);
+  }, []);
+
+  useEffect(() => {
+    if (isPanning) {
+      window.addEventListener('mousemove', onPanMove);
+      window.addEventListener('mouseup', onPanEnd);
+      return () => {
+        window.removeEventListener('mousemove', onPanMove);
+        window.removeEventListener('mouseup', onPanEnd);
+      };
+    }
+  }, [isPanning, onPanMove, onPanEnd]);
+
+  // Zoom handler with cursor-centered zoom
+  const handleWheel = useCallback((e) => {
+    e.preventDefault();
+    
+    // Get mouse position in SVG coordinates
+    const svgCoords = getSVGCoordinates(e);
+    const mouseX = svgCoords.x;
+    const mouseY = svgCoords.y;
+    
+    // Calculate new zoom level
+    const delta = e.deltaY * -0.003;
+    const newZoom = Math.min(Math.max(0.5, zoom + delta), 1.5); // 0.5x - 1.5x
+    
+    if (newZoom === zoom) return;
+    
+    const zoomRatio = newZoom / zoom;
+    const newPanX = mouseX - (mouseX - panOffset.x) * zoomRatio;
+    const newPanY = mouseY - (mouseY - panOffset.y) * zoomRatio;
+    
+    setZoom(newZoom);
+    setPanOffset({ x: newPanX, y: newPanY });
+  }, [zoom, panOffset.x, panOffset.y]);
+
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (svg) {
+      svg.addEventListener('wheel', handleWheel, { passive: false });
+      return () => svg.removeEventListener('wheel', handleWheel);
+    }
+  }, [handleWheel]);
+
+  const fitToScreen = () => {
+    if (nodePositions.length === 0) return;
+    
+    // Bounding box of all nodes
+    const padding = 50;
+    const nodeRadius = 20;
+    
+    const xs = nodePositions.map(pos => pos.x);
+    const ys = nodePositions.map(pos => pos.y);
+    
+    const minX = Math.min(...xs) - nodeRadius - padding;
+    const maxX = Math.max(...xs) + nodeRadius + padding;
+    const minY = Math.min(...ys) - nodeRadius - padding;
+    const maxY = Math.max(...ys) + nodeRadius + padding;
+    
+    const contentWidth = maxX - minX;
+    const contentHeight = maxY - minY;
+    
+    // Calculate zoom to fit
+    const scaleX = viewBox.width / contentWidth;
+    const scaleY = viewBox.height / contentHeight;
+    const newZoom = Math.min(scaleX, scaleY, 3); 
+    
+    // Center of content
+    const contentCenterX = (minX + maxX) / 2;
+    const contentCenterY = (minY + maxY) / 2;
+    
+    // Pan to center the content
+    const viewBoxCenterX = viewBox.width / 2;
+    const viewBoxCenterY = viewBox.height / 2;
+    
+    const newPanX = viewBoxCenterX - contentCenterX * newZoom;
+    const newPanY = viewBoxCenterY - contentCenterY * newZoom;
+    
+    setZoom(newZoom);
+    setPanOffset({ x: newPanX, y: newPanY });
+  };
 
   const getNodeClass = (nodeIndex) => {
     let classes = 'graph-node';
@@ -140,51 +266,66 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
       <svg 
         ref={svgRef}
         className="graph-svg" 
-        viewBox="0 0 400 400" 
+        viewBox={`${viewBox.minX} ${viewBox.minY} ${viewBox.width} ${viewBox.height}`}
         preserveAspectRatio="xMidYMid meet"
+        onMouseDown={onPanStart}
+        style={{ cursor: isPanning ? 'grabbing' : 'grab' }}
       >
-        {graphData.map((row, i) =>
-          row.map((connected, j) => {
-            if (connected === 1 && i < j) {
-              return (
-                <line
-                  key={`edge-${i}-${j}`}
-                  x1={nodePositions[i].x}
-                  y1={nodePositions[i].y}
-                  x2={nodePositions[j].x}
-                  y2={nodePositions[j].y}
-                  className="graph-edge"
-                />
-              );
-            }
-            return null;
-          })
-        )}
-        
-        {nodePositions.map((pos, i) => (
-          <g 
-            key={`node-${i}`}
-            onMouseDown={(e) => onMouseDown(e, i)}
-            style={{ cursor: dragState.nodeIndex === i ? 'grabbing' : 'grab' }}
-          >
-            <circle
-              cx={pos.x}
-              cy={pos.y}
-              r={20}
-              className={getNodeClass(i)}
-            />
-            <text
-              x={pos.x}
-              y={pos.y}
-              className="graph-node-text"
-              textAnchor="middle"
-              dominantBaseline="middle"
-              pointerEvents= "none"
+        {/* ViewBox border */}
+        <rect 
+          x="0" 
+          y="0" 
+          width={viewBox.width}
+          height={viewBox.height} 
+          fill="none" 
+          stroke="#ccc" 
+          strokeWidth="1"
+          pointerEvents="none"
+        />
+        <g transform={`translate(${panOffset.x}, ${panOffset.y}) scale(${zoom})`}>
+          {graphData.map((row, i) =>
+            row.map((connected, j) => {
+              if (connected === 1 && i < j) {
+                return (
+                  <line
+                    key={`edge-${i}-${j}`}
+                    x1={nodePositions[i].x}
+                    y1={nodePositions[i].y}
+                    x2={nodePositions[j].x}
+                    y2={nodePositions[j].y}
+                    className="graph-edge"
+                  />
+                );
+              }
+              return null;
+            })
+          )}
+          
+          {nodePositions.map((pos, i) => (
+            <g 
+              key={`node-${i}`}
+              onMouseDown={(e) => onMouseDown(e, i)}
+              style={{ cursor: dragState.nodeIndex === i ? 'grabbing' : 'grab' }}
             >
-              {i}
-            </text>
-          </g>
-        ))}
+              <circle
+                cx={pos.x}
+                cy={pos.y}
+                r={20}
+                className={getNodeClass(i)}
+              />
+              <text
+                x={pos.x}
+                y={pos.y}
+                className="graph-node-text"
+                textAnchor="middle"
+                dominantBaseline="middle"
+                pointerEvents="none"
+              >
+                {i}
+              </text>
+            </g>
+          ))}
+        </g>
       </svg>
     );
   };
@@ -193,7 +334,14 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
     <div className="visual-module-display">
       <div className="graph-visualization-wrapper">
         <div className='graph-visualization-container'>
-          <div className="graph-visualization-left">
+          <div className="graph-visualization-left" style={{ position: 'relative' }}>
+            <button 
+              onClick={fitToScreen}
+              className='fit-to-screen-button'
+              title="Fit graph to screen"
+            >
+              <i className="fas fa-expand"></i>
+            </button>
             {renderGraph()}
           </div>
           <div className="graph-visualization-right">

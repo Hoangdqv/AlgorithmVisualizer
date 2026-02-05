@@ -6,7 +6,7 @@ import FileTree from '../FileTree';
 import FileContextMenu from '../FileContextMenu';
 import NewItemModal from '../NewItemModal';
 
-const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelect }) => {
+const Sidebar = ({ onFileSelect, selectedLanguage, apiCache, onUserFileSelect }) => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('samples'); // 'samples' or 'myfiles'
   const [openDropdowns, setOpenDropdowns] = useState({});
@@ -27,11 +27,13 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
     files: null,
   });
 
+  const API_URL = import.meta.env.VITE_API_URL;
+
   // Load available languages
-  useEffect(() => {
+  useCallback(() => {
     const loadLanguages = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/languages`, {
+        const response = await fetch(`${API_URL}/languages`, {
           credentials: 'include'
         });
         if (response.ok) {
@@ -43,7 +45,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
       }
     };
     loadLanguages();
-  }, []);
+  }, [API_URL]);
 
   const loadSamples = useCallback(async () => {
     setLoading(true);
@@ -54,11 +56,11 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
       if (isCategoryRequest) {
         const [category, language] = selectedLanguage.split('_');
         response = await fetch(
-          `${import.meta.env.VITE_API_URL}/algorithms/${category}/${language}`
+          `${API_URL}/algorithms/${category}/${language}`
         );
       } else {
         response = await fetch(
-          `${import.meta.env.VITE_API_URL}/samples/${selectedLanguage.toLowerCase()}`
+          `${API_URL}/samples/${selectedLanguage.toLowerCase()}`
         );
       }
       
@@ -67,7 +69,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
       if (response.ok) {
         const items = data.samples || data.algorithms || [];
         setSamples(items);
-        samplesCache.current[selectedLanguage] = items;
+        apiCache.current.lists[selectedLanguage] = items;
         setOpenDropdowns({ 'samples': true });
       } else {
         console.error('Failed to load samples:', data.error);
@@ -79,7 +81,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
     } finally {
       setLoading(false);
     }
-  }, [selectedLanguage, samplesCache]);
+  }, [selectedLanguage, apiCache, API_URL]);
 
   const loadUserFiles = useCallback(async (forceReload = false) => {
     // Check cache first (unless force reload)
@@ -92,7 +94,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
     setLoading(true);
     try {
       // Load all folders
-      const foldersResponse = await fetch(`${import.meta.env.VITE_API_URL}/user/folders`, {
+      const foldersResponse = await fetch(`${API_URL}/user/folders`, {
         credentials: 'include'
       });
       
@@ -106,7 +108,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
           rootFolders.map(async (folder) => {
             try {
               const treeResponse = await fetch(
-                `${import.meta.env.VITE_API_URL}/user/folders/${folder.folder_id}/tree`,
+                `${API_URL}/user/folders/${folder.folder_id}/tree`,
                 { credentials: 'include' }
               );
               
@@ -128,7 +130,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
       setUserFolders(allFolders);
 
       // Load all files
-      const filesResponse = await fetch(`${import.meta.env.VITE_API_URL}/user/files`, {
+      const filesResponse = await fetch(`${API_URL}/user/files`, {
         credentials: 'include'
       });
       
@@ -149,26 +151,26 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
     } finally {
       setLoading(false);
     }
-  }, [userFilesCache]);
+  }, [userFilesCache, API_URL]);
 
     // Load samples when on samples tab
   useEffect(() => {
     if (activeTab === 'samples') {
-      if (samplesCache.current[selectedLanguage]) {
-        setSamples(samplesCache.current[selectedLanguage]);
+      if (apiCache.current.lists[selectedLanguage]) {
+        setSamples(apiCache.current.lists[selectedLanguage]);
         setOpenDropdowns({ 'samples': true });
         return;
       }
       loadSamples();
     }
-  }, [selectedLanguage, activeTab, loadSamples, samplesCache]);
+  }, [selectedLanguage, activeTab, loadSamples, apiCache, API_URL]);
 
   // Load user files when on myfiles tab
   useEffect(() => {
     if (activeTab === 'myfiles' && user) {
       loadUserFiles();
     }
-  }, [activeTab, user, loadUserFiles]);
+  }, [activeTab, user, loadUserFiles, API_URL]);
   
   const buildFolderHierarchy = (treeNodes) => {
     if (!treeNodes || treeNodes.length === 0) return null;
@@ -187,7 +189,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
     const roots = [];
     treeNodes.forEach(node => {
       if (node.depth === 0) {
-        // This is a root folder
+        // Root folder
         roots.push(nodeMap[node.folder_id]);
       } else {
         // Find the parent (depth - 1)
@@ -283,10 +285,10 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
     }
   };
 
-  const handleUserFileClick = async (fileId) => {
+  const handleUserFileClick = useCallback(async (fileId) => {
     setSelectedFileId(fileId);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/user/files/${fileId}`, {
+      const response = await fetch(`${API_URL}/user/files/${fileId}`, {
         credentials: 'include'
       });
       
@@ -299,7 +301,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
     } catch (error) {
       console.error('Error loading user file:', error);
     }
-  };
+  }, [API_URL, onUserFileSelect]);
 
   const handleContextMenu = (e, item, type) => {
     e.preventDefault();
@@ -337,7 +339,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
     }
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/user/folders`, {
+      const response = await fetch(`${API_URL}/user/folders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -372,7 +374,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
     }
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/user/files`, {
+      const response = await fetch(`${API_URL}/user/files`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -398,8 +400,8 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
     
     try {
       const endpoint = contextMenu.type === 'folder'
-        ? `${import.meta.env.VITE_API_URL}/user/folders/${contextMenu.item.folder_id}`
-        : `${import.meta.env.VITE_API_URL}/user/files/${contextMenu.item.file_id}`;
+        ? `${API_URL}/user/folders/${contextMenu.item.folder_id}`
+        : `${API_URL}/user/files/${contextMenu.item.file_id}`;
       
       const response = await fetch(endpoint, {
         method: 'DELETE',
@@ -425,8 +427,8 @@ const Sidebar = ({ onFileSelect, selectedLanguage, samplesCache, onUserFileSelec
     
     try {
       const endpoint = itemType === 'folder'
-        ? `${import.meta.env.VITE_API_URL}/user/folders/${item.folder_id}`
-        : `${import.meta.env.VITE_API_URL}/user/files/${item.file_id}`;
+        ? `${API_URL}/user/folders/${item.folder_id}`
+        : `${API_URL}/user/files/${item.file_id}`;
       
       const body = itemType === 'folder'
         ? { folder_name: newName }

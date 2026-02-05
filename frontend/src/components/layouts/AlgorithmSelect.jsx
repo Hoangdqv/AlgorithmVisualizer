@@ -16,10 +16,24 @@ const AlgorithmSelect = () => {
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
 
-  const samplesCache = useRef({});
+  const apiCache = useRef({
+    lists: {},  // Cache by category+language
+    code: {}    // Cache by algorithmKey
+  });
   const languages = ['Python', 'JavaScript'];
 
   const handleFileSelect = useCallback(async (algorithmKey) => {
+    const codeKey = `${category}_${selectedLanguage}_${algorithmKey}`;
+    
+    if (apiCache.current.code[codeKey]) {
+      // If found, load from cache
+      const cached = apiCache.current.code[codeKey];
+      setCode(cached.code);
+      setExplanation(cached.explanation || '');
+      setOutput('');
+      return;
+    }
+    
     setLoading(true);
     try {
       const response = await fetch(
@@ -33,14 +47,15 @@ const AlgorithmSelect = () => {
       const data = await response.json();
 
       if (data.code) {
+        // Cache the code and explanation
+        apiCache.current.code[codeKey] = {
+          code: data.code,
+          explanation: data.explanation || ''
+        };
+        
         setCode(data.code);
         setOutput('');
-        // Set explanation if available
-        if (data.explanation) {
-          setExplanation(data.explanation);
-        } else {
-          setExplanation('');
-        }
+        setExplanation(data.explanation || '');
       } else {
         console.error('Error loading algorithm code:', data.error);
         setCode(`// Error loading algorithm code`);
@@ -53,12 +68,12 @@ const AlgorithmSelect = () => {
     }
   }, [category, selectedLanguage]);
 
-  // Fetch algorithms for the category
-  const loadCategoryAlgorithms = useCallback(async () => {
+  useEffect(() => {
     const cacheKey = `${category}_${selectedLanguage}`;
 
-    if (samplesCache.current[cacheKey]) {
-      const cached = samplesCache.current[cacheKey];
+    // Check if algorithm list is cached
+    if (apiCache.current.lists[cacheKey]) {
+      const cached = apiCache.current.lists[cacheKey];
       if (cached.length > 0) {
         handleFileSelect(cached[0].key);
       }
@@ -66,36 +81,37 @@ const AlgorithmSelect = () => {
     }
 
     setLoading(true);
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/algorithms/${category}/${selectedLanguage}`
-      );
+    const fetchAlgorithms = async () => {
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL}/algorithms/${category}/${selectedLanguage}`
+        );
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data.algorithms && data.algorithms.length > 0) {
+          // Cache the algorithm list
+          apiCache.current.lists[cacheKey] = data.algorithms;
+          // Auto-load first algorithm
+          handleFileSelect(data.algorithms[0].key);
+        } else {
+          apiCache.current.lists[cacheKey] = [];
+          setCode(`// No ${selectedLanguage} algorithms available in ${category} category`);
+        }
+      } catch (error) {
+        console.error('Failed to fetch algorithms:', error);
+        setCode(`// Failed to load algorithms: ${error.message}`);
+      } finally {
+        setLoading(false);
       }
+    };
 
-      const data = await response.json();
-
-      if (data.algorithms && data.algorithms.length > 0) {
-        samplesCache.current[cacheKey] = data.algorithms;
-        // Auto-load first algorithm
-        handleFileSelect(data.algorithms[0].key);
-      } else {
-        samplesCache.current[cacheKey] = [];
-        setCode(`// No ${selectedLanguage} algorithms available in ${category} category`);
-      }
-    } catch (error) {
-      console.error('Failed to fetch algorithms:', error);
-      setCode(`// Failed to load algorithms: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedLanguage, category, handleFileSelect]);
-
-  useEffect(() => {
-    loadCategoryAlgorithms();
-  }, [loadCategoryAlgorithms]);
+    fetchAlgorithms();
+  }, [category, selectedLanguage, handleFileSelect]);
 
   const handleEditorChange = (value) => {
     setCode(value || '');
@@ -114,7 +130,7 @@ const AlgorithmSelect = () => {
     setIsOpen(false);
   };
 
-  const runCode = async () => {
+  const runCode = useCallback(async () => {
     setIsRunning(true);
     setOutput('Running...');
     setTracerData(null);
@@ -150,7 +166,7 @@ const AlgorithmSelect = () => {
     } finally {
       setIsRunning(false);
     }
-  };
+  }, [selectedLanguage, code]);
 
   const handleBack = () => {
     navigate('/algorithms');
@@ -172,7 +188,7 @@ const AlgorithmSelect = () => {
       isRunning={isRunning}
       output={output}
       explanation={explanation}
-      samplesCache={samplesCache}
+      apiCache={apiCache}
       handleFileSelect={handleFileSelect}
       sidebarLanguageKey={`${category}_${selectedLanguage}`}
       tracerData={tracerData}

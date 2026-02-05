@@ -1,0 +1,16 @@
+Binary Search Tree In-Order Traversal
+
+This algorithm demonstrates in-order traversal of a Binary Search Tree (BST).
+In-order traversal visits nodes in the following order:
+1. Traverse the left subtree
+2. Visit the current node
+3. Traverse the right subtree
+
+For a BST, in-order traversal visits nodes in ascending order by value.
+
+Time Complexity: O(n) - visits each node once
+Space Complexity: O(h) - recursive call stack where h is tree height
+
+The visualization shows:
+- Orange (Current): The node currently being processed
+- Green (Visited): Nodes that have been visited in the traversal

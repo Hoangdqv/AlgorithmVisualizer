@@ -7,11 +7,11 @@ def bubble_sort(arr, tracer):
         swapped = False
         for j in range(0, n - i - 1):
             # Show comparison (yellow)
-            tracer.add_state(arr.copy(), comparing=[j, j + 1])
+            tracer.add_state(arr.copy(), comparing=[j, j + 1], variables={'i': i, 'j': j})
             if arr[j] > arr[j + 1]:
                 arr[j], arr[j + 1] = arr[j + 1], arr[j]
                 # Show swap result (green)
-                tracer.add_state(arr.copy(), swapped=[j, j + 1])
+                tracer.add_state(arr.copy(), swapped=[j, j + 1], variables={'i': i, 'j': j})
                 swapped = True
         if not swapped:
             break

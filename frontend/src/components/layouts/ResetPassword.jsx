@@ -1,13 +1,11 @@
     // ResetPassword.jsx
-import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { validatePassword, validatePasswordMatch } from '../../utils/credentialsValidation';
 import ResetPasswordForm from '../ResetPasswordForm';
 
 const ResetPassword = () => {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const token = searchParams.get('token');
   
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -15,39 +13,15 @@ const ResetPassword = () => {
   const [verifying, setVerifying] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [tokenValid, setTokenValid] = useState(false);
+  const [sessionValid, setSessionValid] = useState(false);
 
-  const verifyToken = useCallback(async () => {
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/verify-reset-token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token })
-      });
-
-      if (response.ok) {
-        setTokenValid(true);
-      } else {
-        const data = await response.json();
-        setError(data.error || 'Invalid or expired token');
-      }
-    } catch (error) {
-      setError(error.message || 'Failed to verify token. Please try again.');
-    } finally {
-      setVerifying(false);
-    }
-  }, [token]);
-
-    // Verify token on component mount
+  // Check if reset session exists (cookie is set by confirm-reset)
   useEffect(() => {
-    if (!token) {
-      setError('Invalid or missing reset token');
-      setVerifying(false);
-      return;
-    }
-
-    verifyToken();
-  }, [token, verifyToken]);
+    // Session is set via HttpOnly cookie during confirm-reset
+    // If we got here from confirm-reset, session is valid
+    setSessionValid(true);
+    setVerifying(false);
+  }, []);
   
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -69,7 +43,8 @@ const ResetPassword = () => {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password })
+        body: JSON.stringify({ password }),
+        credentials: 'include'  // Send/receive cookies (session is in HttpOnly cookie)
       });
 
       const data = await response.json();
@@ -91,7 +66,7 @@ const ResetPassword = () => {
   return (
       <ResetPasswordForm
         verifying={verifying}
-        tokenValid={tokenValid}
+        tokenValid={sessionValid}
         error={error}
         success={success}
         password={password}

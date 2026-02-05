@@ -339,6 +339,12 @@ button {
   border: 1px solid rgb(139, 139, 139);
 }
 
+.auth-container p{
+  color: white;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
 .auth-container h2 {
   color: white;
   text-align: center;
@@ -1234,16 +1240,35 @@ footer {
 }
 
 .visual-module-block-comparing {
+  margin-top: -1rem;
   background-color: #fbbf24;
-  animation: pulse-yellow 0.5s ease-in-out;
+  animation: 0.5s ease-in-out;
+}
+
+.visual-module-block-selected {
+  margin-top: -1rem;
+  background-color: #ef4444;
+
+}
+
+.visual-module-block-inserted {
+  margin-top: -1rem;
+  background-color: #10b981;
+  
 }
 
 .visual-module-block-swapped {
+  margin-top: -1rem;
   background-color: #10b981;
-  animation: pulse-green 0.5s ease-in-out;
+  animation: 0.5s ease-in-out;
 }
 
 @keyframes pulse-yellow {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+@keyframes pulse-red {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.1); }
 }
@@ -1287,6 +1312,21 @@ footer {
   flex-direction: column;
   align-items: center;
   gap: 1rem;
+}
+
+.fit-to-screen-button {
+  position: absolute;
+  top: 18px;
+  left: 5px;
+  z-index: 1;
+  padding: 6px 9px;
+  color: white;
+  border: none;
+  background-color: #007bff;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .graph-visualization-right {
@@ -1474,6 +1514,159 @@ footer {
   font-weight: bold;
 }
 
+/* Tree Visualization Styles */
+.tree-visualization-wrapper {
+  display: grid;
+  padding: 1rem;
+  gap: 1rem;
+  width: 100%;
+  overflow-y: auto;
+  align-items: start;
+}
+
+.tree-visualization-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: 2rem;
+}
+
+.tree-visualization-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.tree-visualization-right {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tree-svg {
+  width: 100%;
+  max-width: 600px;
+  height: auto;
+  background-color: #1e1e1e;
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
+
+.tree-edge {
+  stroke: #555;
+  stroke-width: 2;
+  opacity: 0.6;
+}
+
+.tree-node {
+  fill: #2d2d2d;
+  stroke: #666;
+  stroke-width: 2;
+  transition: fill 0.3s ease, stroke 0.3s ease, filter 0.3s ease;
+}
+
+.tree-node-current {
+  fill: #ffa500;
+  stroke: #ffa500;
+  filter: drop-shadow(0 0 8px #ffa500);
+}
+
+.tree-node-visited {
+  fill: #4CAF50;
+  stroke: #4CAF50;
+}
+
+.tree-node-text {
+  fill: white;
+  font-size: 16px;
+  font-weight: bold;
+  pointer-events: none;
+}
+
+.tree-legend {
+  display: flex;
+  margin: auto;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: center;
+  padding: 1rem;
+  background-color: #2a2a2a;
+  border-radius: 0.5rem;
+}
+
+.tree-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: white;
+}
+
+.tree-legend-color {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  display: inline-block;
+  border: 2px solid transparent;
+}
+
+.tree-legend-color.tree-node-current {
+  background-color: #ffa500;
+  border-color: #ffa500;
+}
+
+.tree-legend-color.tree-node-visited {
+  background-color: #4CAF50;
+  border-color: #4CAF50;
+}
+
+.tree-info-section {
+  background-color: #2a2a2a;
+  border-radius: 0.5rem;
+  width: 100%;
+  padding: 1rem;
+  height: fit-content;
+  min-height: 0;
+  overflow-y: auto;
+  max-height: 100%;
+}
+
+.tree-info-title {
+  font-size: 1rem;
+  color: white;
+  margin-bottom: 0.75rem;
+  border-bottom: 2px solid #667eea;
+  padding-bottom: 0.25rem;
+}
+
+.tree-info-item {
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  background-color: #1e1e1e;
+  border-radius: 0.25rem;
+  border-left: 3px solid #555;
+}
+
+.tree-info-label {
+  font-size: 0.75rem;
+  color: #888;
+  margin-bottom: 0.15rem;
+  font-weight: 500;
+}
+
+.tree-info-value {
+  font-size: 0.875rem;
+  color: white;
+  font-family: 'Courier New', monospace;
+  padding: 0.15rem;
+}
+
+.tree-info-current {
+  color: #ffa500;
+  font-weight: bold;
+}
+
 /* Responsive adjustments for graph visualization */
 @media (max-width: 900px) {
   .graph-visualization-wrapper {
@@ -1481,6 +1674,14 @@ footer {
   }
   
   .graph-svg {
+    max-width: 350px;
+  }
+
+  .tree-visualization-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .tree-svg {
     max-width: 350px;
   }
 }

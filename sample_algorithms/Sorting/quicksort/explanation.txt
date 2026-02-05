@@ -1,0 +1,68 @@
+QUICK SORT - Algorithm Explanation
+==================================
+
+What is Quick Sort?
+-------------------
+Quick Sort is a highly efficient divide-and-conquer sorting algorithm. It works by selecting a "pivot" element and partitioning the array so that elements smaller than the pivot are on the left, and elements larger are on the right. Then it recursively sorts the left and right partitions.
+
+How It Works
+-----------
+1. Choose a pivot element from the array
+2. Partition: rearrange array so all elements < pivot are left, all elements > pivot are right
+3. Recursively apply the same process to the left partition
+4. Recursively apply the same process to the right partition
+5. Base case: arrays of size 0 or 1 are already sorted
+
+Detailed Steps:
+• Select pivot: Choose a pivot element (can be first, last, middle, or random)
+• Partition: Move smaller elements left, larger elements right of pivot
+• Left recursion: Sort the left sub-array
+• Right recursion: Sort the right sub-array
+• Done: Entire array is sorted
+
+Key Concepts
+-----------
+• Divide-and-Conquer: Divides problem into smaller subproblems recursively
+• In-Place: Can be done without extra memory (depending on implementation)
+• Not Stable: Equal elements may not maintain their original order
+• Pivot Selection: Choice of pivot significantly affects performance
+• Partitioning: Core operation that divides array into two parts
+
+Time Complexity
+---------------
+• Best Case: O(n log n) - Balanced partitions (pivot divides array evenly)
+• Average Case: O(n log n) - Random pivot selections
+• Worst Case: O(n²) - Poor pivot choices (pivot is always smallest/largest)
+• Space: O(log n) - Recursive call stack depth
+
+Why Quick Sort is Popular
+------------------------
+• Very fast in practice - often faster than other O(n log n) algorithms
+• Cache-friendly - good locality of reference
+• Widely used - default sort in many programming languages
+• Space-efficient - in-place sorting possible
+• Adaptive variants can improve worst-case performance
+
+When to Use Quick Sort?
+----------------------
+Good for:
+• Large datasets (> 10,000 elements)
+• General-purpose sorting
+• When average-case performance is important
+• Memory-constrained systems (in-place variant)
+
+Avoid for:
+• Real-time applications where worst-case O(n²) is unacceptable
+• Nearly sorted data (without modifications)
+• When stability is critical
+
+Common Improvements
+-------------------
+• Random pivot selection: Reduces chance of worst-case O(n²)
+• Median-of-three: Choose pivot as median of first, middle, last elements
+• 3-way partitioning: Handles duplicate elements better
+• Hybrid approach: Switch to insertion sort for small partitions
+
+Learning Value
+--------------
+Quick sort teaches divide-and-conquer algorithms, recursion, and the importance of algorithm optimization. It's one of the most important algorithms in computer science and appears in many real-world applications.

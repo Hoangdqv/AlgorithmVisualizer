@@ -1,4 +1,4 @@
-import tracers.tracer as trc
+import tracers.tracer as service
 
 # [ALGORITHM]
 def dfs(graph, start_node, tracer):
@@ -79,8 +79,7 @@ if __name__ == '__main__':
     ]
     
     start = 0
-    tracer = trc.Tracer(category='graphs', data_structure='stack', data_structure_label='Stack')
-    result = dfs(adjacency_matrix, start, tracer)
+    result, tracer = dfs(adjacency_matrix, start, service.Tracer('graphs', 'stack', 'Stack'))
     
     print(f"DFS Traversal starting from node {start}:")
     print(f"Visit order: {result['visited_order']}")

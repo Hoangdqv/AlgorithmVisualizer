@@ -1,0 +1,64 @@
+SELECTION SORT - Algorithm Explanation
+======================================
+
+What is Selection Sort?
+------------------------
+Selection Sort works by repeatedly finding the minimum element from the unsorted portion of the array and placing it at the beginning. Think of it like selecting the smallest card from a hand of cards and setting it aside.
+
+How It Works
+--------------
+1. Find the minimum element in the unsorted portion
+2. Swap it with the first element of the unsorted portion
+3. Move the boundary between sorted and unsorted portions one position to the right
+4. Repeat until the entire array is sorted
+
+Detailed Steps:
+• Pass 1: Search entire array, find minimum, swap with first element
+• Pass 2: Search remaining elements, find minimum, swap with second element
+• Pass 3+: Continue with each remaining section
+• Done when only one element remains unsorted
+
+Key Concepts
+--------------
+• Selection-Based: Selects the minimum element each time
+• In-Place: Doesn't require extra memory for another array
+• Not Stable: Equal elements may not maintain their original order
+• No Early Termination: Always performs the same number of comparisons
+• Predictable: Always uses n(n-1)/2 comparisons, regardless of input
+
+Time Complexity
+-------------------
+• Best Case: O(n²) - Even if array is sorted
+• Average Case: O(n²) - Random order
+• Worst Case: O(n²) - Reverse order
+• Space: O(1) - In-place sorting
+
+Advantages
+-----------
+• Very few swaps (at most n swaps) - better than bubble sort
+• Predictable performance - always O(n²)
+• Simple to understand and implement
+• Good for small datasets where minimizing writes is important
+
+Disadvantages
+--------------
+• Always O(n²) - no best case improvement
+• Not stable - may change order of equal elements
+• More comparisons than insertion sort on average
+
+When to Use Selection Sort?
+----------------------------
+Good for:
+• Small datasets (< 100 elements)
+• When minimizing the number of swaps is important
+• Teaching sorting concepts
+• Memory-write-limited systems
+
+Avoid for:
+• Large datasets
+• Nearly sorted data (no optimization possible)
+• Production code (use built-in sorts instead)
+
+Learning Value
+------------------
+Selection sort teaches the concept of dividing arrays into sorted and unsorted portions, and the efficiency gains from minimizing swaps. It's especially useful in scenarios where writing to memory is expensive.

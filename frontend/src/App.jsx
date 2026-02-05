@@ -6,7 +6,9 @@ import Home from './components/layouts/Home';
 import Error from './components/layouts/Error';
 import SignIn from './components/layouts/SignIn';
 import SignUp from './components/layouts/SignUp';
+import About from './components/layouts/About';
 import ResetPassword from './components/layouts/ResetPassword';
+import ConfirmReset from './components/layouts/ConfirmReset';
 import AlgorithmGrid from './components/layouts/CategoryGrid';
 import AlgorithmSelect from './components/layouts/AlgorithmSelect';
 
@@ -22,9 +24,11 @@ export default function App() {
             <Route path="/algorithms" element={<AlgorithmGrid />} />
             <Route path="/editor" element={<AlgorithmSelect />} />
             <Route path="/playground" element={<CodeEditor />} />
+            <Route path="/about" element={<About />} />
             <Route path="/login" element={<SignIn />} />
             <Route path="/signin" element={<SignIn />} />
             <Route path="/signup" element={<SignUp />} />
+            <Route path="/confirm-reset" element={<ConfirmReset />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/*" element={<Error />} />
           </Routes>

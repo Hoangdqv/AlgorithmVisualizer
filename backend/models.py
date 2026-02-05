@@ -11,6 +11,7 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=True)  # Nullable for OAuth users
     oauth_provider = db.Column(db.String(50), nullable=True)  # 'google', 'github', etc.
     oauth_id = db.Column(db.String(255), nullable=True)  # Provider's user ID
+    role = db.Column(db.Enum('user', 'admin', name='user_roles'), default='user', nullable=False)  # 'user' or 'admin'
     created_at = db.Column(db.DateTime, default=datetime.now(), nullable=False)
     last_login = db.Column(db.DateTime, nullable=True)
     
@@ -29,11 +30,12 @@ class User(db.Model):
         return bcrypt.checkpw(password.encode('utf-8'), self.password_hash.encode('utf-8'))
     
     def to_dict(self):
-        """Return user data as dictionary (without password)"""
+        """Return user data as dictionary"""
         return {
             'id': self.id,
             'username': self.username,
             'email': self.email,
+            'role': self.role,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'last_login': self.last_login.isoformat() if self.last_login else None
         }

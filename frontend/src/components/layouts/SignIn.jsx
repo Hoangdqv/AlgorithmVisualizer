@@ -15,6 +15,7 @@ export default function SignIn() {
 
     const emailIsValid = validateEmail(email);
     const emailIsEmpty = isEmailEmpty(email);
+
     const handleForgotPassword = async () => {
         if (emailIsEmpty){
             setError('Please enter your email to reset your password.');

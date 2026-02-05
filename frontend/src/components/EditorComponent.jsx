@@ -22,7 +22,7 @@ const EditorComponent = ({
   isRunning, 
   handleFileSelect, 
   handleUserFileSelect,
-  samplesCache, 
+  apiCache, 
   code, 
   handleEditorChange, 
   output, 
@@ -74,19 +74,19 @@ const EditorComponent = ({
         {/* Sidebar Panel */}
         {showSidebar && (
           <>
-            <Panel minSize={15} maxSize={20} className='panel-border-white' id='sidebar-panel' order={1}>
+            <Panel minSize={15} maxSize={15} className='panel-border-white' id='sidebar-panel' order={1}>
               <Sidebar
                 onFileSelect={handleFileSelect}
                 onUserFileSelect={handleUserFileSelect}
                 selectedLanguage={sidebarLanguageKey || selectedLanguage}
-                samplesCache={samplesCache} />
+                apiCache={apiCache} />
             </Panel>
             <PanelResizeHandle className='resizable-handle-horizontal' />
           </>
         )}
 
         {/* Code Editor Panel */}
-        <Panel minSize={30} className='panel-border-white' id='code-editor-panel' order={2}>
+        <Panel minSize={30} defaultSize={39} className='panel-border-white' id='code-editor-panel' order={2}>
           <div className="code-editor">
             <PanelGroup direction="vertical">
               {/* Editor Panel */}
@@ -154,7 +154,7 @@ const EditorComponent = ({
         {tracerData !== undefined && (
           <>
             <PanelResizeHandle className='resizable-handle-horizontal' />
-            <Panel minSize={25} defaultSize={35} className='panel-border-white' id='visualization-panel' order={3}>
+            <Panel minSize={35} defaultSize={46} className='panel-border-white' id='visualization-panel' order={3}>
               <VisualModule tracerData={tracerData} isRunning={isRunning} selectedLanguage={selectedLanguage} />
             </Panel>
           </>

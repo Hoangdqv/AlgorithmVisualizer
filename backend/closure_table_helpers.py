@@ -2,7 +2,7 @@
 """Helper functions for closure table operations"""
 from datetime import datetime
 from database import db
-from models import Folder, ClosureTable
+from models import Folder, ClosureTable, Language
 
 def create_folder_with_closure(folder_name, path, user_id, parent_folder_id=None, folder_type='user-defined', created_at=datetime.now()):
     """
@@ -199,3 +199,13 @@ def get_root_folders(user_id, folder_type='user-defined'):
     ).all()
     
     return root_folders
+
+def get_all_languages():
+    """
+    Get all distinct programming languages from the closure table.
+    
+    Returns:
+        List of language names
+    """
+    languages = Language.query.distinct().all()
+    return [lang.language for lang in languages]
