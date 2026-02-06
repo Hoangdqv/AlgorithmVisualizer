@@ -64,7 +64,7 @@ function partitionHoare(arr, tracer, low, high) {
 
 // [TEST]
 if (require.main === module) {
-    const originalArr = [92, 14, 461, 1122, 235, 9, 127, 48, 75, 42];
+    const originalArr = [92, 14, 461, 1122, 235, 9, 127];
     const tracer = new Tracer('sorting'); // Tracer instance
     const [sortedArr] = quickSortHoare([...originalArr], tracer);
     

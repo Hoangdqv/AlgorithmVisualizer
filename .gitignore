@@ -69,3 +69,4 @@ coverage/
 # Misc
 *.log
 .cache/
+frontend/src/components/visualizations/GraphVisualization-positioning-guide.md

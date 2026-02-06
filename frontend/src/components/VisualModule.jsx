@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import SortingVisualization from './visualizations/SortingVisualization';
 import GraphVisualization from './visualizations/GraphVisualization';
 import TreeVisualization from './visualizations/TreeVisualization';
@@ -14,8 +14,6 @@ const VisualModule = ({ tracerData, isRunning, selectedLanguage }) => {
   const displayTotalSteps = displayStates.length;
   
   // Calculate play speed based on total steps
-  // Scale duration based on step count to account for rendering overhead
-  // Small operations: 10s | Medium: 15s | Large (1000+): 20s | Very Large (5000+): 25s
   let baseDuration = 10000; // Default 10s
   if (displayTotalSteps > 5000) baseDuration = 25000;      // Very large: 25s
   else if (displayTotalSteps > 1000) baseDuration = 20000; // Large: 20s
@@ -23,7 +21,7 @@ const VisualModule = ({ tracerData, isRunning, selectedLanguage }) => {
   
   const playSpeed = displayTotalSteps > 100 
     ? (baseDuration / displayTotalSteps) / speedMultiplier // Scale duration by steps, adjusted by multiplier
-    : 1000 / speedMultiplier; // Traditional: 1s per step, adjusted by multiplier
+    : 1000 / speedMultiplier;
 
   useEffect(() => {
     // Reset visualization when language changes
@@ -78,7 +76,7 @@ const VisualModule = ({ tracerData, isRunning, selectedLanguage }) => {
   const handleReset = () => {
     setCurrentStep(0);
     setIsPlaying(false);
-    // Reset graph node positions if necessary
+    // Reset graph node positions
     if (graphVisualizationRef.current) {
       graphVisualizationRef.current.resetPositions();
     }
@@ -131,12 +129,10 @@ const VisualModule = ({ tracerData, isRunning, selectedLanguage }) => {
 
   return (
     <div className="visual-module-container">
-      {/* Header */}
       <div className="visual-module-header">
         <div className="visual-module-header-top">
           <div className="visual-module-title-section">
             <h2 className="visual-module-title">Algorithm Visualization</h2>
-            {/* Playback Controls */}
             <div className="visual-module-controls-section">
                 <div className="visual-module-controls">
                 <button
@@ -166,7 +162,6 @@ const VisualModule = ({ tracerData, isRunning, selectedLanguage }) => {
                     Next →
                 </button>
                 </div>
-            {/* Speed Control */}
                 <div className="visual-module-speed-control">
                     <label className="visual-module-speed-label">Speed:</label>
                     <input
@@ -189,7 +184,6 @@ const VisualModule = ({ tracerData, isRunning, selectedLanguage }) => {
           </div>   
         </div>
         
-        {/* Progress Bar - Slider with Snap Points */}
         <p className="visual-module-step-info">
           Step {currentStep + 1} of {displayTotalSteps}
         </p>

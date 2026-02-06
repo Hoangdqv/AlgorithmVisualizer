@@ -7,12 +7,13 @@ const SortingVisualization = ({ currentState }) => {
   const inserted = useMemo(() => currentState?.inserted || [], [currentState]);
   const selected = useMemo(() => currentState?.selected || [], [currentState]);
   const variables = useMemo(() => currentState?.variables || {}, [currentState]);
+  const pivot = useMemo(() => currentState?.pivot, [currentState]);
   
   // Convert arrays to Sets for O(1)
   const comparingSet = useMemo(() => new Set(comparing), [comparing]);
   const swappedSet = useMemo(() => new Set(swapped), [swapped]);
   const insertedSet = useMemo(() => new Set(inserted), [inserted]);
-  
+
   const canvasRef = useRef(null);
   const THRESHOLD = 30; // Switch to canvas for arrays larger than this
   const useCanvas = arrayData.length > THRESHOLD;
@@ -83,7 +84,9 @@ const SortingVisualization = ({ currentState }) => {
   const getBlockClass = (index) => {
     let classes = 'visual-module-block';
     // Priority: comparing (temp) > swapped > selected (persistent) > inserted > default
-    if (comparing.includes(index)) {
+    if (pivot === index) {
+      classes += ' visual-module-block-pivot';
+    } else if(comparing.includes(index)) {
       classes += ' visual-module-block-comparing';
     } else if (swapped.includes(index)) {
       classes += ' visual-module-block-swapped';
@@ -149,11 +152,6 @@ const SortingVisualization = ({ currentState }) => {
             <div className="visual-module-array-content">
               Size: {arrayStats?.size} | Min: {arrayStats?.min} | Max: {arrayStats?.max}
             </div>
-            {Object.keys(variables).length > 0 && (
-              <div className="visual-module-array-content" style={{ marginTop: '8px' }}>
-                Variables: {Object.entries(variables).map(([key, val]) => `${key}=${val}`).join(', ')}
-              </div>
-            )}
           </>
         ) : (
           <>
@@ -161,11 +159,16 @@ const SortingVisualization = ({ currentState }) => {
             <div className="visual-module-array-content">
               [{arrayData.join(', ')}]
             </div>
-            {Object.keys(variables).length > 0 && (
-              <div className="visual-module-array-content" style={{ marginTop: '8px' }}>
-                Variables: {Object.entries(variables).map(([key, val]) => `${key}=${val}`).join(', ')}
-              </div>
-            )}
+          </>
+        )}
+        
+        {/* Always show variables */}
+        {Object.keys(variables).length > 0 && (
+          <>
+            <div className="visual-module-array-label" style={{ marginTop: '12px' }}>Variables:</div>
+            <div className="visual-module-array-content">
+              {Object.entries(variables).map(([key, val]) => `${key} = ${val}`).join(', ')}
+            </div>
           </>
         )}
       </div>

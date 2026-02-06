@@ -30,7 +30,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, apiCache, onUserFileSelect })
   const API_URL = import.meta.env.VITE_API_URL;
 
   // Load available languages
-  useCallback(() => {
+  useEffect(() => {
     const loadLanguages = async () => {
       try {
         const response = await fetch(`${API_URL}/languages`, {
@@ -84,7 +84,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, apiCache, onUserFileSelect })
   }, [selectedLanguage, apiCache, API_URL]);
 
   const loadUserFiles = useCallback(async (forceReload = false) => {
-    // Check cache first (unless force reload)
+    // Check cache first
     if (!forceReload && userFilesCache.folders && userFilesCache.files) {
       setUserFolders(userFilesCache.folders);
       setUserFiles(userFilesCache.files);
@@ -181,27 +181,24 @@ const Sidebar = ({ onFileSelect, selectedLanguage, apiCache, onUserFileSelect })
       nodeMap[node.folder_id] = { 
         ...node, 
         children: [],
-        files: node.files || [] // Ensure files array exists
+        files: node.files || []
       };
     });
 
-    // Build parent-child relationships
+    // Build parent-child relationships using parent_folder_id
     const roots = [];
     treeNodes.forEach(node => {
       if (node.depth === 0) {
         // Root folder
         roots.push(nodeMap[node.folder_id]);
       } else {
-        // Find the parent (depth - 1)
-        const parentNode = treeNodes.find(n => 
-          n.depth === node.depth - 1 && 
-          n.folder_id !== node.folder_id
-        );
+        // Find the parent using parent_folder_id
+        const parentId = node.parent_folder_id;
         
-        if (parentNode && nodeMap[parentNode.folder_id]) {
+        if (parentId && nodeMap[parentId]) {
           // Add this node as a child of the parent
-          if (!nodeMap[parentNode.folder_id].children.includes(nodeMap[node.folder_id])) {
-            nodeMap[parentNode.folder_id].children.push(nodeMap[node.folder_id]);
+          if (!nodeMap[parentId].children.includes(nodeMap[node.folder_id])) {
+            nodeMap[parentId].children.push(nodeMap[node.folder_id]);
           }
         }
       }

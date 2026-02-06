@@ -62,7 +62,7 @@ def partition_hoare(arr, tracer, low, high):
 
 # [TEST]
 if __name__ == "__main__":
-    original_arr = [92, 14, 461, 1122, 235, 9, 127, 48, 75, 42]
+    original_arr = [92, 14, 461, 1122, 235, 9, 127]
     sorted_arr, tracer = quick_sort_hoare(original_arr.copy(), trc.Tracer(category='sorting'))
 
     print(f'Original array: {original_arr}')

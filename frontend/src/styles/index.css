@@ -1239,6 +1239,12 @@ footer {
   transform: scale(1.05);
 }
 
+.visual-module-block-pivot {
+  margin-top: -1rem;
+  background-color: #9b59b6 !important;
+  border-color: #8e44ad !important;
+}
+
 .visual-module-block-comparing {
   margin-top: -1rem;
   background-color: #fbbf24;
