@@ -1,16 +1,20 @@
 # app.py
-from flask import Flask, request, jsonify, session
+from flask import Flask, request, jsonify, session, Response
 from flask_cors import CORS
 from flask_mail import Mail, Message
 from flask_migrate import Migrate
 from datetime import datetime, timedelta
 import requests
+import threading
+import queue
+import json
 from functools import wraps
 from config import LANGUAGE_MAP, ALGORITHM_MAP, SAMPLE_CODE_DIR, SAMPLE_ALGORITHMS_DIR
 from containerHandler import ContainerHandler
 from database import db, init_db
 import os
 import secrets
+import re
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
@@ -52,8 +56,30 @@ migrate = Migrate(app, db)
 # CORS configuration to allow credentials
 CORS(app, supports_credentials=True, origins=['http://localhost:5173'])
 
-PISTON_API_URL = "https://emkc.org/api/v2/piston"
 container_handler = ContainerHandler()
+
+# Server Startup cleanup: Remove leftover containers if any
+def _startup_cleanup():
+    try:
+        client = container_handler._get_client()
+        orphans = client.containers.list(
+            all=True,
+            filters={'ancestor': 'python:3.13-alpine', 'status': 'exited'}
+        ) + client.containers.list(
+            all=True,
+            filters={'ancestor': 'node:22-alpine', 'status': 'exited'}
+        )
+        for c in orphans:
+            try: c.remove()
+            except: pass
+    except Exception:
+        pass
+
+_startup_cleanup()
+
+# run_id -> { container, temp_file, stop_event, raw_sock, output_q, lock }
+active_runs = {}
+active_runs_lock = threading.Lock()
 
 # ============================================
 # RBAC DECORATORS
@@ -176,7 +202,8 @@ def get_sample_code(language, sample_key):
             'code': clean_code,
             'language': language,
             'name': sample['name'],
-            'description': sample['description']
+            'description': sample['description'],
+            'await_console_input': sample.get('await_console_input', False)
         })
     except FileNotFoundError:
         return jsonify({'error': 'Sample code file not found'}), 404
@@ -198,7 +225,7 @@ def get_all_algorithm_categories():
     ]
     return jsonify({'categories': categories})
 
-# Get algorithms by category and languagemethods=['GET'])
+@app.route('/api/algorithms/<category>', methods=['GET'])
 def get_category_info(category):
     """Get category info with all algorithms across all languages"""
     category_config = ALGORITHM_MAP.get(category.lower())
@@ -273,39 +300,42 @@ def execute_code():
         data = request.get_json()
         language = data.get('language', '').lower()
         code = data.get('code', '')
-        
+
         if not code:
             return jsonify({'error': 'No code provided'}), 400
-        
-        lang_config = LANGUAGE_MAP.get(language)
-        if not lang_config:
+
+        if language not in ('python', 'javascript'):
             return jsonify({'error': f'Language {language} not supported'}), 400
-        
-        piston_language = lang_config['piston_name']
-        
-        piston_response = requests.post(
-            f"{PISTON_API_URL}/execute",
-            json={
-                "language": piston_language,
-                "version": "*",
-                "files": [{"content": code}]
-            }
-        )
-        
-        if piston_response.status_code == 200:
-            result = piston_response.json()
-            return jsonify({
-                'success': True,
-                'output': result.get('run', {}).get('output', ''),
-                'stderr': result.get('run', {}).get('stderr', ''),
-                'code': result.get('run', {}).get('code', 0)
-            })
-        else:
-            return jsonify({'success': False, 'error': 'Failed to execute code'}), 500
-            
+
+        result = container_handler.execute_code(language, code)
+
+        if not result.get('success'):
+            return jsonify(result), 500
+
+        return jsonify({
+            'success': True,
+            'output': result.get('output', ''),
+            'stderr': result.get('stderr', ''),
+            'code': result.get('exit_code', 0)
+        })
+
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
     
+
+def inject_params_block(code, language, params_block):
+    """
+    Replace the [PARAMS]...[/PARAMS] block in algorithm source code
+    """
+    if language == 'python':
+        indented = '\n'.join('    ' + line for line in params_block.split('\n'))
+        pattern = r'    # \[PARAMS\].*?    # \[/PARAMS\]'
+        replacement = f'    # [PARAMS]\n{indented}\n    # [/PARAMS]'
+    else:  # javascript
+        pattern = r'// \[PARAMS\].*?// \[/PARAMS\]'
+        replacement = f'// [PARAMS]\n{params_block}\n// [/PARAMS]'
+    return re.sub(pattern, replacement, code, flags=re.DOTALL)
+
 
 @app.route('/api/execute/algorithm', methods=['POST'])
 def execute_algorithm():
@@ -313,7 +343,11 @@ def execute_algorithm():
         data = request.get_json()
         language = data.get('language', '').lower()
         code = data.get('code', '')
-        
+        params_block = data.get('params_block', None)
+
+        if params_block is not None:
+            code = inject_params_block(code, language, params_block)
+
         print(f"\n{'='*60}")
         print(f"[API] Received execution request for {language}")
         print(f"{'='*60}")
@@ -456,7 +490,6 @@ def logout():
 
 @app.route('/api/auth/google', methods=['POST'])
 def google_login():
-    """Login or register user via Google OAuth"""
     from models import User
     from google.oauth2 import id_token
     from google.auth.transport import requests as google_requests
@@ -468,7 +501,7 @@ def google_login():
         return jsonify({'error': 'No credential provided'}), 400
     
     try:
-        # Verify the Google token
+        # Verify
         client_id = os.environ.get('GOOGLE_CLIENT_ID')
         if not client_id:
             return jsonify({'error': 'Google OAuth not configured'}), 500
@@ -479,7 +512,7 @@ def google_login():
             client_id
         )
         print(f"Google ID info: {idinfo}")
-        # Extract user info from Google token
+        # Extract user info from Google
         google_id = idinfo['sub']
         email = idinfo.get('email')
         name = idinfo.get('name')
@@ -503,7 +536,7 @@ def google_login():
                 base_username = email.split('@')[0]
                 username = base_username
                 
-                # Add random string if username already exists (better than counter for privacy)
+                # Add random string if username already exists
                 while User.query.filter_by(username=username).first():
                     random_suffix = secrets.token_hex(3)  # 6 random hex chars
                     username = f"{base_username}_{random_suffix}"
@@ -513,15 +546,13 @@ def google_login():
                     email=email,
                     oauth_provider='google',
                     oauth_id=google_id,
-                    password_hash=None  # OAuth users don't have password
+                    password_hash=None 
                 )
                 db.session.add(user)
         
-        # Update last login
         user.last_login = datetime.now()
         db.session.commit()
         
-        # Set session
         session['user_id'] = user.id
         session['username'] = user.username
         
@@ -1325,6 +1356,283 @@ def get_sample_file(file_id):
         return jsonify({'error': 'Sample file not found'}), 404
     
     return jsonify({'file': file.to_dict(include_content=True)}), 200
+
+
+# ============================================
+# INTERACTIVE EXECUTION — SSE (Server-Sent Events)
+# ============================================
+
+MAX_INTERACTIVE_TIMEOUT = 30  # seconds before container is killed automatically
+STDIN_TIMEOUT_EXTENSION = 15  # extra seconds granted per stdin submission
+MAX_TOTAL_TIMEOUT = 120       # hard cap — container can never live longer than this
+
+
+def _cleanup_run(run_id):
+    """Kill container and free all resources for a run."""
+    with active_runs_lock:
+        run_data = active_runs.pop(run_id, None)
+    if not run_data:
+        return
+    # Cancel the wall-time timer first so it cannot fire after cleanup
+    timer = run_data.get('timer')
+    if timer:
+        timer.cancel()
+    # Signal the reader thread to stop
+    run_data['stop_event'].set()
+    # Close the raw socket so the reader unblocks
+    raw = run_data.get('raw_sock')
+    if raw:
+        try:
+            raw.close()
+        except Exception:
+            pass
+    # Kill/remove the container
+    container = run_data.get('container')
+    if container:
+        container_handler.cleanup_container(container)
+    # Remove temp file
+    temp_file = run_data.get('temp_file')
+    if temp_file:
+        try:
+            os.unlink(temp_file)
+        except Exception:
+            pass
+
+
+def _read_container_output(run_id, raw_sock, stop_event, output_q):
+    """
+    Background thread: reads bytes from the attached Docker PTY socket and
+    pushes them onto the output queue.  Exits when the container process
+    finishes or the stop_event is set.
+    """
+    try:
+        raw_sock.settimeout(0.3)
+    except Exception:
+        pass  # npipesocket on Windows may not support settimeout
+    output_bytes = 0
+    output_cap = 50 * 1024  # 50 KB live output cap
+
+    while not stop_event.is_set():
+        try:
+            data = raw_sock.recv(4096)
+            if not data:
+                break
+            output_bytes += len(data)
+            text = data.decode('utf-8', errors='replace')
+            output_q.put(('output', text))
+            if output_bytes >= output_cap:
+                output_q.put(('output', '\n[Output truncated at 50 KB]'))
+                break
+        except OSError:
+            with active_runs_lock:
+                run_data = active_runs.get(run_id)
+            if not run_data:
+                break
+            try:
+                run_data['container'].reload()
+                if run_data['container'].status not in ('running', 'created'):
+                    break
+            except Exception:
+                break
+        except Exception:
+            break
+
+    # Container finished — check if we still own this run
+    with active_runs_lock:
+        run_data = active_runs.get(run_id)
+    if run_data is None:
+        return
+
+    exit_code = 0
+    try:
+        result = run_data['container'].wait(timeout=5)
+        exit_code = result.get('StatusCode', 0)
+    except Exception:
+        pass
+
+    output_q.put(('done', exit_code))
+
+
+@app.route('/api/execute/run', methods=['POST'])
+def start_execution():
+    """
+    POST { language: str, code: str }
+    Returns { run_id: str }
+    """
+    data = request.get_json(silent=True) or {}
+    language = data.get('language', '').lower()
+    code = data.get('code', '')
+
+    if not code:
+        return jsonify({'error': 'No code provided'}), 400
+    if language not in LANGUAGE_MAP:
+        return jsonify({'error': f'Language {language} not supported'}), 400
+
+    run_id = secrets.token_hex(8)
+
+    try:
+        container, temp_file = container_handler.create_interactive_container(language, code)
+        container.start()
+
+        sock = container_handler._get_api_client().attach_socket(
+            container.id,
+            params={'stdin': 1, 'stdout': 1, 'stderr': 1, 'stream': 1}
+        )
+        raw_sock = getattr(sock, '_sock', sock)
+
+        stop_event = threading.Event()
+        output_q = queue.Queue()
+
+        run_data = {
+            'container': container,
+            'temp_file': temp_file,
+            'stop_event': stop_event,
+            'raw_sock': raw_sock,
+            'output_q': output_q,
+        }
+
+        with active_runs_lock:
+            active_runs[run_id] = run_data
+
+        # Background reader thread
+        t = threading.Thread(
+            target=_read_container_output,
+            args=(run_id, raw_sock, stop_event, output_q),
+            daemon=True,
+        )
+        t.start()
+
+        # Wall-time timeout
+        def _timeout_kill():
+            with active_runs_lock:
+                rd = active_runs.get(run_id)
+            if rd:
+                rd['output_q'].put(('output', f'\n[Execution timed out after {MAX_INTERACTIVE_TIMEOUT}s]'))
+                rd['output_q'].put(('done', -1))
+                _cleanup_run(run_id)
+
+        timer = threading.Timer(MAX_INTERACTIVE_TIMEOUT, _timeout_kill)
+        timer.daemon = True
+        timer.start()
+        run_data['timer'] = timer
+        run_data['elapsed'] = 0  # track total time granted so far
+
+        return jsonify({'run_id': run_id}), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/execute/<run_id>/stream')
+def stream_output(run_id):
+    """
+    SSE endpoint.  Keeps the connection open, pushing output events to the
+    client as they arrive from the Docker container.
+    """
+    with active_runs_lock:
+        run_data = active_runs.get(run_id)
+    if not run_data:
+        return jsonify({'error': 'Run not found'}), 404
+
+    output_q = run_data['output_q']
+
+    def generate():
+        while True:
+            try:
+                msg_type, payload = output_q.get(timeout=1)
+            except queue.Empty:
+                # Send a keep-alive comment to prevent proxy/browser timeouts
+                yield ': keepalive\n\n'
+                continue
+
+            if msg_type == 'output':
+                # Encode payload as JSON so newlines inside output are preserved
+                yield f'data: {json.dumps({"output": payload})}\n\n'
+            elif msg_type == 'done':
+                yield f'event: done\ndata: {json.dumps({"exit_code": payload})}\n\n'
+                break
+
+        # Stream ended — clean up the run
+        _cleanup_run(run_id)
+
+    return Response(generate(), mimetype='text/event-stream', headers={
+        'Cache-Control': 'no-cache',
+        'X-Accel-Buffering': 'no',  # disable nginx buffering if present
+    })
+
+
+def _reset_timer(run_id, run_data):
+    """
+    Cancel the current timeout timer and start a new one with
+    STDIN_TIMEOUT_EXTENSION seconds, unless the hard cap has been reached.
+    """
+    old_timer = run_data.get('timer')
+    if old_timer:
+        old_timer.cancel()
+
+    elapsed = run_data.get('elapsed', 0) + STDIN_TIMEOUT_EXTENSION
+    if elapsed >= MAX_TOTAL_TIMEOUT:
+        # Hard cap reached — let the container be killed on its current timer
+        return
+    run_data['elapsed'] = elapsed
+
+    remaining = min(STDIN_TIMEOUT_EXTENSION, MAX_TOTAL_TIMEOUT - elapsed)
+
+    def _timeout_kill():
+        with active_runs_lock:
+            rd = active_runs.get(run_id)
+        if rd:
+            rd['output_q'].put(('output', f'\n[Execution timed out]'))
+            rd['output_q'].put(('done', -1))
+            _cleanup_run(run_id)
+
+    timer = threading.Timer(remaining, _timeout_kill)
+    timer.daemon = True
+    timer.start()
+    run_data['timer'] = timer
+
+
+@app.route('/api/execute/<run_id>/stdin', methods=['POST'])
+def send_stdin(run_id):
+    """
+    POST { data: str } — a line of text to write to the container's stdin.
+    """
+    with active_runs_lock:
+        run_data = active_runs.get(run_id)
+    if not run_data:
+        return jsonify({'error': 'Run not found'}), 404
+
+    raw_sock = run_data.get('raw_sock')
+    if not raw_sock:
+        return jsonify({'error': 'No stdin socket'}), 400
+
+    try:
+        payload = (request.get_json(silent=True) or {}).get('data', '')
+        encoded = (payload + '\n').encode('utf-8')
+        sender = getattr(raw_sock, 'sendall', None) or raw_sock.send
+        sender(encoded)
+        # Extend the timeout since the user is actively interacting
+        _reset_timer(run_id, run_data)
+        return '', 204
+    except Exception as e:
+        return jsonify({'error': f'Failed to send input: {str(e)}'}), 500
+
+
+@app.route('/api/execute/<run_id>/stop', methods=['POST'])
+def stop_execution(run_id):
+    """
+    POST — kill the running container and end the SSE stream.
+    """
+    with active_runs_lock:
+        run_data = active_runs.get(run_id)
+    if not run_data:
+        return jsonify({'error': 'Run not found'}), 404
+
+    # Push stop messages onto the queue so the SSE stream picks them up
+    run_data['output_q'].put(('output', '\n[Execution stopped by user]'))
+    run_data['output_q'].put(('done', -1))
+    _cleanup_run(run_id)
+    return '', 204
 
 
 if __name__ == '__main__':

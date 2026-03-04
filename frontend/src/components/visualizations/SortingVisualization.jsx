@@ -8,11 +8,13 @@ const SortingVisualization = ({ currentState }) => {
   const selected = useMemo(() => currentState?.selected || [], [currentState]);
   const variables = useMemo(() => currentState?.variables || {}, [currentState]);
   const pivot = useMemo(() => currentState?.pivot, [currentState]);
+  const range = useMemo(() => currentState?.range || null, [currentState]);
   
   // Convert arrays to Sets for O(1)
   const comparingSet = useMemo(() => new Set(comparing), [comparing]);
   const swappedSet = useMemo(() => new Set(swapped), [swapped]);
   const insertedSet = useMemo(() => new Set(inserted), [inserted]);
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
 
   const canvasRef = useRef(null);
   const THRESHOLD = 30; // Switch to canvas for arrays larger than this
@@ -43,6 +45,9 @@ const SortingVisualization = ({ currentState }) => {
       const x = padding + index * barWidth;
       const y = height - padding - barHeight;
 
+      // Check if index is outside the active partition range
+      const isDimmed = range && (index < range[0] || index > range[1]);
+
       // Determine bar color based on state (using Sets for O(1) lookup)
       let color = '#4a90e2'; // Default blue
       
@@ -52,11 +57,24 @@ const SortingVisualization = ({ currentState }) => {
         color = '#27ae60'; // Green for inserted
       } else if (comparingSet.has(index)) {
         color = '#f39c12'; // Orange for comparing
+      } else if (selectedSet.has(index)) {
+        color = '#ef4444'; // Red for selected
       }
+
+      // Apply dimmed effect
+      ctx.globalAlpha = isDimmed ? 0.25 : 1.0;
 
       // Draw bar
       ctx.fillStyle = color;
       ctx.fillRect(x, y, barWidth - 1, barHeight);
+
+      // Draw pivot marker (bottom border)
+      if (pivot === index) {
+        ctx.fillStyle = '#9b59b6';
+        ctx.fillRect(x, height - padding, barWidth - 1, 4);
+      }
+
+      ctx.globalAlpha = 1.0;
     });
 
     // Draw legend
@@ -79,22 +97,37 @@ const SortingVisualization = ({ currentState }) => {
     ctx.fillRect(190, legendY - 8, 12, 12);
     ctx.fillStyle = '#FFFFFF';
     ctx.fillText('Swapped/Inserted', 205, legendY);
-  }, [arrayData, comparingSet, swappedSet, insertedSet, useCanvas]);
+
+    ctx.fillStyle = '#9b59b6';
+    ctx.fillRect(340, legendY - 8, 12, 12);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText('Pivot', 355, legendY);
+  }, [arrayData, comparingSet, swappedSet, insertedSet, selectedSet, pivot, range, useCanvas]);
 
   const getBlockClass = (index) => {
     let classes = 'visual-module-block';
-    // Priority: comparing (temp) > swapped > selected (persistent) > inserted > default
+
+    // Dim blocks outside the active partition range
+    if (range && (index < range[0] || index > range[1])) {
+      classes += ' visual-module-block-dimmed';
+    }
+
+    // Pivot is a persistent marker (border) — can coexist with action highlights
     if (pivot === index) {
       classes += ' visual-module-block-pivot';
-    } else if(comparing.includes(index)) {
+    }
+
+    // Action highlights are mutually exclusive (background color)
+    if (comparingSet.has(index)) {
       classes += ' visual-module-block-comparing';
-    } else if (swapped.includes(index)) {
+    } else if (swappedSet.has(index)) {
       classes += ' visual-module-block-swapped';
-    } else if (selected.includes(index)) {
+    } else if (selectedSet.has(index)) {
       classes += ' visual-module-block-selected';
-    } else if (inserted.includes(index)) {
+    } else if (insertedSet.has(index)) {
       classes += ' visual-module-block-inserted';
     }
+
     return classes;
   };
 

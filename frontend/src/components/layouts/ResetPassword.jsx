@@ -17,8 +17,6 @@ const ResetPassword = () => {
 
   // Check if reset session exists (cookie is set by confirm-reset)
   useEffect(() => {
-    // Session is set via HttpOnly cookie during confirm-reset
-    // If we got here from confirm-reset, session is valid
     setSessionValid(true);
     setVerifying(false);
   }, []);

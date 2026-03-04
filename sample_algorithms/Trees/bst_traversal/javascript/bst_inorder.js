@@ -4,7 +4,7 @@
  * visiting nodes in ascending order (left -> root -> right).
  */
 
-const { TreeTracer } = require('./tracers/tracer');
+import Tracer from './tracers/tracer.js';
 
 // [ALGORITHM]
 function inorderTraversal(treeNodes, rootId, tracer) {
@@ -13,7 +13,7 @@ function inorderTraversal(treeNodes, rootId, tracer) {
      * 
      * @param {Array} treeNodes - List of tree nodes [{id: 1, value: 10, children: [left, right]}, ...]
      * @param {number} rootId - ID of the root node
-     * @param {TreeTracer} tracer - TreeTracer instance
+     * @param {Tracer} tracer - Tracer instance
      */
     
     // Build node map for quick lookup
@@ -24,7 +24,7 @@ function inorderTraversal(treeNodes, rootId, tracer) {
     
     const visited = [];
     
-    function traverse(nodeId) {
+    function traverse(nodeId, depth, path) {
         if (nodeId === null || nodeId === undefined) {
             return;
         }
@@ -34,44 +34,55 @@ function inorderTraversal(treeNodes, rootId, tracer) {
             return;
         }
         
+        const currentPath = [...path, nodeId];
         const children = node.children || [];
         
         // Left subtree
         if (children.length > 0) {
             const leftChild = children[0];
-            tracer.addTreeState(treeNodes, [...visited], leftChild);
-            traverse(leftChild);
+            tracer.addState([], {
+                tree: treeNodes, visited: [...visited], current: leftChild,
+                depth: depth + 1, path: [...currentPath, leftChild]
+            });
+            traverse(leftChild, depth + 1, currentPath);
         }
         
-        // Current node
+        // Visit current node
         visited.push(nodeId);
-        tracer.addTreeState(treeNodes, [...visited], nodeId);
+        tracer.addState([], {
+            tree: treeNodes, visited: [...visited], current: nodeId,
+            depth, path: currentPath
+        });
         
         // Right subtree
         if (children.length > 1) {
             const rightChild = children[1];
-            tracer.addTreeState(treeNodes, [...visited], rightChild);
-            traverse(rightChild);
+            tracer.addState([], {
+                tree: treeNodes, visited: [...visited], current: rightChild,
+                depth: depth + 1, path: [...currentPath, rightChild]
+            });
+            traverse(rightChild, depth + 1, currentPath);
         }
     }
     
     // Initial state
-    tracer.addTreeState(treeNodes, [], rootId);
+    tracer.addState([], {
+        tree: treeNodes, visited: [], current: rootId,
+        depth: 0, path: [rootId]
+    });
     
     // Start traversal
-    traverse(rootId);
+    traverse(rootId, 0, []);
     
     // Final state
-    tracer.addTreeState(treeNodes, visited, null);
+    tracer.addState([], {
+        tree: treeNodes, visited: visited, current: null,
+        depth: 0, path: []
+    });
 }
 
-// Sample BST
-//           10
-//         /    \
-//        5      15
-//       / \    /  \
-//      3   7  12   20
-
+// [TEST]
+// [PARAMS]
 const treeNodes = [
     { id: 1, value: 10, children: [2, 3] },
     { id: 2, value: 5, children: [4, 5] },
@@ -81,15 +92,10 @@ const treeNodes = [
     { id: 6, value: 12, children: [] },
     { id: 7, value: 20, children: [] }
 ];
+const rootId = 1;
+// [/PARAMS]
+const tracer = new Tracer('trees', 'BST', 'Binary Search Tree');
 
-// [TEST]
-if (require.main === module) {
-    // Create tracer
-    const tracer = new TreeTracer("BST", "Binary Search Tree");
+inorderTraversal(treeNodes, rootId, tracer);
 
-    // Run the algorithm
-    inorderTraversal(treeNodes, 1, tracer);
-
-    // Output the tracer data
-    tracer.finalize();
-}
+tracer.finalize();

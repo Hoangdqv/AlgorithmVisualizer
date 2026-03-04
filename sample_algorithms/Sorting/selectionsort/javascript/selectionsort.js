@@ -1,4 +1,5 @@
-const Tracer = require('../../tracers/tracer');
+import Tracer from './tracers/tracer.js';
+import { swap } from './helpers.js';  // Helper function: swaps arr[i] and arr[j] in-place
 
 // [ALGORITHM]
 function selectionSort(arr, tracer) {
@@ -18,10 +19,12 @@ function selectionSort(arr, tracer) {
             }
         }
         
+        // If minIndex changed, update the selected position
+        tracer.addState([...arr], { selected: [i, minIndex], variables: { i, minIndex } });
         // Swap the minimum element with the first element of unsorted portion
         if (minIndex !== i) {
-            [arr[i], arr[minIndex]] = [arr[minIndex], arr[i]];
-            tracer.addState([...arr], { swapped: [i, minIndex], selected: [i], variables: { i, minIndex } });  // Keep selected position visible
+            swap(arr, i, minIndex);
+            tracer.addState([...arr], { swapped: [i, minIndex], selected: [i], variables: { i, minIndex } });
         }
     }
     tracer.addState([...arr]); // Complete state
@@ -29,14 +32,14 @@ function selectionSort(arr, tracer) {
 }
 
 // [TEST]
-if (require.main === module) {
-    const originalArr = [64, 34, 25, 12, 22, 11, 90];
-    const tracer = new Tracer('sorting'); // Tracer instance
-    const [sortedArr] = selectionSort([...originalArr], tracer);
-    
-    console.log('Original array:', originalArr);
-    console.log('Sorted array:', sortedArr);
-    
-    // Output tracer data for visualization
-    tracer.finalize();
-}
+// [PARAMS]
+const originalArr = [64, 34, 25, 12, 22, 11, 90];
+// [/PARAMS]
+const tracer = new Tracer('sorting'); // Tracer instance
+const [sortedArr] = selectionSort([...originalArr], tracer);
+
+console.log('Original array:', originalArr);
+console.log('Sorted array:', sortedArr);
+
+// Output tracer data for visualization
+tracer.finalize();

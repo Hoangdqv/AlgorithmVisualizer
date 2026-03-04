@@ -193,9 +193,51 @@ button {
   font-family: monospace;
   font-size: 14px;
   height: 100%;
-  overflow-y: auto;
+  overflow: hidden;
   white-space: pre-wrap;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+.console-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;          /* allow flex child to shrink below content */
+}
+.console-pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: inherit;
+  font-size: inherit;
+}
+/* Stdin input row — appears at the bottom of the console when a program is running */
+.stdin-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  border-top: 1px solid #333;
+  padding-top: 0.5rem;
+  flex-shrink: 0;
+}
+.stdin-caret {
+  color: #4CAF50;
+  font-weight: bold;
+  user-select: none;
+}
+.stdin-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #d4d4d4;
+  font-family: monospace;
+  font-size: 14px;
+  caret-color: #4CAF50;
+}
+.stdin-input::placeholder {
+  color: #555;
 }
 .console-text {
   color: #4CAF50;
@@ -1241,8 +1283,13 @@ footer {
 
 .visual-module-block-pivot {
   margin-top: -1rem;
-  background-color: #9b59b6 !important;
-  border-color: #8e44ad !important;
+  background-color: #9b59b6;
+  box-shadow: 0 4px 12px rgba(155, 89, 182, 0.5);
+}
+
+.visual-module-block-dimmed {
+  opacity: 0.25;
+  pointer-events: none;
 }
 
 .visual-module-block-comparing {
@@ -1563,6 +1610,13 @@ footer {
   stroke: #555;
   stroke-width: 2;
   opacity: 0.6;
+  transition: stroke 0.3s ease, stroke-width 0.3s ease, opacity 0.3s ease;
+}
+
+.tree-edge-active {
+  stroke: #ffa500;
+  stroke-width: 3;
+  opacity: 1;
 }
 
 .tree-node {
@@ -1625,6 +1679,17 @@ footer {
 .tree-legend-color.tree-node-visited {
   background-color: #4CAF50;
   border-color: #4CAF50;
+}
+
+.tree-legend-line {
+  width: 1.25rem;
+  height: 3px;
+  display: inline-block;
+  border-radius: 2px;
+}
+
+.tree-legend-line.tree-edge-active {
+  background-color: #ffa500;
 }
 
 .tree-info-section {
@@ -1818,3 +1883,133 @@ footer {
   }
 }
 
+/* ─── MODE TOGGLE ────────────────────────────────────────────────────────────── */
+.mode-toggle {
+  display: flex;
+  background: #2d2d2d;
+  border-radius: 0.25rem;
+  overflow: hidden;
+  border: 1px solid #444;
+}
+
+.mode-toggle button {
+  padding: 0.45em 0.85em;
+  background: transparent;
+  color: #999;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+  margin: 0;
+}
+
+.mode-toggle button.active {
+  background: #4167ff;
+  color: #fff;
+}
+
+.mode-toggle button:hover:not(.active) {
+  color: #d4d4d4;
+  background: #383838;
+}
+
+/* ─── MINIMAL MODE PANEL ─────────────────────────────────────────────────────── */
+.minimal-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+  color: #d4d4d4;
+  background: #1e1e1e;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.minimal-panel-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #888;
+  font-size: 0.95rem;
+}
+
+.minimal-panel-header h3 {
+  color: #fff;
+  margin: 0 0 0.25rem;
+  font-size: 1.15rem;
+}
+
+.minimal-panel-header p {
+  color: #888;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.minimal-panel-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+.minimal-panel-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.minimal-panel-field label {
+  font-weight: 600;
+  color: #e0e0e0;
+  font-size: 0.9rem;
+}
+
+.minimal-panel-description {
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.minimal-panel-input {
+  padding: 0.55rem 0.75rem;
+  background: #2d2d2d;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #d4d4d4;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 0.9rem;
+  transition: border-color 0.15s;
+}
+
+.minimal-panel-input:focus {
+  outline: none;
+  border-color: #4167ff;
+}
+
+.minimal-panel-input::placeholder {
+  color: #666;
+}
+
+.minimal-panel-run-btn {
+  margin-top: 0.5rem;
+  padding: 0.65rem 1.25rem;
+  background: #4167ff;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: background 0.15s;
+  align-self: flex-start;
+}
+
+.minimal-panel-run-btn:hover:not(:disabled) {
+  background: #3555dd;
+}
+
+.minimal-panel-run-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

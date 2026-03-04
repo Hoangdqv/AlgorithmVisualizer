@@ -1,4 +1,4 @@
-const ToggleDropdownBtn = ({toggleDropdown, isOpen, loading, selectedLanguage}) => {
+const ToggleDropdownBtn = ({toggleDropdown, isOpen, loading, currentLanguage}) => {
   return (
     <button 
     className="select-button"
@@ -7,7 +7,7 @@ const ToggleDropdownBtn = ({toggleDropdown, isOpen, loading, selectedLanguage}) 
     disabled={loading}
     >
     <span className="selected-value">
-        {selectedLanguage}
+        {currentLanguage}
     </span>
     <span className={`arrow ${isOpen ? 'rotate' : ''}`}></span>
     </button>

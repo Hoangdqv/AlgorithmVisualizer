@@ -1,4 +1,4 @@
-import tracers.tracer as service
+from tracers.tracer import Tracer
 
 # [ALGORITHM]
 def dfs(graph, start_node, tracer):
@@ -42,7 +42,7 @@ def dfs(graph, start_node, tracer):
 
         # Explore neighbors
         for neighbor in range(n - 1, -1, -1):
-            if graph[current][neighbor] == 1 and not visited[neighbor]:
+            if graph[current][neighbor] == 1 and not visited[neighbor] and neighbor not in stack:
                 stack.append(neighbor)
                 
                 # Show neighbor being discovered
@@ -63,26 +63,25 @@ def dfs(graph, start_node, tracer):
         completed=True
     )
     
-    return {'visited_order': visited_order, 'tracer': tracer}
+    return visited_order, tracer
 
 # [TEST]
 if __name__ == '__main__':
-    # Example graph: 6 nodes (0-5)
-    # Adjacency matrix representation
+    # [PARAMS]
     adjacency_matrix = [
-        [0, 1, 1, 0, 0, 0],  # Node 0 connects to 1, 2
-        [1, 0, 0, 1, 1, 0],  # Node 1 connects to 0, 3, 4
-        [1, 0, 0, 0, 1, 0],  # Node 2 connects to 0, 4
-        [0, 1, 0, 0, 0, 1],  # Node 3 connects to 1, 5
-        [0, 1, 1, 0, 0, 1],  # Node 4 connects to 1, 2, 5
-        [0, 0, 0, 1, 1, 0]   # Node 5 connects to 3, 4
+        [0, 1, 1, 0, 0, 0],
+        [1, 0, 0, 1, 1, 0],
+        [1, 0, 0, 0, 1, 0],
+        [0, 1, 0, 0, 0, 1],
+        [0, 1, 1, 0, 0, 1],
+        [0, 0, 0, 1, 1, 0]
     ]
-    
     start = 0
-    result, tracer = dfs(adjacency_matrix, start, service.Tracer('graphs', 'stack', 'Stack'))
+    # [/PARAMS]
+    result, tracer = dfs(adjacency_matrix, start, Tracer('graphs', 'stack', 'Stack'))
     
     print(f"DFS Traversal starting from node {start}:")
-    print(f"Visit order: {result['visited_order']}")
+    print(f"Visit order: {result}")
     print("Graph structure (adjacency matrix):")
     for i, row in enumerate(adjacency_matrix):
         print(f"  Node {i}: {row}")

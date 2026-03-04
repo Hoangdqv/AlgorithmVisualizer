@@ -1,4 +1,5 @@
-const Tracer = require('../../tracers/tracer');
+import Tracer from '../../tracers/tracer.js';
+import { swap } from './helpers.js';  // Helper function: swaps arr[i] and arr[j] in-place
 
 // [ALGORITHM]
 function quickSort(arr, tracer, low = 0, high = arr.length - 1) {
@@ -13,7 +14,6 @@ function quickSort(arr, tracer, low = 0, high = arr.length - 1) {
     quickSort(arr, tracer, pivotIndex + 1, high);
   }
   
-  // Track state after partitioning
   if (low === 0 && high === arr.length - 1) {
     tracer.addState([...arr]); // Complete state
   }
@@ -25,38 +25,49 @@ function partition(arr, tracer, low, high) {
   const pivot = arr[high];
   let i = low - 1;
   
-  // Show pivot selection (purple)
-  tracer.addState([...arr], { selected: [high], variables: { pivotIdx: high, low, high } });
+  tracer.addState(
+    [...arr], 
+    { pivot: high, range: [low, high], variables: { pivotIdx: high, low, high } }
+  );
   
   for (let j = low; j < high; j++) {
-    // Show comparison (yellow)
-    tracer.addState([...arr], { comparing: [j, high], variables: { i, j, low, high } });
+    // Show comparison
+    tracer.addState([...arr], { 
+      comparing: [j, high], 
+      pivot: high, 
+      range: [low, high], 
+      variables: { i, j, low, high } 
+      });
     
     if (arr[j] < pivot) {
       i++;
       // Swap elements
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-      // Show swap result (green)
-      tracer.addState([...arr], { swapped: [i, j], variables: { i, j, low, high } });
+      swap(arr, i, j);
+      // Show swap result
+      tracer.addState([...arr], { 
+        swapped: [i, j],
+        pivot: high, 
+        range: [low, high], 
+        variables: { i, j, low, high } 
+      });
     }
   }
   
   // Place pivot in its final position
-  [arr[i + 1], arr[high]] = [arr[high], arr[i + 1]];
-  tracer.addState([...arr], { swapped: [i + 1, high], variables: { i, pivotIdx: high, low, high } });
+  swap(arr, i + 1, high);
+  tracer.addState([...arr], { swapped: [i + 1, high], pivot: i + 1, range: [low, high], variables: { i, pivotIdx: high, low, high } });
   
   return i + 1;
 }
 
 // [TEST]
-if (require.main === module) {
-    const originalArr = [92, 14, 461, 1122, 235, 9, 127];
-    const tracer = new Tracer('sorting'); // Tracer instance
-    const [sortedArr] = quickSort([...originalArr], tracer);
-    
-    console.log('Original array:', originalArr);
-    console.log('Sorted array:', sortedArr);
-    
-    // Output tracer data for visualization
-    tracer.finalize();
-}
+// [PARAMS]
+const originalArr = [92, 14, 461, 1122, 235, 9, 127];
+// [/PARAMS]
+const tracer = new Tracer('sorting'); // Tracer instance
+const [sortedArr] = quickSort([...originalArr], tracer);
+
+console.log('Original array:', originalArr);
+console.log('Sorted array:', sortedArr);
+
+tracer.finalize();

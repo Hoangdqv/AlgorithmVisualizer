@@ -3,8 +3,10 @@ import { useState, useEffect, useRef, useImperativeHandle, forwardRef, useCallba
 const TreeVisualization = forwardRef(({ currentState, tracerData }, ref) => {
 
   const treeData = useMemo(() => currentState?.tree || [], [currentState?.tree]);
+  const path = useMemo(() => currentState?.path || [], [currentState?.path]);
   const visited = currentState?.visited || [];
   const current = currentState?.current;
+  const depth = currentState?.depth;
 
   // Get data structure info from metadata
   const dataStructureLabel = tracerData?.metadata?.dataStructureLabel || 'Tree';
@@ -305,6 +307,23 @@ const TreeVisualization = forwardRef(({ currentState, tracerData }, ref) => {
     return node ? (node.value !== undefined ? node.value : node.id) : '-';
   };
 
+  // Build a set of path edges for O(1) lookup
+  const pathEdgeSet = useMemo(() => {
+    const set = new Set();
+    for (let i = 0; i < path.length - 1; i++) {
+      set.add(`${path[i]}-${path[i + 1]}`);
+      set.add(`${path[i + 1]}-${path[i]}`); // edges are parent→child, check both directions
+    }
+    return set;
+  }, [path]);
+
+  const getEdgeClass = (parentId, childId) => {
+    if (pathEdgeSet.has(`${parentId}-${childId}`)) {
+      return 'tree-edge tree-edge-active';
+    }
+    return 'tree-edge';
+  };
+
   const renderTree = () => {
     if (nodePositions.length === 0 || treeData.length === 0) return null;
 
@@ -329,7 +348,7 @@ const TreeVisualization = forwardRef(({ currentState, tracerData }, ref) => {
                 y1={nodePositions[parentIndex].y}
                 x2={nodePositions[childIndex].x}
                 y2={nodePositions[childIndex].y}
-                className="tree-edge"
+                className={getEdgeClass(node.id, childId)}
               />
             );
           }
@@ -352,7 +371,7 @@ const TreeVisualization = forwardRef(({ currentState, tracerData }, ref) => {
           height={viewBox.height} 
           fill="none" 
           stroke="#ccc" 
-          strokeWidth="1"
+          strokeWidth="2"
           pointerEvents="none"
         />
         <g transform={`translate(${panOffset.x}, ${panOffset.y}) scale(${zoom})`}>
@@ -422,15 +441,29 @@ const TreeVisualization = forwardRef(({ currentState, tracerData }, ref) => {
                 <div className="tree-info-value">{treeData.length}</div>
               </div>
               <div className="tree-info-item">
-                <div className="tree-info-label">Visited Nodes:</div>
-                <div className="tree-info-value">
-                  [{visited && visited.length > 0 ? visited.map(getNodeValueById).join(', ') : 'none'}]
-                </div>
-              </div>
-              <div className="tree-info-item">
                 <div className="tree-info-label">Current Node:</div>
                 <div className="tree-info-value tree-info-current">
                   {current !== null && current !== undefined ? getNodeValueById(current) : '-'}
+                </div>
+              </div>
+              {depth !== null && depth !== undefined && (
+                <div className="tree-info-item">
+                  <div className="tree-info-label">Depth:</div>
+                  <div className="tree-info-value">{depth}</div>
+                </div>
+              )}
+              {path.length > 0 && (
+                <div className="tree-info-item">
+                  <div className="tree-info-label">Path:</div>
+                  <div className="tree-info-value">
+                    {path.map(getNodeValueById).join(' → ')}
+                  </div>
+                </div>
+              )}
+              <div className="tree-info-item">
+                <div className="tree-info-label">Visited Nodes:</div>
+                <div className="tree-info-value">
+                  [{visited && visited.length > 0 ? visited.map(getNodeValueById).join(', ') : 'none'}]
                 </div>
               </div>
             </div>
@@ -442,6 +475,9 @@ const TreeVisualization = forwardRef(({ currentState, tracerData }, ref) => {
           </div>
           <div className="tree-legend-item">
             <span className="tree-legend-color tree-node-visited"></span> Visited
+          </div>
+          <div className="tree-legend-item">
+            <span className="tree-legend-line tree-edge-active"></span> Active Path
           </div>
         </div>
       </div>

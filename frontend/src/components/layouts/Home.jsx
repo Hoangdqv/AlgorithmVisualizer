@@ -51,7 +51,7 @@ export default function Home() {
             </div>
             <div className="home-feature-card">
               <h3>Visualize</h3>
-              <p>See each step of the algorithm with color-coded blocks and interactive playback controls</p>
+              <p>See each step of the algorithm with color visuals and interactive playback controls</p>
             </div>
           </div>
         </section>

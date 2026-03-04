@@ -3,7 +3,7 @@ import SortingVisualization from './visualizations/SortingVisualization';
 import GraphVisualization from './visualizations/GraphVisualization';
 import TreeVisualization from './visualizations/TreeVisualization';
 
-const VisualModule = ({ tracerData, isRunning, selectedLanguage }) => {
+const VisualModule = ({ tracerData, isRunning, currentLanguage }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speedMultiplier, setSpeedMultiplier] = useState(1); // 0.5x to 2x
@@ -28,7 +28,7 @@ const VisualModule = ({ tracerData, isRunning, selectedLanguage }) => {
     setDisplayData(null);
     setCurrentStep(0);
     setIsPlaying(false);
-  }, [selectedLanguage]);
+  }, [currentLanguage]);
 
   useEffect(() => {
       if (tracerData && tracerData.states && tracerData.states.length > 0) {

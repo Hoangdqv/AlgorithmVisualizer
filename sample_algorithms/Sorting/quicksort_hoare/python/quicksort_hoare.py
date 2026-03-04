@@ -1,5 +1,6 @@
 # Quick Sort (Hoare Partition) in Python
-import tracers.tracer as trc
+from tracers.tracer import Tracer
+from helpers import swap  # Helper function: swaps arr[i] and arr[j] in-place
 
 # [ALGORITHM]
 def quick_sort_hoare(arr, tracer, low=0, high=None):
@@ -24,9 +25,8 @@ def quick_sort_hoare(arr, tracer, low=0, high=None):
 
 def partition_hoare(arr, tracer, low, high):
     pivot = arr[low]
-    
-    # Show pivot selection (purple)
-    tracer.add_state(arr.copy(), selected=[low], variables={'pivot_idx': low, 'low': low, 'high': high})
+    # Show pivot selection
+    tracer.add_state(arr.copy(), pivot=low, range=[low, high], variables={'pivot_idx': low, 'low': low, 'high': high})
     
     i = low - 1
     j = high + 1
@@ -35,26 +35,26 @@ def partition_hoare(arr, tracer, low, high):
         # Move left pointer right
         while True:
             i += 1
-            # Show left scan (yellow)
+            # Show left scan
             if i <= j:
-                tracer.add_state(arr.copy(), comparing=[i, low], variables={'i': i, 'j': j, 'low': low, 'high': high})
+                tracer.add_state(arr.copy(), comparing=[i, low], pivot=low, range=[low, high], variables={'i': i, 'j': j, 'low': low, 'high': high})
             if arr[i] >= pivot:
                 break
         
         # Move right pointer left
         while True:
             j -= 1
-            # Show right scan (yellow)
+            # Show right scan
             if i <= j:
-                tracer.add_state(arr.copy(), comparing=[j, low], variables={'i': i, 'j': j, 'low': low, 'high': high})
+                tracer.add_state(arr.copy(), comparing=[j, low], pivot=low, range=[low, high], variables={'i': i, 'j': j, 'low': low, 'high': high})
             if arr[j] <= pivot:
                 break
         
         # If pointers haven't crossed, swap
         if i < j:
-            arr[i], arr[j] = arr[j], arr[i]
-            # Show swap result (green)
-            tracer.add_state(arr.copy(), swapped=[i, j], variables={'i': i, 'j': j, 'low': low, 'high': high})
+            swap(arr, i, j)
+            # Show swap result
+            tracer.add_state(arr.copy(), swapped=[i, j], pivot=low, range=[low, high], variables={'i': i, 'j': j, 'low': low, 'high': high})
         else:
             break
     
@@ -62,8 +62,10 @@ def partition_hoare(arr, tracer, low, high):
 
 # [TEST]
 if __name__ == "__main__":
+    # [PARAMS]
     original_arr = [92, 14, 461, 1122, 235, 9, 127]
-    sorted_arr, tracer = quick_sort_hoare(original_arr.copy(), trc.Tracer(category='sorting'))
+    # [/PARAMS]
+    sorted_arr, tracer = quick_sort_hoare(original_arr.copy(), Tracer(category='sorting'))
 
     print(f'Original array: {original_arr}')
     print(f'Sorted array: {sorted_arr}')

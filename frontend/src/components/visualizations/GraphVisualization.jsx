@@ -279,7 +279,7 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
           height={viewBox.height} 
           fill="none" 
           stroke="#ccc" 
-          strokeWidth="1"
+          strokeWidth="2"
           pointerEvents="none"
         />
         <g transform={`translate(${panOffset.x}, ${panOffset.y}) scale(${zoom})`}>

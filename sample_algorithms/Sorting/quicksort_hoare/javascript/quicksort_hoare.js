@@ -1,4 +1,5 @@
-const Tracer = require('../../tracers/tracer');
+import Tracer from '../../tracers/tracer.js';
+import { swap } from './helpers.js';  // Helper function: swaps arr[i] and arr[j] in-place
 
 // [ALGORITHM]
 function quickSortHoare(arr, tracer, low = 0, high = arr.length - 1) {
@@ -24,8 +25,12 @@ function quickSortHoare(arr, tracer, low = 0, high = arr.length - 1) {
 function partitionHoare(arr, tracer, low, high) {
   const pivot = arr[low];
   
-  // Show pivot selection (purple)
-  tracer.addState([...arr], { selected: [low], variables: { pivotIdx: low, low, high } });
+  // Show pivot selection
+  tracer.addState([...arr], { 
+    pivot: low, 
+    range: [low, high], 
+    variables: { pivotIdx: low, low, high } 
+  });
   
   let i = low - 1;
   let j = high + 1;
@@ -34,26 +39,41 @@ function partitionHoare(arr, tracer, low, high) {
     // Move left pointer right
     do {
       i++;
-      // Show left scan (yellow)
+      // Show left scan
       if (i <= j) {
-        tracer.addState([...arr], { comparing: [i, low], variables: { i, j, low, high } });
+        tracer.addState([...arr], { 
+          comparing: [i, low], 
+          pivot: low, 
+          range: [low, high], 
+          variables: { i, j, low, high } 
+        });
       }
     } while (arr[i] < pivot);
     
     // Move right pointer left
     do {
       j--;
-      // Show right scan (yellow)
+      // Show right scan
       if (i <= j) {
-        tracer.addState([...arr], { comparing: [j, low], variables: { i, j, low, high } });
+        tracer.addState([...arr], { 
+          comparing: [j, low], 
+          pivot: low, 
+          range: [low, high], 
+          variables: { i, j, low, high } 
+        });
       }
     } while (arr[j] > pivot);
     
     // If pointers haven't crossed, swap
     if (i < j) {
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-      // Show swap result (green)
-      tracer.addState([...arr], { swapped: [i, j], variables: { i, j, low, high } });
+      swap(arr, i, j);
+      // Show swap result
+      tracer.addState([...arr], { 
+        swapped: [i, j], 
+        pivot: low, 
+        range: [low, high], 
+        variables: { i, j, low, high } 
+      });
     } else {
       break;
     }
@@ -63,14 +83,14 @@ function partitionHoare(arr, tracer, low, high) {
 }
 
 // [TEST]
-if (require.main === module) {
-    const originalArr = [92, 14, 461, 1122, 235, 9, 127];
-    const tracer = new Tracer('sorting'); // Tracer instance
-    const [sortedArr] = quickSortHoare([...originalArr], tracer);
-    
-    console.log('Original array:', originalArr);
-    console.log('Sorted array:', sortedArr);
-    
-    // Output tracer data for visualization
-    tracer.finalize();
-}
+// [PARAMS]
+const originalArr = [92, 14, 461, 1122, 235, 9, 127];
+// [/PARAMS]
+const tracer = new Tracer('sorting'); // Tracer instance
+const [sortedArr] = quickSortHoare([...originalArr], tracer);
+
+console.log('Original array:', originalArr);
+console.log('Sorted array:', sortedArr);
+
+// Output tracer data for visualization
+tracer.finalize();

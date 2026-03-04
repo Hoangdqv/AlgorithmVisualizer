@@ -2,10 +2,12 @@ import docker
 import json
 import tempfile
 import os
+import socket as _socket
 
 class ContainerHandler:
     def __init__(self):
         self.client = None
+        self.api_client = None
         self.docker_images = {
             'python': 'python:3.13-alpine',
             'javascript': 'node:22-alpine'
@@ -13,14 +15,22 @@ class ContainerHandler:
         # Security limits
         self.max_code_size = 100 * 1024  # 100KB max code size
         self.execution_timeout = 30  # 30 seconds
+        self.simple_timeout = 10    # 10 seconds for plain code runs
         self.memory_limit = '128m'  # 128MB RAM limit
         self.cpu_quota = 50000  # 50% CPU (50000 out of 100000)
-    
+        self.max_output_bytes = 10 * 1024  # 10KB output cap for simple runs
+
     def _get_client(self):
-        """Lazy initialization of Docker client."""
+        """Lazy initialization of high-level Docker client."""
         if self.client is None:
             self.client = docker.from_env()
         return self.client
+
+    def _get_api_client(self):
+        """Lazy initialization of low-level Docker API client (needed for attach_socket)."""
+        if self.api_client is None:
+            self.api_client = docker.APIClient()
+        return self.api_client
     
     def _validate_code(self, code):
         """Validate code for security concerns."""
@@ -48,6 +58,133 @@ class ContainerHandler:
                 return False, f'Dangerous operation blocked: {pattern}'
         
         return True, None
+
+    def execute_code(self, language, code):
+        if len(code) > self.max_code_size:
+            return {'success': False, 'error': 'Code exceeds maximum size limit'}
+
+        docker_image = self.docker_images.get(language)
+        if not docker_image:
+            return {'success': False, 'error': f'Language {language} not supported'}
+
+        ext = 'py' if language == 'python' else 'js'
+        # -u flag on Python disables output buffering
+        cmd = ['python', '-u', '/app/code.py'] if language == 'python' else ['node', '/app/code.js']
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix=f'.{ext}', delete=False, encoding='utf-8') as f:
+            temp_file = f.name
+            f.write(code)
+
+        try:
+            container = self._get_client().containers.run(
+                docker_image,
+                command=cmd,
+                volumes={os.path.abspath(temp_file): {'bind': f'/app/code.{ext}', 'mode': 'ro'}},
+                detach=True,
+                remove=False,
+                network_mode='none',
+                mem_limit=self.memory_limit,
+                cpu_quota=self.cpu_quota,
+                cpu_period=100000,
+                read_only=True,
+                tmpfs={'/tmp': 'size=10M,noexec,nosuid'},
+                cap_drop=['ALL'],
+                security_opt=['no-new-privileges'],
+                pids_limit=50,
+                user='nobody',
+                ulimits=[
+                    docker.types.Ulimit(name='nofile', soft=64, hard=64),
+                    docker.types.Ulimit(name='fsize', soft=10485760, hard=10485760),
+                ],
+            )
+
+            result = container.wait(timeout=self.simple_timeout)
+
+            output = container.logs(stdout=True, stderr=False).decode('utf-8', errors='replace')
+            errors = container.logs(stdout=False, stderr=True).decode('utf-8', errors='replace')
+
+            # Cap output to prevent flooding
+            if len(output) > self.max_output_bytes:
+                output = output[:self.max_output_bytes] + '\n[Output truncated at 10 KB]'
+
+            try:
+                container.remove()
+            except Exception:
+                pass
+
+            return {
+                'success': True,
+                'output': output,
+                'stderr': errors,
+                'exit_code': result['StatusCode']
+            }
+
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+        finally:
+            try:
+                os.unlink(temp_file)
+            except Exception:
+                pass
+
+    def create_interactive_container(self, language, code):
+        """
+        Create (but do not start) a Docker container for interactive stdin/stdout
+        execution.  The caller is responsible for starting the container and
+        attaching to it via attach_socket().
+
+        Returns (container, temp_file_path) so the caller can clean up the
+        temp file when the session ends.
+        """
+        if len(code) > self.max_code_size:
+            raise ValueError('Code exceeds maximum size limit')
+
+        docker_image = self.docker_images.get(language)
+        if not docker_image:
+            raise ValueError(f'Language {language} not supported')
+
+        ext = 'py' if language == 'python' else 'js'
+        cmd = ['python', '-u', '/app/code.py'] if language == 'python' else ['node', '/app/code.js']
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix=f'.{ext}', delete=False, encoding='utf-8') as f:
+            temp_file = f.name
+            f.write(code)
+
+        container = self._get_client().containers.create(
+            docker_image,
+            command=cmd,
+            volumes={os.path.abspath(temp_file): {'bind': f'/app/code.{ext}', 'mode': 'ro'}},
+            stdin_open=True,   # keep stdin pipe open
+            tty=True,          # allocate a PTY → raw byte stream (no 8-byte mux headers)
+            detach=True,
+            network_mode='none',
+            mem_limit=self.memory_limit,
+            cpu_quota=self.cpu_quota,
+            cpu_period=100000,
+            read_only=True,
+            tmpfs={'/tmp': 'size=10M,noexec,nosuid'},
+            cap_drop=['ALL'],
+            security_opt=['no-new-privileges'],
+            pids_limit=50,
+            user='nobody',
+            ulimits=[
+                docker.types.Ulimit(name='nofile', soft=64, hard=64),
+                docker.types.Ulimit(name='fsize', soft=10485760, hard=10485760),
+            ],
+        )
+
+        return container, temp_file
+
+    def cleanup_container(self, container):
+        """Kill and remove a container, ignoring errors."""
+        try:
+            container.kill()
+        except Exception:
+            pass
+        try:
+            container.remove()
+        except Exception:
+            pass
     
     def execute_algorithm(self, language, code):
         print(f"\n[CONTAINER] Starting execution for {language}")
@@ -77,8 +214,10 @@ class ContainerHandler:
         # Get tracers directory path
         backend_dir = os.path.dirname(os.path.abspath(__file__))
         tracers_dir = os.path.join(os.path.dirname(backend_dir), 'tracers')
+        helpers_dir = os.path.join(os.path.dirname(backend_dir), 'sample_algorithms')
         
         print(f"[CONTAINER] Tracers directory: {tracers_dir}")
+        print(f"[CONTAINER] Helpers directory: {helpers_dir}")
         
         try:
             # Determine file extension and command
@@ -105,6 +244,14 @@ class ContainerHandler:
                     os.path.abspath(tracers_dir): {
                         'bind': '/app/tracers',
                         'mode': 'ro'  # Read-only
+                    },
+                    os.path.abspath(os.path.join(helpers_dir, 'helpers.py')): {
+                        'bind': '/app/helpers.py',
+                        'mode': 'ro'
+                    },
+                    os.path.abspath(os.path.join(helpers_dir, 'helpers.js')): {
+                        'bind': '/app/helpers.js',
+                        'mode': 'ro'
                     }
                 },
                 detach=True,
@@ -114,10 +261,15 @@ class ContainerHandler:
                 cpu_quota=self.cpu_quota,
                 cpu_period=100000,
                 read_only=True,  # Read-only root filesystem
-                tmpfs={'/tmp': 'size=10M'},
+                tmpfs={'/tmp': 'size=10M,noexec,nosuid'},
                 cap_drop=['ALL'],
                 security_opt=['no-new-privileges'],
                 pids_limit=50,
+                user='nobody',
+                ulimits=[
+                    docker.types.Ulimit(name='nofile', soft=64, hard=64),
+                    docker.types.Ulimit(name='fsize', soft=10485760, hard=10485760),
+                ],
             )
             
             # Wait for container to finish

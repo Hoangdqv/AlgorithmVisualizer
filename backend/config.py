@@ -20,6 +20,12 @@ LANGUAGE_MAP = {
                 'name': 'Bubble Sort',
                 'description': 'Sort an array using bubble sort'
             },
+            'guessinggame': {
+                'file': 'python/guessinggame.py',
+                'name': 'Number Guessing Game',
+                'description': 'Random numbers and input loops',
+                'await_console_input': True
+            },
         }
     },
     'javascript': {
@@ -35,6 +41,12 @@ LANGUAGE_MAP = {
                 'file': 'javascript/fibonacci.js',
                 'name': 'Fibonacci Sequence',
                 'description': 'Calculate Fibonacci numbers'
+            },
+            'guessinggame': {
+                'file': 'javascript/guessinggame.js',
+                'name': 'Number Guessing Game',
+                'description': 'Random numbers and input loops',
+                'await_console_input': True
             }
         }
     }

@@ -13,10 +13,23 @@ const FileTree = ({
 }) => {
 
   const [expandedFolders, setExpandedFolders] = useState({});
-  const suffix = {
-    'python': 'py',
-    'javascript': 'js'
-  }
+  
+  // Dynamic file extension mapper
+  const getFileExtension = (languageName) => {
+    const extensionMap = {
+      'python': 'py',
+      'javascript': 'js',
+      'java': 'java',
+      'cpp': 'cpp',
+      'c': 'c',
+      'go': 'go',
+      'rust': 'rs',
+      'typescript': 'ts',
+      'ruby': 'rb',
+      'php': 'php'
+    };
+    return extensionMap[languageName.toLowerCase()] || 'txt';
+  };
 
   const toggleFolder = (folderId, e) => {
     e.stopPropagation();
@@ -51,7 +64,7 @@ const FileTree = ({
   const handleLanguages = (file) => {
     if (!languages) return null;
     const lang = languages.find(lang => lang.lang_id === file.lang_id);
-    return lang ? suffix[lang.language.toLowerCase()] : null;
+    return lang ? getFileExtension(lang.language) : 'txt';
   }
 
   const indent = depth * 16;

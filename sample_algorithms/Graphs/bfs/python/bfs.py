@@ -1,4 +1,4 @@
-import tracers.tracer as service
+from tracers.tracer import Tracer
 from collections import deque
 
 # [ALGORITHM]
@@ -68,19 +68,18 @@ def bfs(graph, start_node, tracer):
 
 # [TEST]
 if __name__ == "__main__":
-    # Example graph: 6 nodes (0-5)
-    # Adjacency matrix representation
+    # [PARAMS]
     adjacency_matrix = [
-        [0, 1, 1, 0, 0, 0],  # Node 0 connects to 1, 2
-        [1, 0, 0, 1, 1, 0],  # Node 1 connects to 0, 3, 4
-        [1, 0, 0, 0, 1, 0],  # Node 2 connects to 0, 4
-        [0, 1, 0, 0, 0, 1],  # Node 3 connects to 1, 5
-        [0, 1, 1, 0, 0, 1],  # Node 4 connects to 1, 2, 5
-        [0, 0, 0, 1, 1, 0]   # Node 5 connects to 3, 4
+        [0, 1, 1, 0, 0, 0],
+        [1, 0, 0, 1, 1, 0],
+        [1, 0, 0, 0, 1, 0],
+        [0, 1, 0, 0, 0, 1],
+        [0, 1, 1, 0, 0, 1],
+        [0, 0, 0, 1, 1, 0]
     ]
-    
     start = 0
-    result, tracer = bfs(adjacency_matrix, start, service.Tracer('graphs', 'queue', 'Queue'))
+    # [/PARAMS]
+    result, tracer = bfs(adjacency_matrix, start, Tracer('graphs', 'queue', 'Queue'))
     
     print(f'BFS Traversal starting from node {start}:')
     print(f'Visit order: {result}')

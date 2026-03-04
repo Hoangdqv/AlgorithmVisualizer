@@ -1,4 +1,4 @@
-const Tracer = require('./tracers/tracer');
+import Tracer from './tracers/tracer.js';
 
 // [ALGORITHM]
 function dfs(graph, startNode, tracer) {
@@ -69,31 +69,26 @@ function dfs(graph, startNode, tracer) {
 }
 
 // [TEST]
-if (require.main === module) {
-    // Example graph: 6 nodes (0-5)
-    // Adjacency matrix representation
-    const adjacencyMatrix = [
-        [0, 1, 1, 0, 0, 0],  // Node 0 connects to 1, 2
-        [1, 0, 0, 1, 1, 0],  // Node 1 connects to 0, 3, 4
-        [1, 0, 0, 0, 1, 0],  // Node 2 connects to 0, 4
-        [0, 1, 0, 0, 0, 1],  // Node 3 connects to 1, 5
-        [0, 1, 1, 0, 0, 1],  // Node 4 connects to 1, 2, 5
-        [0, 0, 0, 1, 1, 0]   // Node 5 connects to 3, 4
-    ];
-    
-    const start = 0;
-    const tracer = new Tracer('graphs', 'stack', 'Stack');
-    const { visitedOrder } = dfs(adjacencyMatrix, start, tracer);
-    
-    console.log(`DFS Traversal starting from node ${start}:`);
-    console.log(`Visit order: ${visitedOrder}`);
-    console.log('Graph structure (adjacency matrix):');
-    adjacencyMatrix.forEach((row, i) => {
-        console.log(`  Node ${i}: [${row.join(', ')}]`);
-    });
-    
-    // Output tracer data for visualization
-    tracer.finalize();
-}
+// [PARAMS]
+const adjacencyMatrix = [
+    [0, 1, 1, 0, 0, 0],
+    [1, 0, 0, 1, 1, 0],
+    [1, 0, 0, 0, 1, 0],
+    [0, 1, 0, 0, 0, 1],
+    [0, 1, 1, 0, 0, 1],
+    [0, 0, 0, 1, 1, 0]
+];
+const start = 0;
+// [/PARAMS]
+const tracer = new Tracer('graphs', 'stack', 'Stack');
+const { visitedOrder } = dfs(adjacencyMatrix, start, tracer);
 
-module.exports = { dfs };
+console.log(`DFS Traversal starting from node ${start}:`);
+console.log(`Visit order: ${visitedOrder}`);
+console.log('Graph structure (adjacency matrix):');
+adjacencyMatrix.forEach((row, i) => {
+    console.log(`  Node ${i}: [${row.join(', ')}]`);
+});
+
+// Output tracer data for visualization
+tracer.finalize();

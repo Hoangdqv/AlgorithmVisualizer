@@ -6,7 +6,7 @@ import FileTree from '../FileTree';
 import FileContextMenu from '../FileContextMenu';
 import NewItemModal from '../NewItemModal';
 
-const Sidebar = ({ onFileSelect, selectedLanguage, apiCache, onUserFileSelect }) => {
+const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, onUserFileSelect }) => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('samples'); // 'samples' or 'myfiles'
   const [openDropdowns, setOpenDropdowns] = useState({});
@@ -50,17 +50,17 @@ const Sidebar = ({ onFileSelect, selectedLanguage, apiCache, onUserFileSelect })
   const loadSamples = useCallback(async () => {
     setLoading(true);
     try {
-      const isCategoryRequest = selectedLanguage.includes('_');
+      const isCategoryRequest = currentLanguage.includes('_');
       let response;
       
       if (isCategoryRequest) {
-        const [category, language] = selectedLanguage.split('_');
+        const [category, language] = currentLanguage.split('_');
         response = await fetch(
           `${API_URL}/algorithms/${category}/${language}`
         );
       } else {
         response = await fetch(
-          `${API_URL}/samples/${selectedLanguage.toLowerCase()}`
+          `${API_URL}/samples/${currentLanguage.toLowerCase()}`
         );
       }
       
@@ -69,7 +69,8 @@ const Sidebar = ({ onFileSelect, selectedLanguage, apiCache, onUserFileSelect })
       if (response.ok) {
         const items = data.samples || data.algorithms || [];
         setSamples(items);
-        apiCache.current.lists[selectedLanguage] = items;
+        apiCache.current.lists[currentLanguage] = items;
+        setSelectedSampleKey(items[0]?.key || null);
         setOpenDropdowns({ 'samples': true });
       } else {
         console.error('Failed to load samples:', data.error);
@@ -81,7 +82,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, apiCache, onUserFileSelect })
     } finally {
       setLoading(false);
     }
-  }, [selectedLanguage, apiCache, API_URL]);
+  }, [currentLanguage, apiCache, API_URL]);
 
   const loadUserFiles = useCallback(async (forceReload = false) => {
     // Check cache first
@@ -156,14 +157,15 @@ const Sidebar = ({ onFileSelect, selectedLanguage, apiCache, onUserFileSelect })
     // Load samples when on samples tab
   useEffect(() => {
     if (activeTab === 'samples') {
-      if (apiCache.current.lists[selectedLanguage]) {
-        setSamples(apiCache.current.lists[selectedLanguage]);
+      if (apiCache.current.lists[currentLanguage]) {
+        setSamples(apiCache.current.lists[currentLanguage]);
+        setSelectedSampleKey(apiCache.current.lists[currentLanguage][0]?.key || null);
         setOpenDropdowns({ 'samples': true });
         return;
       }
       loadSamples();
     }
-  }, [selectedLanguage, activeTab, loadSamples, apiCache, API_URL]);
+  }, [currentLanguage, activeTab, loadSamples, apiCache, API_URL]);
 
   // Load user files when on myfiles tab
   useEffect(() => {
@@ -209,7 +211,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, apiCache, onUserFileSelect })
 
   useEffect(() => {
     setSearchQuery('');
-  }, [selectedLanguage, activeTab]);
+  }, [currentLanguage, activeTab]);
 
   const filteredSamples = useMemo(() => {
     if (!searchQuery.trim()) {
@@ -484,15 +486,15 @@ const Sidebar = ({ onFileSelect, selectedLanguage, apiCache, onUserFileSelect })
           // Samples Tab Content
           <>
             <h3 style={{ color: 'white', marginBottom: '1rem', fontSize: '16px' }}>
-              {selectedLanguage.includes('_') 
-                ? `${selectedLanguage.split('_')[0].charAt(0).toUpperCase() + selectedLanguage.split('_')[0].slice(1)} Algorithms`
-                : `${selectedLanguage} Samples`
+              {currentLanguage.includes('_') 
+                ? `${currentLanguage.split('_')[0].charAt(0).toUpperCase() + currentLanguage.split('_')[0].slice(1)} Algorithms`
+                : `${currentLanguage} Samples`
               }
             </h3>
             <SearchBar 
               value={searchQuery}
               onChange={setSearchQuery}
-              placeholder={`Search ${selectedLanguage.includes('_') ? 'algorithms' : 'samples'}...`}
+              placeholder={`Search ${currentLanguage.includes('_') ? 'algorithms' : 'samples'}...`}
             />
             <hr style={{ borderColor: '#333', margin: '1rem 0' }} />
 
@@ -505,7 +507,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage, apiCache, onUserFileSelect })
                   className='folder-button'
                 >
                   <span>
-                    📁 {selectedLanguage.includes('_') ? 'Algorithms' : 'Code Samples'} 
+                    📁 {currentLanguage.includes('_') ? 'Algorithms' : 'Code Samples'} 
                     ({filteredSamples.length}{searchQuery && samples.length !== filteredSamples.length ? ` of ${samples.length}` : ''})
                   </span>
                 </button>
