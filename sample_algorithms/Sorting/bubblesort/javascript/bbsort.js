@@ -9,13 +9,15 @@ function bubbleSort(arr, tracer) {
         let swapped = false;  
         for (let j = 0; j < n - i - 1; j++) {
             tracer.addState([...arr], { 
-                comparing: [j, j + 1], 
+                comparing: [j, j + 1],
+                indexVars: ['i', 'j'],
                 variables: { i, j } 
             });
             if (arr[j] > arr[j + 1]) {
                 swap(arr, j, j + 1);
                 tracer.addState([...arr], { 
-                    swapped: [j, j + 1], 
+                    swapped: [j, j + 1],
+                    indexVars: ['i', 'j'],
                     variables: { i, j } 
                 });
                 swapped = true;

@@ -28,7 +28,8 @@ function partitionHoare(arr, tracer, low, high) {
   // Show pivot selection
   tracer.addState([...arr], { 
     pivot: low, 
-    range: [low, high], 
+    range: [low, high],
+    indexVars: ['low', 'high', 'pivotIdx'],
     variables: { pivotIdx: low, low, high } 
   });
   
@@ -44,7 +45,8 @@ function partitionHoare(arr, tracer, low, high) {
         tracer.addState([...arr], { 
           comparing: [i, low], 
           pivot: low, 
-          range: [low, high], 
+          range: [low, high],
+          indexVars: ['i', 'j', 'low', 'high'],
           variables: { i, j, low, high } 
         });
       }
@@ -58,7 +60,8 @@ function partitionHoare(arr, tracer, low, high) {
         tracer.addState([...arr], { 
           comparing: [j, low], 
           pivot: low, 
-          range: [low, high], 
+          range: [low, high],
+          indexVars: ['i', 'j', 'low', 'high'],
           variables: { i, j, low, high } 
         });
       }
@@ -66,12 +69,21 @@ function partitionHoare(arr, tracer, low, high) {
     
     // If pointers haven't crossed, swap
     if (i < j) {
+      // Show which elements will be swapped
+      tracer.addState([...arr], { 
+        comparing: [i, j], 
+        pivot: low, 
+        range: [low, high],
+        indexVars: ['i', 'j', 'low', 'high'],
+        variables: { i, j, low, high } 
+      });
       swap(arr, i, j);
       // Show swap result
       tracer.addState([...arr], { 
         swapped: [i, j], 
         pivot: low, 
-        range: [low, high], 
+        range: [low, high],
+        indexVars: ['i', 'j', 'low', 'high'],
         variables: { i, j, low, high } 
       });
     } else {

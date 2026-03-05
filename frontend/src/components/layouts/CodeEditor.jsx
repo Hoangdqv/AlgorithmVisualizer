@@ -10,7 +10,7 @@ const CodeEditor = () => {
   const [showSidebar, setShowSidebar] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-  const [currentFile, setCurrentFile] = useState(null);
+  const [selectedUserFile, setSelectedUserFile] = useState(null);
   const [autoSaving, setAutoSaving] = useState(false);
   const [languageData, setLanguageData] = useState([]);
   const [stdinValue, setStdinValue] = useState('');
@@ -32,12 +32,12 @@ const CodeEditor = () => {
   const autoSaveTimeout = useRef(null);
   const runIdRef = useRef(null);
   const eventSourceRef = useRef(null);
-  // Guards event handlers against stale events from previous runs
+  
   const activeRunRef = useRef(false);
 
   const API_URL = import.meta.env.VITE_API_URL;
 
-  // ── SSE cleanup helper ─────────────────────────────────────────────────────
+  // SSE Cleanup check
   const closeStream = useCallback(() => {
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
@@ -45,7 +45,7 @@ const CodeEditor = () => {
     }
   }, []);
 
-  // Silent stop used on file/language change — no message appended.
+  // Silent stop used on file/language change
   const forceStopExecution = useCallback(() => {
     if (!activeRunRef.current) return;
     const rid = runIdRef.current;
@@ -60,10 +60,10 @@ const CodeEditor = () => {
     }
   }, [API_URL, closeStream]);
 
-  // ── File selection handlers ────────────────────────────────────────────────
+  // File selection handlers
   const handleFileSelect = useCallback(async (sampleKey) => {
     forceStopExecution();
-    setCurrentFile(null);
+    setSelectedUserFile(null);
     const codeKey = `${currentLanguage}_${sampleKey}`;
 
     if (apiCache.current.code[codeKey]) {
@@ -104,7 +104,7 @@ const CodeEditor = () => {
 
   const handleUserFileSelect = (file) => {
     forceStopExecution();
-    setCurrentFile(file);
+    setSelectedUserFile(file);
     setCode(file.content || '');
     setOutput('');
     const langObj = languageData.find(lang => lang.lang_id === file.lang_id);
@@ -137,6 +137,9 @@ const CodeEditor = () => {
 
   // Load sample code when language changes
   useEffect(() => {
+    // If a user file is selected, skip samples loading
+    if (selectedUserFile) return;
+
     const cacheKey = currentLanguage;
 
     // Check if sample list is cached
@@ -165,18 +168,20 @@ const CodeEditor = () => {
       }
     };
     fetchSampleCode(currentLanguage);
-  }, [currentLanguage, handleFileSelect, API_URL]);
+  }, [currentLanguage, selectedUserFile, handleFileSelect, API_URL]);
 
-  // ── Editor change handler ──────────────────────────────────────────────────
+  // Editor change handler
   const handleEditorChange = (value) => {
     setCode(value || '');
-    if (currentFile) {
+    setAwaitConsoleInput(_codeNeedsInput(value || '', currentLanguage.toLowerCase()));
+
+    if (selectedUserFile) {
       if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current);
       autoSaveTimeout.current = setTimeout(() => saveUserFile(value || ''), 10000);
     }
   };
 
-  // ── Code execution ───────────────────────────────────────────────
+  // Code execution handler
   const runCode = async () => {
     setIsRunning(true);
     setOutput('');
@@ -294,10 +299,10 @@ const CodeEditor = () => {
 
   // ── Auto-save ─────────────────────────────────────────────────────────────
   const saveUserFile = async (content) => {
-    if (!currentFile) return;
+    if (!selectedUserFile) return;
     setAutoSaving(true);
     try {
-      const response = await fetch(`${API_URL}/user/files/${currentFile.file_id}`, {
+      const response = await fetch(`${API_URL}/user/files/${selectedUserFile.file_id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -342,7 +347,7 @@ const CodeEditor = () => {
 
       // Playground-specific props
       handleUserFileSelect={handleUserFileSelect}
-      currentFile={currentFile}
+      selectedUserFile={selectedUserFile}
       autoSaving={autoSaving}
 
       // Interactive stdin props

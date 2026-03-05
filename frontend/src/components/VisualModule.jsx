@@ -94,8 +94,6 @@ const VisualModule = ({ tracerData, isRunning, currentLanguage }) => {
     setIsPlaying(false);
   };
 
-
-
   if (isRunning) {
     return (
       <div className="visual-module-empty">
@@ -121,10 +119,8 @@ const VisualModule = ({ tracerData, isRunning, currentLanguage }) => {
     } else if (category === 'sorting') {
       return <SortingVisualization currentState={currentState} />;
     } else if (category === 'trees') {
-      return <TreeVisualization ref={graphVisualizationRef} currentState={currentState} tracerData={displayData} />;
+      return <TreeVisualization ref={graphVisualizationRef} currentState={currentState} />;
     }
-    // Default
-    return <SortingVisualization currentState={currentState} />;
   };
 
   return (

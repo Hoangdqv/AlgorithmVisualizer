@@ -11,7 +11,8 @@ def insertion_sort(arr, tracer):
         
         tracer.add_state(
             arr.copy(), 
-            selected=[i], 
+            selected=[i],
+            indexVars=['i'],
             variables={'i': i}
         )
         arr[i] = None
@@ -21,7 +22,8 @@ def insertion_sort(arr, tracer):
             # Comparing (yellow)
             tracer.add_state(
                 arr.copy(), 
-                comparing=[j, j + 1], 
+                comparing=[j, j + 1],
+                indexVars=['i', 'j'],
                 variables={'i': i, 'j': j}
             )
             arr[j + 1] = arr[j]
@@ -30,7 +32,8 @@ def insertion_sort(arr, tracer):
             # Shifted (green)
             tracer.add_state(
                 arr.copy(), 
-                swapped=[j, j + 1], 
+                swapped=[j, j + 1],
+                indexVars=['i', 'j'],
                 variables={'i': i, 'j': j}
             )
             j -= 1

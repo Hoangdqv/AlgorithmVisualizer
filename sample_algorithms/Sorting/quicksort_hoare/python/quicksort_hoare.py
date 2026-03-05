@@ -26,7 +26,7 @@ def quick_sort_hoare(arr, tracer, low=0, high=None):
 def partition_hoare(arr, tracer, low, high):
     pivot = arr[low]
     # Show pivot selection
-    tracer.add_state(arr.copy(), pivot=low, range=[low, high], variables={'pivot_idx': low, 'low': low, 'high': high})
+    tracer.add_state(arr.copy(), pivot=low, range=[low, high], indexVars=['low', 'high', 'pivot_idx'], variables={'pivot_idx': low, 'low': low, 'high': high})
     
     i = low - 1
     j = high + 1
@@ -37,7 +37,7 @@ def partition_hoare(arr, tracer, low, high):
             i += 1
             # Show left scan
             if i <= j:
-                tracer.add_state(arr.copy(), comparing=[i, low], pivot=low, range=[low, high], variables={'i': i, 'j': j, 'low': low, 'high': high})
+                tracer.add_state(arr.copy(), comparing=[i, low], pivot=low, range=[low, high], indexVars=['i', 'j', 'low', 'high'], variables={'i': i, 'j': j, 'low': low, 'high': high})
             if arr[i] >= pivot:
                 break
         
@@ -46,15 +46,17 @@ def partition_hoare(arr, tracer, low, high):
             j -= 1
             # Show right scan
             if i <= j:
-                tracer.add_state(arr.copy(), comparing=[j, low], pivot=low, range=[low, high], variables={'i': i, 'j': j, 'low': low, 'high': high})
+                tracer.add_state(arr.copy(), comparing=[j, low], pivot=low, range=[low, high], indexVars=['i', 'j', 'low', 'high'], variables={'i': i, 'j': j, 'low': low, 'high': high})
             if arr[j] <= pivot:
                 break
         
         # If pointers haven't crossed, swap
         if i < j:
+            # Show which elements will be swapped
+            tracer.add_state(arr.copy(), comparing=[i, j], pivot=low, range=[low, high], indexVars=['i', 'j', 'low', 'high'], variables={'i': i, 'j': j, 'low': low, 'high': high})
             swap(arr, i, j)
             # Show swap result
-            tracer.add_state(arr.copy(), swapped=[i, j], pivot=low, range=[low, high], variables={'i': i, 'j': j, 'low': low, 'high': high})
+            tracer.add_state(arr.copy(), swapped=[i, j], pivot=low, range=[low, high], indexVars=['i', 'j', 'low', 'high'], variables={'i': i, 'j': j, 'low': low, 'high': high})
         else:
             break
     

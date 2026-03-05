@@ -1,16 +1,52 @@
-Binary Search Tree In-Order Traversal
+Binary Search Tree Operations
 
-This algorithm demonstrates in-order traversal of a Binary Search Tree (BST).
-In-order traversal visits nodes in the following order:
-1. Traverse the left subtree
-2. Visit the current node
-3. Traverse the right subtree
+This algorithm provides various operations on a Binary Search Tree (BST):
 
-For a BST, in-order traversal visits nodes in ascending order by value.
+=== TRAVERSAL OPERATIONS ===
 
-Time Complexity: O(n) - visits each node once
-Space Complexity: O(h) - recursive call stack where h is tree height
+1. In-Order Traversal (left → root → right)
+   - Visits nodes in ascending order for BST
+   - Time Complexity: O(n)
+   - Use case: Get sorted sequence of values
 
-The visualization shows:
+2. Pre-Order Traversal (root → left → right)
+   - Visits parent before children
+   - Time Complexity: O(n)
+   - Use case: Copy tree structure, prefix expression
+
+3. Post-Order Traversal (left → right → root)
+   - Visits children before parent
+   - Time Complexity: O(n)
+   - Use case: Delete tree, postfix expression
+
+=== MODIFICATION OPERATIONS ===
+
+4. Search
+   - Find a target value in the BST
+   - Time Complexity: O(h) where h is tree height
+   - Best case: O(log n) for balanced tree
+   - Worst case: O(n) for skewed tree
+
+5. Insert
+   - Find the correct position to insert a new value
+   - Time Complexity: O(h)
+   - Maintains BST property (left < parent < right)
+
+6. Delete
+   - Locate a node to be deleted
+   - Time Complexity: O(h)
+   - Note: Actual deletion with rebalancing would require tree modification
+
+=== HOW TO USE ===
+
+Change the 'operation' parameter to select which operation to visualize:
+- 'inorder', 'preorder', 'postorder' for traversals
+- 'search', 'insert', 'delete' for modifications (also set 'target' value)
+
+=== VISUALIZATION ===
+
 - Orange (Current): The node currently being processed
-- Green (Visited): Nodes that have been visited in the traversal
+- Green (Visited): Nodes that have been visited
+- Active Path: Shows the path being traversed
+
+Space Complexity: O(h) - recursive call stack where h is tree height

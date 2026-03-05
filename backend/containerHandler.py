@@ -13,7 +13,7 @@ class ContainerHandler:
             'javascript': 'node:22-alpine'
         }
         # Security limits
-        self.max_code_size = 100 * 1024  # 100KB max code size
+        self.max_code_size = 10000 * 1024  # 10MB max code size
         self.execution_timeout = 30  # 30 seconds
         self.simple_timeout = 10    # 10 seconds for plain code runs
         self.memory_limit = '128m'  # 128MB RAM limit
@@ -92,8 +92,10 @@ class ContainerHandler:
                 security_opt=['no-new-privileges'],
                 pids_limit=50,
                 user='nobody',
+                # Ulimits to restrict file descriptors and file size
                 ulimits=[
                     docker.types.Ulimit(name='nofile', soft=64, hard=64),
+                    # 10mb size limit
                     docker.types.Ulimit(name='fsize', soft=10485760, hard=10485760),
                 ],
             )
@@ -165,6 +167,7 @@ class ContainerHandler:
             tmpfs={'/tmp': 'size=10M,noexec,nosuid'},
             cap_drop=['ALL'],
             security_opt=['no-new-privileges'],
+            # limit processes
             pids_limit=50,
             user='nobody',
             ulimits=[
@@ -196,8 +199,6 @@ class ContainerHandler:
             print(f"[CONTAINER] Validation failed: {error_msg}")
             return {'success': False, 'error': error_msg}
         
-        print(f"[CONTAINER] Code validation passed")
-        
         docker_image = self.docker_images.get(language)
         if not docker_image:
             return {
@@ -228,11 +229,7 @@ class ContainerHandler:
                 container_path = '/app/algorithm.js'
                 cmd = ['node', container_path]
             
-            print(f"[CONTAINER] Using image: {docker_image}")
-            print(f"[CONTAINER] Command: {' '.join(cmd)}")
-            print(f"[CONTAINER] Starting container...")
-            
-            # Run container with code mounted (don't auto-remove yet)
+            # Run container with code mounted
             container = self._get_client().containers.run(
                 docker_image,
                 command=cmd,
@@ -273,7 +270,6 @@ class ContainerHandler:
             )
             
             # Wait for container to finish
-            print(f"[CONTAINER] Waiting for execution (timeout: {self.execution_timeout}s)...")
             result = container.wait(timeout=self.execution_timeout)
             print(f"[CONTAINER] Execution completed with exit code: {result['StatusCode']}")
             
@@ -299,7 +295,6 @@ class ContainerHandler:
             end_marker = '--- TRACER_JSON_END ---'
             
             if start_marker in logs and end_marker in logs:
-                print(f"[CONTAINER] Found JSON markers, extracting tracer data...")
                 start_idx = logs.find(start_marker) + len(start_marker)
                 end_idx = logs.find(end_marker)
                 json_data = logs[start_idx:end_idx].strip()
@@ -308,7 +303,6 @@ class ContainerHandler:
                 user_output = logs[:logs.find(start_marker)].strip()
                 
                 print(f"[CONTAINER] Extracted {len(states.get('states', []))} trace states")
-                print(f"[CONTAINER] Execution successful\n")
                 
                 return {
                     'success': True,
@@ -318,8 +312,7 @@ class ContainerHandler:
                     'exit_code': result['StatusCode']
                 }
             else:
-                print(f"[CONTAINER] No JSON markers found, returning raw output")
-                print(f"[CONTAINER] Execution successful\n")
+                print(f"[CONTAINER] No JSON markers found, returning raw output")   
                 return {
                     'success': True,
                     'output': logs,

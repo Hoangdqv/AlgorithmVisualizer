@@ -7,24 +7,24 @@ function selectionSort(arr, tracer) {
     
     for (let i = 0; i < n - 1; i++) {
         // Show the position where we'll place the minimum (blue highlight)
-        tracer.addState([...arr], { selected: [i], variables: { i } });
+        tracer.addState([...arr], { selected: [i], indexVars: ['i'], variables: { i } });
         
         let minIndex = i;
         
         // Find the minimum element in the unsorted portion
         for (let j = i + 1; j < n; j++) {
-            tracer.addState([...arr], { comparing: [minIndex, j], selected: [i], variables: { i, j, minIndex } });  // Keep selected position visible
+            tracer.addState([...arr], { comparing: [minIndex, j], selected: [i], indexVars: ['i', 'j', 'minIndex'], variables: { i, j, minIndex } });  // Keep selected position visible
             if (arr[j] < arr[minIndex]) {
                 minIndex = j;
             }
         }
         
         // If minIndex changed, update the selected position
-        tracer.addState([...arr], { selected: [i, minIndex], variables: { i, minIndex } });
+        tracer.addState([...arr], { selected: [i, minIndex], indexVars: ['i', 'minIndex'], variables: { i, minIndex } });
         // Swap the minimum element with the first element of unsorted portion
         if (minIndex !== i) {
             swap(arr, i, minIndex);
-            tracer.addState([...arr], { swapped: [i, minIndex], selected: [i], variables: { i, minIndex } });
+            tracer.addState([...arr], { swapped: [i, minIndex], selected: [i], indexVars: ['i', 'minIndex'], variables: { i, minIndex } });
         }
     }
     tracer.addState([...arr]); // Complete state

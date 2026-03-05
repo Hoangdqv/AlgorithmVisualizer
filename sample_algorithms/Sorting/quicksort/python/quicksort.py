@@ -26,22 +26,24 @@ def partition(arr, tracer, low, high):
     pivot = arr[high]
     i = low - 1
     
-    tracer.add_state(arr.copy(), pivot=high, range=[low, high], variables={'pivot_idx': high, 'low': low, 'high': high, 'i': i})
+    tracer.add_state(arr.copy(), pivot=high, range=[low, high], indexVars=['i', 'j', 'low', 'high', 'pivot_idx'], variables={'pivot_idx': high, 'low': low, 'high': high, 'i': i})
     
     for j in range(low, high):
-        tracer.add_state(arr.copy(), comparing=[j], pivot=high, range=[low, high], variables={'i': i, 'j': j, 'low': low, 'high': high})
+        tracer.add_state(arr.copy(), selected=[j], pivot=high, range=[low, high], indexVars=['i', 'j', 'low', 'high'], variables={'i': i, 'j': j, 'low': low, 'high': high})
         
         if arr[j] < pivot:
             i += 1
             if i != j:
+                tracer.add_state(arr.copy(), comparing=[i, j], pivot=high, range=[low, high], indexVars=['i', 'j', 'low', 'high'], variables={'i': i, 'j': j, 'low': low, 'high': high})
                 swap(arr, i, j)
-                tracer.add_state(arr.copy(), swapped=[i, j], pivot=high, range=[low, high], variables={'i': i, 'j': j, 'low': low, 'high': high})
+                tracer.add_state(arr.copy(), swapped=[i, j], pivot=high, range=[low, high], indexVars=['i', 'j', 'low', 'high'], variables={'i': i, 'j': j, 'low': low, 'high': high})
     
     if i + 1 != high:
+        tracer.add_state(arr.copy(), comparing=[i + 1, high], pivot = high, range=[low, high], indexVars=['i', 'low', 'high', 'pivot_idx'], variables={'i': i, 'pivot_idx': i + 1, 'low': low, 'high': high})
         swap(arr, i + 1, high)
-        tracer.add_state(arr.copy(), swapped=[i + 1, high], pivot=i + 1, range=[low, high], variables={'i': i, 'pivot_idx': i + 1, 'low': low, 'high': high})
+        tracer.add_state(arr.copy(), swapped=[i + 1, high], pivot=i + 1, range=[low, high], indexVars=['i', 'low', 'high', 'pivot_idx'], variables={'i': i, 'pivot_idx': i + 1, 'low': low, 'high': high})
     else:
-        tracer.add_state(arr.copy(), pivot=i + 1, range=[low, high], variables={'i': i, 'pivot_idx': i + 1, 'low': low, 'high': high})
+        tracer.add_state(arr.copy(), pivot=i + 1, range=[low, high], indexVars=['i', 'low', 'high', 'pivot_idx'], variables={'i': i, 'pivot_idx': i + 1, 'low': low, 'high': high})
     
     return i + 1
 

@@ -12,7 +12,7 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
   const dataStructureType = tracerData?.metadata?.dataStructure || 'queue';
   const dataStructureLabel = tracerData?.metadata?.dataStructureLabel || 'Queue';
 
-  const [nodePositions, setNodePositions] = useState([]);
+  const [nodePositions, updateNodePositions] = useState([]);
   const [dragState, setDragState] = useState({ nodeIndex: null, offset: [0, 0] });
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -33,8 +33,8 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
     height: 400
   }), []);
 
-  // Function to calculate initial positions
-  const calculateInitialPositions = (nodeCount) => {
+  // Function to calculate initial positions in a circle layout
+  const calculateInitialPositions = useCallback((nodeCount) => {
     if (nodeCount === 0) return [];
 
     const positions = [];
@@ -45,13 +45,13 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
       positions.push({ x, y });
     }
     return positions;
-  };
+  }, []);
 
   // Expose resetPositions to parent component
   useImperativeHandle(ref, () => ({
     resetPositions: () => {
       const nodeCount = graphData.length;
-      setNodePositions(calculateInitialPositions(nodeCount));
+      updateNodePositions(calculateInitialPositions(nodeCount));
       setPanOffset({ x: 0, y: 0 });
       setZoom(1);
     }
@@ -60,8 +60,8 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
   // Initialize node positions
   useEffect(() => {
     const nodeCount = graphData.length;
-    setNodePositions(calculateInitialPositions(nodeCount));
-  }, [graphData.length]);
+    updateNodePositions(calculateInitialPositions(nodeCount));
+  }, [graphData.length, calculateInitialPositions]);
 
   const getSVGCoordinates = (e) => {
     if (!svgRef.current) return { x: 0, y: 0 };
@@ -110,7 +110,7 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
     newX = Math.max(minBoundX, Math.min(maxBoundX, newX));
     newY = Math.max(minBoundY, Math.min(maxBoundY, newY));
     
-    setNodePositions(prev => {
+    updateNodePositions(prev => {
       const newPositions = [...prev];
       newPositions[dragState.nodeIndex] = { x: newX, y: newY };
       return newPositions;

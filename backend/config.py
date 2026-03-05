@@ -95,6 +95,13 @@ ALGORITHM_MAP = {
                     'name': 'Quick Sort (Hoare Partition)',
                     'description': 'Quick sort using Hoare partition scheme - typically faster with fewer swaps',
                     'explanation_file': 'Sorting/quicksort_hoare/explanation.txt'
+                },
+                {
+                    'key': 'radixsort',
+                    'file': 'Sorting/radixsort/python/radixsort.py',
+                    'name': 'Radix Sort',
+                    'description': 'Non-comparison sort that processes digits from least to most significant',
+                    'explanation_file': 'Sorting/radixsort/explanation.txt'
                 }
             ],
             'javascript': [
@@ -132,6 +139,13 @@ ALGORITHM_MAP = {
                     'name': 'Quick Sort (Hoare Partition)',
                     'description': 'Quick sort using Hoare partition scheme - typically faster with fewer swaps',
                     'explanation_file': 'Sorting/quicksort_hoare/explanation.txt'
+                },
+                {
+                    'key': 'radixsort',
+                    'file': 'Sorting/radixsort/javascript/radixsort.js',
+                    'name': 'Radix Sort',
+                    'description': 'Non-comparison sort that processes digits from least to most significant',
+                    'explanation_file': 'Sorting/radixsort/explanation.txt'
                 }
             ]
         }
@@ -178,19 +192,19 @@ ALGORITHM_MAP = {
         'algorithms': {
             'python': [
                 {
-                    'key': 'bst_inorder',
-                    'file': 'Trees/bst_traversal/python/bst_inorder.py',
-                    'name': 'BST In-Order Traversal',
-                    'description': 'In-order traversal of a Binary Search Tree',
+                    'key': 'bst_operations',
+                    'file': 'Trees/bst_traversal/python/bst_operations.py',
+                    'name': 'BST Operations',
+                    'description': 'Binary Search Tree operations: traversals (inorder, preorder, postorder), search, insert, delete',
                     'explanation_file': 'Trees/bst_traversal/explanation.txt'
                 }
             ],
             'javascript': [
                 {
-                    'key': 'bst_inorder',
-                    'file': 'Trees/bst_traversal/javascript/bst_inorder.js',
-                    'name': 'BST In-Order Traversal',
-                    'description': 'In-order traversal of a Binary Search Tree',
+                    'key': 'bst_operations',
+                    'file': 'Trees/bst_traversal/javascript/bst_operations.js',
+                    'name': 'BST Operations',
+                    'description': 'Binary Search Tree operations: traversals (inorder, preorder, postorder), search, insert, delete',
                     'explanation_file': 'Trees/bst_traversal/explanation.txt'
                 }
             ]

@@ -16,7 +16,8 @@ def dfs(graph, start_node, tracer):
     visited_order = []
     
     # Initial state - show graph with start node in stack
-    tracer.add_state([],
+    tracer.add_state(
+        [],
         graph=graph,
         visited=visited.copy(),
         stack=stack.copy()

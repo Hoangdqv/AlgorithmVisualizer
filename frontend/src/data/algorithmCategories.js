@@ -4,7 +4,7 @@ export const algorithmCategories = [
     name: 'Sorting',
     category: 'Sorting',
     description: 'Algorithms that arrange elements in a specific order, such as numerical or lexicographical.',
-    examples: ['Bubble Sort', 'Selection Sort', 'Insertion Sort', 'Quick Sort'],
+    examples: ['Bubble Sort', 'Selection Sort', 'Insertion Sort', 'Quick Sort', 'Radix Sort'],
   },
   {
     id: 2,

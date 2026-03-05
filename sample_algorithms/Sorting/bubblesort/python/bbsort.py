@@ -10,7 +10,8 @@ def bubble_sort(arr, tracer):
             # Show comparison (yellow)
             tracer.add_state(
                 arr.copy(), 
-                comparing=[j, j + 1], 
+                comparing=[j, j + 1],
+                indexVars=['i', 'j'],
                 variables={'i': i, 'j': j}
             )
             if arr[j] > arr[j + 1]:
@@ -18,7 +19,8 @@ def bubble_sort(arr, tracer):
                 # Show swap result (green)
                 tracer.add_state(
                     arr.copy(), 
-                    swapped=[j, j + 1], 
+                    swapped=[j, j + 1],
+                    indexVars=['i', 'j'],
                     variables={'i': i, 'j': j}
                 )
                 swapped = True

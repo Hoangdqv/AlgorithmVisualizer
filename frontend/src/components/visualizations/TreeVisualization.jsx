@@ -1,22 +1,22 @@
 import { useState, useEffect, useRef, useImperativeHandle, forwardRef, useCallback, useMemo } from 'react';
 
-const TreeVisualization = forwardRef(({ currentState, tracerData }, ref) => {
+const TreeVisualization = forwardRef(({ currentState }, ref) => {
 
+  console.log(currentState); // Debug: log currentState to verify data structure and content
   const treeData = useMemo(() => currentState?.tree || [], [currentState?.tree]);
   const path = useMemo(() => currentState?.path || [], [currentState?.path]);
   const visited = currentState?.visited || [];
   const current = currentState?.current;
   const depth = currentState?.depth;
+  const message = currentState?.message;
 
-  // Get data structure info from metadata
-  const dataStructureLabel = tracerData?.metadata?.dataStructureLabel || 'Tree';
-
-  const [nodePositions, setNodePositions] = useState([]);
-  const [dragState, setDragState] = useState({ nodeIndex: null, offset: [0, 0] });
+  const [nodePositions, updateNodePositions] = useState({});
+  const [dragState, setDragState] = useState({ nodeId: null, offset: [0, 0] });
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
+  const [graphState, resetGraphState] = useState(false);
   const svgRef = useRef(null);
   const isDraggingRef = useRef(false);
   const isPanningRef = useRef(false);
@@ -34,23 +34,29 @@ const TreeVisualization = forwardRef(({ currentState, tracerData }, ref) => {
 
   // Tree layout algorithm
   const calculateTreePositions = useCallback((nodes) => {
-    if (!nodes || nodes.length === 0) return [];
+    if (!nodes || nodes.length === 0) return {};
 
-    // Build children map for quick lookup
+    // Build children map
     const childrenMap = {};
     const nodeMap = {};
     nodes.forEach(node => {
-      childrenMap[node.id] = node.children || [];
+      childrenMap[node.id] = (node.children || []).filter(id => id !== null && id !== undefined);
       nodeMap[node.id] = node;
     });
 
     // Find root node
-    const allChildren = new Set(nodes.flatMap(n => n.children || []));
+    const allChildren = new Set(
+      nodes.flatMap(n => (n.children || []).filter(id => id !== null && id !== undefined))
+    );
     const root = nodes.find(n => !allChildren.has(n.id));
 
     if (!root) {
       // Fallback: use first node if no clear root
-      return nodes.map((_, i) => ({ x: viewBox.width / 2, y: 50 + i * 80 }));
+      const result = {};
+      nodes.forEach((node, i) => {
+        result[node.id] = { x: viewBox.width / 2, y: 50 + i * 80 };
+      });
+      return result;
     }
 
 
@@ -80,7 +86,7 @@ const TreeVisualization = forwardRef(({ currentState, tracerData }, ref) => {
 
       // Center node in its allocated space
       const x = leftBound + (width * MIN_HORIZONTAL_SPACING) / 2;
-      const y = 50 + level * LEVEL_HEIGHT; // Start from top with padding
+      const y = 50 + level * LEVEL_HEIGHT;
 
       positions[nodeId] = { x, y };
 
@@ -100,25 +106,55 @@ const TreeVisualization = forwardRef(({ currentState, tracerData }, ref) => {
 
     assignPositions(root.id, 0, startX);
 
-    // Map positions back to nodes array order
-    return nodes.map(node => positions[node.id] || { x: viewBox.width / 2, y: 50 });
+    // Return positions by node ID
+    // id: { x: number, y: number }
+    return positions;
   }, [viewBox.width]);
 
   // Expose resetPositions to parent component
   useImperativeHandle(ref, () => ({
     resetPositions: () => {
-      setNodePositions(calculateTreePositions(treeData));
+      resetGraphState(true);
       setPanOffset({ x: 0, y: 0 });
       setZoom(1);
     }
   }));
 
-  // Initialize node positions when tree data changes
+  const treeStructure = useMemo(() => {
+    return treeData.map(node => ({ 
+        id: node.id, 
+        children: (node.children || []).filter(childId => childId !== null && childId !== undefined)
+      }))
+  }, [treeData]);
+
   useEffect(() => {
-    if (treeData.length > 0) {
-      setNodePositions(calculateTreePositions(treeData));
-    }
-  }, [treeData, treeData.length, calculateTreePositions]);
+    updateNodePositions(prev => {
+      if (graphState) {
+        resetGraphState(false);
+        return calculateTreePositions(treeStructure);
+      }
+
+      const prevNodeIds = new Set(Object.keys(prev).map(id => parseInt(id)));
+      const newNodeIds = new Set(treeStructure.map(n => n.id));
+      
+      // Check if any nodes were added
+      const hasNewNodes = Array.from(newNodeIds).some(id => !prevNodeIds.has(id));
+      
+      if (hasNewNodes || Object.keys(prev).length === 0) {
+        // Nodes were added/first render - recalculate positions
+        return calculateTreePositions(treeStructure);
+      } else {
+        // Only deletions. Keep existing positions, just remove deleted nodes
+        const cleaned = { ...prev };
+        Object.keys(cleaned).forEach(nodeId => {
+          if (!newNodeIds.has(parseInt(nodeId))) {
+            delete cleaned[nodeId];
+          }
+        });
+        return cleaned;
+      }
+    });
+  }, [treeStructure, calculateTreePositions, graphState]);
 
   const getSVGCoordinates = (e) => {
     if (!svgRef.current) return { x: 0, y: 0 };
@@ -136,22 +172,23 @@ const TreeVisualization = forwardRef(({ currentState, tracerData }, ref) => {
     };
   };
 
-  const onMouseDown = (e, nodeIndex) => {
+  const onMouseDown = (e, nodeId) => {
     e.preventDefault();
     e.stopPropagation();
     isDraggingRef.current = true;
     
     const svgCoords = getSVGCoordinates(e);
+    const nodePos = nodePositions[nodeId] || { x: 0, y: 0 };
     const offset = [
-      (svgCoords.x - panOffset.x) / zoom - nodePositions[nodeIndex].x,
-      (svgCoords.y - panOffset.y) / zoom - nodePositions[nodeIndex].y
+      (svgCoords.x - panOffset.x) / zoom - nodePos.x,
+      (svgCoords.y - panOffset.y) / zoom - nodePos.y
     ];
     
-    setDragState({ nodeIndex, offset });
+    setDragState({ nodeId, offset });
   };
 
   const onMouseMove = useCallback((e) => {
-    if (!isDraggingRef.current || dragState.nodeIndex === null) return;
+    if (!isDraggingRef.current || dragState.nodeId === null) return;
     
     const svgCoords = getSVGCoordinates(e);
     let newX = (svgCoords.x - panOffset.x) / zoom - dragState.offset[0];
@@ -167,20 +204,20 @@ const TreeVisualization = forwardRef(({ currentState, tracerData }, ref) => {
     newX = Math.max(minBoundX, Math.min(maxBoundX, newX));
     newY = Math.max(minBoundY, Math.min(maxBoundY, newY));
     
-    setNodePositions(prev => {
-      const newPositions = [...prev];
-      newPositions[dragState.nodeIndex] = { x: newX, y: newY };
+    updateNodePositions(prev => {
+      const newPositions = { ...prev };
+      newPositions[dragState.nodeId] = { x: newX, y: newY };
       return newPositions;
     });
-  }, [viewBox, dragState.nodeIndex, dragState.offset, panOffset.x, panOffset.y, zoom]);
+  }, [viewBox, dragState.nodeId, dragState.offset, panOffset.x, panOffset.y, zoom]);
 
   const onMouseUp = useCallback(() => {
     isDraggingRef.current = false;
-    setDragState({ nodeIndex: null, offset: [0, 0] });
+    setDragState({ nodeId: null, offset: [0, 0] });
   }, []);
 
   useEffect(() => {
-    if (dragState.nodeIndex !== null) {
+    if (dragState.nodeId !== null) {
       window.addEventListener('mousemove', onMouseMove);
       window.addEventListener('mouseup', onMouseUp);
       return () => {
@@ -188,7 +225,7 @@ const TreeVisualization = forwardRef(({ currentState, tracerData }, ref) => {
         window.removeEventListener('mouseup', onMouseUp);
       };
     }
-  }, [dragState.nodeIndex, onMouseMove, onMouseUp]);
+  }, [dragState.nodeId, onMouseMove, onMouseUp]);
 
   // Pan handlers
   const onPanStart = (e) => {
@@ -257,13 +294,14 @@ const TreeVisualization = forwardRef(({ currentState, tracerData }, ref) => {
   }, [handleWheel]);
 
   const fitToScreen = () => {
-    if (nodePositions.length === 0) return;
+    const positions = Object.values(nodePositions);
+    if (positions.length === 0) return;
     
     const padding = 50;
     const nodeRadius = 20;
     
-    const xs = nodePositions.map(pos => pos.x);
-    const ys = nodePositions.map(pos => pos.y);
+    const xs = positions.map(pos => pos.x);
+    const ys = positions.map(pos => pos.y);
     
     const minX = Math.min(...xs) - nodeRadius - padding;
     const maxX = Math.max(...xs) + nodeRadius + padding;
@@ -293,9 +331,14 @@ const TreeVisualization = forwardRef(({ currentState, tracerData }, ref) => {
   const getNodeClass = (node) => {
     let classes = 'tree-node';
     
-    if (current === node.id) {
+    const isVisited = visited.includes(node.id);
+    const isCurrent = current === node.id;
+    
+    if (isCurrent && isVisited) {
+      classes += ' tree-node-current tree-node-visited';
+    } else if (isCurrent) {
       classes += ' tree-node-current';
-    } else if (visited.includes(node.id)) {
+    } else if (isVisited) {
       classes += ' tree-node-visited';
     }
     
@@ -304,7 +347,18 @@ const TreeVisualization = forwardRef(({ currentState, tracerData }, ref) => {
 
   const getNodeValueById = (nodeId) => {
     const node = treeData.find(n => n.id === nodeId);
-    return node ? (node.value !== undefined ? node.value : node.id) : '-';
+    return node ? (node.value !== undefined ? node.value : node.id) : null;
+  };
+
+  // Get currently existing visited
+  const buildVisitedList = () => {
+    if (!visited || visited.length === 0) return [];
+    
+    // Remove duplicates and filter out deleted nodes
+    const uniqueVisited = [...new Set(visited)];
+    return uniqueVisited
+      .map(nodeId => getNodeValueById(nodeId))
+      .filter(value => value !== null);
   };
 
   // Build a set of path edges for O(1) lookup
@@ -325,29 +379,22 @@ const TreeVisualization = forwardRef(({ currentState, tracerData }, ref) => {
   };
 
   const renderTree = () => {
-    if (nodePositions.length === 0 || treeData.length === 0) return null;
+    if (Object.keys(nodePositions).length === 0 || treeData.length === 0) return null;
 
     try {
-      // Build id to index map for quick lookup
-      const idToIndex = {};
-      treeData.forEach((node, index) => {
-        idToIndex[node.id] = index;
-      });
-
       // Render edges (parent to children)
       const edges = [];
-      treeData.forEach((node, parentIndex) => {
+      treeData.forEach((node) => {
         const children = node.children || [];
         children.forEach(childId => {
-          const childIndex = idToIndex[childId];
-          if (childIndex !== undefined && nodePositions[parentIndex] && nodePositions[childIndex]) {
+          if (childId && nodePositions[node.id] && nodePositions[childId]) {
             edges.push(
               <line
                 key={`edge-${node.id}-${childId}`}
-                x1={nodePositions[parentIndex].x}
-                y1={nodePositions[parentIndex].y}
-                x2={nodePositions[childIndex].x}
-                y2={nodePositions[childIndex].y}
+                x1={nodePositions[node.id].x}
+                y1={nodePositions[node.id].y}
+                x2={nodePositions[childId].x}
+                y2={nodePositions[childId].y}
                 className={getEdgeClass(node.id, childId)}
               />
             );
@@ -379,23 +426,24 @@ const TreeVisualization = forwardRef(({ currentState, tracerData }, ref) => {
           {edges}
           
           {/* Draw nodes */}
-          {treeData.map((node, i) => {
-            if (!nodePositions[i]) return null; // Skip if position not calculated yet
+          {treeData.map((node) => {
+            const pos = nodePositions[node.id];
+            if (!pos) return null; // Skip if position not calculated yet
             return (
             <g 
               key={`node-${node.id}`}
-              onMouseDown={(e) => onMouseDown(e, i)}
-              style={{ cursor: dragState.nodeIndex === i ? 'grabbing' : 'grab' }}
+              onMouseDown={(e) => onMouseDown(e, node.id)}
+              style={{ cursor: dragState.nodeId === node.id ? 'grabbing' : 'grab' }}
             >
               <circle
-                cx={nodePositions[i].x}
-                cy={nodePositions[i].y}
+                cx={pos.x}
+                cy={pos.y}
                 r={20}
                 className={getNodeClass(node)}
               />
               <text
-                x={nodePositions[i].x}
-                y={nodePositions[i].y}
+                x={pos.x}
+                y={pos.y}
                 className="tree-node-text"
                 textAnchor="middle"
                 dominantBaseline="middle"
@@ -432,10 +480,10 @@ const TreeVisualization = forwardRef(({ currentState, tracerData }, ref) => {
           <div className="tree-visualization-right">
             <div className="tree-info-section">
               <h3 className="tree-info-title">Algorithm State</h3>
-              <div className="tree-info-item">
+              {/* <div className="tree-info-item">
                 <div className="tree-info-label">Tree Type:</div>
                 <div className="tree-info-value">{dataStructureLabel}</div>
-              </div>
+              </div> */}
               <div className="tree-info-item">
                 <div className="tree-info-label">Total Nodes:</div>
                 <div className="tree-info-value">{treeData.length}</div>
@@ -446,24 +494,26 @@ const TreeVisualization = forwardRef(({ currentState, tracerData }, ref) => {
                   {current !== null && current !== undefined ? getNodeValueById(current) : '-'}
                 </div>
               </div>
+              {message && (
+              <div className="tree-info-item">
+                  <>
+                    <div className="tree-info-label">Status:</div>
+                    <div className="tree-info-value" style={{ fontStyle: 'italic', color: '#ffa500' }}>
+                      {message || '-'}
+                    </div>
+                  </>
+              </div>
+              )}
               {depth !== null && depth !== undefined && (
                 <div className="tree-info-item">
                   <div className="tree-info-label">Depth:</div>
                   <div className="tree-info-value">{depth}</div>
                 </div>
               )}
-              {path.length > 0 && (
-                <div className="tree-info-item">
-                  <div className="tree-info-label">Path:</div>
-                  <div className="tree-info-value">
-                    {path.map(getNodeValueById).join(' → ')}
-                  </div>
-                </div>
-              )}
               <div className="tree-info-item">
                 <div className="tree-info-label">Visited Nodes:</div>
-                <div className="tree-info-value">
-                  [{visited && visited.length > 0 ? visited.map(getNodeValueById).join(', ') : 'none'}]
+                <div className="tree-info-value tree-info-visited">
+                  [{buildVisitedList().length > 0 ? buildVisitedList().join(', ') : 'none'}]
                 </div>
               </div>
             </div>
@@ -475,9 +525,6 @@ const TreeVisualization = forwardRef(({ currentState, tracerData }, ref) => {
           </div>
           <div className="tree-legend-item">
             <span className="tree-legend-color tree-node-visited"></span> Visited
-          </div>
-          <div className="tree-legend-item">
-            <span className="tree-legend-line tree-edge-active"></span> Active Path
           </div>
         </div>
       </div>

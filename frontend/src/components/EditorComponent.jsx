@@ -36,7 +36,7 @@ const EditorComponent = ({
 
   // Playground-specific props
   handleUserFileSelect,
-  currentFile,
+  selectedUserFile,
   autoSaving,
 
   // Interactive stdin props
@@ -126,7 +126,7 @@ const EditorComponent = ({
           )}
         </>
       )}
-      {currentFile && (
+      {selectedUserFile && (
         <div className="autosave-indicator">
           {autoSaving && <span style={{ color: '#4CAF50' }}>Saving in progress...</span>}
         </div>

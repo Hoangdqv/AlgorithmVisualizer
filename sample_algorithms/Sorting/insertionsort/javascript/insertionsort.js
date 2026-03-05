@@ -10,7 +10,8 @@ function insertionSort(arr, tracer) {
         let j = i - 1;
         
         tracer.addState([...arr], {   
-            selected: [i], 
+            selected: [i],
+            indexVars: ['i'],
             variables: { i: i } 
         });
         arr[i] = null;
@@ -20,6 +21,7 @@ function insertionSort(arr, tracer) {
             // Comparing (yellow)
             tracer.addState([...arr], {
                 comparing: [j, j + 1],
+                indexVars: ['i', 'j'],
                 variables: { i: i, j: j } 
             });
             arr[j + 1] = arr[j];
@@ -27,7 +29,8 @@ function insertionSort(arr, tracer) {
             
             // Shifted (green)
             tracer.addState([...arr], { 
-                swapped: [j, j + 1], 
+                swapped: [j, j + 1],
+                indexVars: ['i', 'j'],
                 variables: { i: i, j: j } 
             });
             j--;

@@ -1,0 +1,23 @@
+What is Radix Sort?
+Radix Sort is a non-comparison-based sorting algorithm that sorts integers by processing individual digits. It sorts numbers digit by digit, starting from the least significant digit (LSD) to the most significant digit (MSD).
+
+How does it work?
+1. Find the maximum number in the array to determine the number of digits.
+2. For each digit position (ones, tens, hundreds, ...):
+   a. Use a stable sorting algorithm (counting sort) to sort the array based on the current digit.
+   b. Move to the next digit position.
+3. After processing all digit positions, the array is sorted.
+
+Key Concepts:
+- Non-comparison-based: Unlike bubble sort or quick sort, radix sort never directly compares two elements. Instead, it distributes elements into buckets based on individual digits.
+- Stable sort: The counting sort subroutine preserves the relative order of elements with equal digits, which is essential for radix sort's correctness.
+- Counting sort subroutine: Each pass uses counting sort on a single digit. It counts occurrences of each digit (0-9), computes cumulative counts, then places elements into their correct positions.
+- Time complexity: O(d * (n + k)) where d is the number of digits in the maximum number, n is the number of elements, and k is the range of each digit (10 for decimal). For fixed-width integers, this simplifies to O(n).
+- Space complexity: O(n + k) for the output array and count array.
+- Only works on non-negative integers: Standard radix sort assumes non-negative integer values.
+
+Why learn Radix Sort?
+- Demonstrates that sorting doesn't always require comparisons.
+- Introduces the concept of digit-by-digit processing.
+- Shows how a stable subroutine (counting sort) can be composed into a more powerful algorithm.
+- Achieves linear time complexity for integer sorting, outperforming comparison-based O(n log n) sorts when the number of digits is small relative to n.

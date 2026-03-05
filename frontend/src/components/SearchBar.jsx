@@ -3,6 +3,7 @@ const SearchBar = ({ value, onChange, placeholder = "Search samples..." }) => {
     <div className="search-bar-container">
       <input
         type="text"
+        name="search-bar-input"
         className="search-bar-input"
         value={value}
         onChange={(e) => onChange(e.target.value)}
