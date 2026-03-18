@@ -1,0 +1,154 @@
+{
+  "sample_algorithms_dir": "C:\\Users\\dqvth\\Desktop\\vsc\\ThesisProject\\sample_algorithms",
+  "categories": {
+    "sorting": {
+      "display_name": "Sorting",
+      "algorithms": {
+        "python": {
+          "bubblesort": {
+            "file": "Sorting/bubblesort/python/bbsort.py",
+            "name": "Bubble Sort",
+            "description": "Sort an array using bubble sort algorithm",
+            "explanation_file": "Sorting/bubblesort/explanation.txt"
+          },
+          "selectionsort": {
+            "file": "Sorting/selectionsort/python/selectionsort.py",
+            "name": "Selection Sort",
+            "description": "Sort an array using selection sort algorithm",
+            "explanation_file": "Sorting/selectionsort/explanation.txt"
+          },
+          "insertionsort": {
+            "file": "Sorting/insertionsort/python/insertionsort.py",
+            "name": "Insertion Sort",
+            "description": "Sort an array using insertion sort algorithm",
+            "explanation_file": "Sorting/insertionsort/explanation.txt"
+          },
+          "quicksort": {
+            "file": "Sorting/quicksort/python/quicksort.py",
+            "name": "Quick Sort",
+            "description": "Sort an array using quick sort algorithm (divide-and-conquer)",
+            "explanation_file": "Sorting/quicksort/explanation.txt"
+          },
+          "quicksort_hoare": {
+            "file": "Sorting/quicksort_hoare/python/quicksort_hoare.py",
+            "name": "Quick Sort (Hoare Partition)",
+            "description": "Quick sort using Hoare partition scheme - typically faster with fewer swaps",
+            "explanation_file": "Sorting/quicksort_hoare/explanation.txt"
+          },
+          "radixsort": {
+            "file": "Sorting/radixsort/python/radixsort.py",
+            "name": "Radix Sort",
+            "description": "Non-comparison sort that processes digits from least to most significant",
+            "explanation_file": "Sorting/radixsort/explanation.txt"
+          }
+        },
+        "javascript": {
+          "bubblesort": {
+            "file": "Sorting/bubblesort/javascript/bbsort.js",
+            "name": "Bubble Sort",
+            "description": "Sort an array using bubble sort algorithm",
+            "explanation_file": "Sorting/bubblesort/explanation.txt"
+          },
+          "selectionsort": {
+            "file": "Sorting/selectionsort/javascript/selectionsort.js",
+            "name": "Selection Sort",
+            "description": "Sort an array using selection sort algorithm",
+            "explanation_file": "Sorting/selectionsort/explanation.txt"
+          },
+          "insertionsort": {
+            "file": "Sorting/insertionsort/javascript/insertionsort.js",
+            "name": "Insertion Sort",
+            "description": "Sort an array using insertion sort algorithm",
+            "explanation_file": "Sorting/insertionsort/explanation.txt"
+          },
+          "quicksort": {
+            "file": "Sorting/quicksort/javascript/quicksort.js",
+            "name": "Quick Sort",
+            "description": "Sort an array using quick sort algorithm (divide-and-conquer)",
+            "explanation_file": "Sorting/quicksort/explanation.txt"
+          },
+          "quicksort_hoare": {
+            "file": "Sorting/quicksort_hoare/javascript/quicksort_hoare.js",
+            "name": "Quick Sort (Hoare Partition)",
+            "description": "Quick sort using Hoare partition scheme - typically faster with fewer swaps",
+            "explanation_file": "Sorting/quicksort_hoare/explanation.txt"
+          },
+          "radixsort": {
+            "file": "Sorting/radixsort/javascript/radixsort.js",
+            "name": "Radix Sort",
+            "description": "Non-comparison sort that processes digits from least to most significant",
+            "explanation_file": "Sorting/radixsort/explanation.txt"
+          }
+        }
+      }
+    },
+    "graphs": {
+      "display_name": "Graphs",
+      "algorithms": {
+        "python": {
+          "bfs": {
+            "file": "Graphs/bfs/python/bfs.py",
+            "name": "Breadth-First Search",
+            "description": "BFS traversal using adjacency matrix",
+            "explanation_file": "Graphs/bfs/explanation.txt"
+          },
+          "dfs": {
+            "file": "Graphs/dfs/python/dfs.py",
+            "name": "Depth-First Search",
+            "description": "DFS traversal using adjacency matrix",
+            "explanation_file": "Graphs/dfs/explanation.txt"
+          },
+          "aa": {
+            "file": "Graphs/aa/python/aa.py",
+            "name": "Aa",
+            "description": "Aa algorithm",
+            "explanation_file": "Graphs/aa/explanation.txt",
+            "await_console_input": false
+          }
+        },
+        "javascript": {
+          "bfs": {
+            "file": "Graphs/bfs/javascript/bfs.js",
+            "name": "Breadth-First Search",
+            "description": "BFS traversal using adjacency matrix",
+            "explanation_file": "Graphs/bfs/explanation.txt"
+          },
+          "dfs": {
+            "file": "Graphs/dfs/javascript/dfs.js",
+            "name": "Depth-First Search",
+            "description": "DFS traversal using adjacency matrix",
+            "explanation_file": "Graphs/dfs/explanation.txt"
+          },
+          "aa": {
+            "file": "Graphs/aa/javascript/aa.js",
+            "name": "Aa",
+            "description": "Aa algorithm",
+            "explanation_file": "Graphs/aa/explanation.txt",
+            "await_console_input": false
+          }
+        }
+      }
+    },
+    "trees": {
+      "display_name": "Trees",
+      "algorithms": {
+        "python": {
+          "bst_operations": {
+            "file": "Trees/bst_traversal/python/bst_operations.py",
+            "name": "BST Operations",
+            "description": "Binary Search Tree operations: traversals (inorder, preorder, postorder), search, insert, delete",
+            "explanation_file": "Trees/bst_traversal/explanation.txt"
+          }
+        },
+        "javascript": {
+          "bst_operations": {
+            "file": "Trees/bst_traversal/javascript/bst_operations.js",
+            "name": "BST Operations",
+            "description": "Binary Search Tree operations: traversals (inorder, preorder, postorder), search, insert, delete",
+            "explanation_file": "Trees/bst_traversal/explanation.txt"
+          }
+        }
+      }
+    }
+  }
+}

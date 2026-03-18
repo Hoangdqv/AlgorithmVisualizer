@@ -2,9 +2,7 @@ import { useState, useEffect, useRef, useImperativeHandle, forwardRef, useCallba
 
 const TreeVisualization = forwardRef(({ currentState }, ref) => {
 
-  console.log(currentState); // Debug: log currentState to verify data structure and content
   const treeData = useMemo(() => currentState?.tree || [], [currentState?.tree]);
-  const path = useMemo(() => currentState?.path || [], [currentState?.path]);
   const visited = currentState?.visited || [];
   const current = currentState?.current;
   const depth = currentState?.depth;
@@ -17,6 +15,7 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [graphState, resetGraphState] = useState(false);
+  const [autoFit, setAutoFit] = useState(false);
   const svgRef = useRef(null);
   const isDraggingRef = useRef(false);
   const isPanningRef = useRef(false);
@@ -51,7 +50,7 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
     const root = nodes.find(n => !allChildren.has(n.id));
 
     if (!root) {
-      // Fallback: use first node if no clear root
+      // use first node if no clear root
       const result = {};
       nodes.forEach((node, i) => {
         result[node.id] = { x: viewBox.width / 2, y: 50 + i * 80 };
@@ -78,13 +77,13 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
 
     calculateWidth(root.id);
 
-    // Step 2: Assign x,y positions recursively
+    // Assign x,y positions recursively
     const positions = {};
 
     const assignPositions = (nodeId, level, leftBound) => {
       const width = subtreeWidths[nodeId];
 
-      // Center node in its allocated space
+      // center node in its allocated space
       const x = leftBound + (width * MIN_HORIZONTAL_SPACING) / 2;
       const y = 50 + level * LEVEL_HEIGHT;
 
@@ -111,15 +110,6 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
     return positions;
   }, [viewBox.width]);
 
-  // Expose resetPositions to parent component
-  useImperativeHandle(ref, () => ({
-    resetPositions: () => {
-      resetGraphState(true);
-      setPanOffset({ x: 0, y: 0 });
-      setZoom(1);
-    }
-  }));
-
   const treeStructure = useMemo(() => {
     return treeData.map(node => ({ 
         id: node.id, 
@@ -141,10 +131,13 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
       const hasNewNodes = Array.from(newNodeIds).some(id => !prevNodeIds.has(id));
       
       if (hasNewNodes || Object.keys(prev).length === 0) {
+        if (hasNewNodes) {
+          setAutoFit(true);
+        }
         // Nodes were added/first render - recalculate positions
         return calculateTreePositions(treeStructure);
       } else {
-        // Only deletions. Keep existing positions, just remove deleted nodes
+        // Keep existing positions, just remove deleted nodes
         const cleaned = { ...prev };
         Object.keys(cleaned).forEach(nodeId => {
           if (!newNodeIds.has(parseInt(nodeId))) {
@@ -293,7 +286,7 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
     }
   }, [handleWheel]);
 
-  const fitToScreen = () => {
+  const fitToScreen = useCallback(() => {
     const positions = Object.values(nodePositions);
     if (positions.length === 0) return;
     
@@ -326,7 +319,25 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
     
     setZoom(newZoom);
     setPanOffset({ x: newPanX, y: newPanY });
-  };
+  }, [nodePositions, viewBox.height, viewBox.width]);
+
+  // Expose resetPositions to parent component
+  useImperativeHandle(ref, () => ({
+    resetPositions: () => {
+      resetGraphState(true);
+      setPanOffset({ x: 0, y: 0 });
+      setZoom(1);
+    },
+    fit: () => {
+      fitToScreen();
+    }
+  }), [fitToScreen]);
+
+  useEffect(() => {
+    if (!autoFit) return;
+    fitToScreen();
+    setAutoFit(false);
+  }, [nodePositions, autoFit, fitToScreen]);
 
   const getNodeClass = (node) => {
     let classes = 'tree-node';
@@ -350,7 +361,7 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
     return node ? (node.value !== undefined ? node.value : node.id) : null;
   };
 
-  // Get currently existing visited
+  // Build a list of visited node values for display
   const buildVisitedList = () => {
     if (!visited || visited.length === 0) return [];
     
@@ -359,23 +370,6 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
     return uniqueVisited
       .map(nodeId => getNodeValueById(nodeId))
       .filter(value => value !== null);
-  };
-
-  // Build a set of path edges for O(1) lookup
-  const pathEdgeSet = useMemo(() => {
-    const set = new Set();
-    for (let i = 0; i < path.length - 1; i++) {
-      set.add(`${path[i]}-${path[i + 1]}`);
-      set.add(`${path[i + 1]}-${path[i]}`); // edges are parent→child, check both directions
-    }
-    return set;
-  }, [path]);
-
-  const getEdgeClass = (parentId, childId) => {
-    if (pathEdgeSet.has(`${parentId}-${childId}`)) {
-      return 'tree-edge tree-edge-active';
-    }
-    return 'tree-edge';
   };
 
   const renderTree = () => {
@@ -388,6 +382,7 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
         const children = node.children || [];
         children.forEach(childId => {
           if (childId && nodePositions[node.id] && nodePositions[childId]) {
+            // Draw edge from node to child
             edges.push(
               <line
                 key={`edge-${node.id}-${childId}`}
@@ -395,7 +390,7 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
                 y1={nodePositions[node.id].y}
                 x2={nodePositions[childId].x}
                 y2={nodePositions[childId].y}
-                className={getEdgeClass(node.id, childId)}
+                className="tree-edge"
               />
             );
           }
@@ -422,7 +417,7 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
           pointerEvents="none"
         />
         <g transform={`translate(${panOffset.x}, ${panOffset.y}) scale(${zoom})`}>
-          {/* Draw edges first (behind nodes) */}
+          {/* Draw edges first*/}
           {edges}
           
           {/* Draw nodes */}
@@ -446,6 +441,7 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
                 y={pos.y}
                 className="tree-node-text"
                 textAnchor="middle"
+                // Align text vertically centered
                 dominantBaseline="middle"
                 pointerEvents="none"
               >

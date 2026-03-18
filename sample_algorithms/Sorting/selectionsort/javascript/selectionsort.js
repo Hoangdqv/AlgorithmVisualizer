@@ -6,7 +6,6 @@ function selectionSort(arr, tracer) {
     const n = arr.length;
     
     for (let i = 0; i < n - 1; i++) {
-        // Show the position where we'll place the minimum (blue highlight)
         tracer.addState([...arr], { selected: [i], indexVars: ['i'], variables: { i } });
         
         let minIndex = i;

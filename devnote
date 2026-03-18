@@ -7,3 +7,9 @@ Next implementations:
 - Add more sample algorithms and coding challenges/categories for users to practice on.
 
 - Thinking about migrating samples and algorithms to database instead of local device.
+
+
+
+== Errors ==
+- COOP (Cross Origin Opener Policy) error known for GoogleOauth, working as intended despite error in console, maybe need to change in dev server instead of local device
+- Added time delay for Google token verification because local device have time desyncs

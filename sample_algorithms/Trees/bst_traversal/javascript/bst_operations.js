@@ -12,7 +12,7 @@ import {
     bstSearch,
     bstInsert,
     bstDelete
-} from '../../../helpers.js';
+} from './helpers.js';
 
 // [ALGORITHM]
 function bstOperations(treeNodes, rootId, operation, tracer, target = null) {
@@ -72,7 +72,7 @@ const tracer = new Tracer('trees', 'BST', 'Binary Search Tree');
 const result = bstOperations(treeNodes, rootId, operation, tracer, target);
 
 if (operation === 'search') {
-    console.log(`Search for ${target}: ${result ? 'Found' : 'Not found'}`);
+    console.log(`Searching for ${target}: ${result ? 'Found' : 'Not found'}`);
 } else if (operation === 'insert') {
     console.log(`Insertion path for ${target}: [${result.join(', ')}]`);
 } else if (operation === 'delete') {

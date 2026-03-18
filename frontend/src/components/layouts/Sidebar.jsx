@@ -1,14 +1,15 @@
 // Sidebar.jsx
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import getFileExtension from '../../scripts/getFileExtension';
 import { useAuth } from '../../context/useAuth';
 import SearchBar from '../SearchBar';
 import FileTree from '../FileTree';
 import FileContextMenu from '../FileContextMenu';
 import NewItemModal from '../NewItemModal';
 
-const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, onUserFileSelect }) => {
+const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, onUserFileSelect, initialTab = 'samples' }) => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('samples'); // 'samples' or 'myfiles'
+  const [activeTab, setActiveTab] = useState(initialTab); // 'samples' or 'myfiles'
   const [openDropdowns, setOpenDropdowns] = useState({});
   const [samples, setSamples] = useState([]);
   const [userFolders, setUserFolders] = useState([]);
@@ -84,7 +85,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
     }
   }, [currentLanguage, apiCache, API_URL]);
 
-  const loadUserFiles = useCallback(async (forceReload = false) => {
+  const loadUserFiles = useCallback(async (forceReload = false, silent = false) => {
     // Check cache first
     if (!forceReload && userFilesCache.folders && userFilesCache.files) {
       setUserFolders(userFilesCache.folders);
@@ -92,7 +93,9 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
       return;
     }
     
-    setLoading(true);
+    if (!silent) {
+      setLoading(true);
+    }
     try {
       // Load all folders
       const foldersResponse = await fetch(`${API_URL}/user/folders`, {
@@ -150,7 +153,9 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
     } catch (error) {
       console.error('Error loading user files:', error);
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [userFilesCache, API_URL]);
 
@@ -225,21 +230,38 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
   }, [samples, searchQuery]);
 
   // Filter user files and folders based on search query
+  // File structure: file: { file_id, file_name, folder_id (nullable), lang_id }
   const filteredUserData = useMemo(() => {
     if (!searchQuery.trim()) {
       return { folders: userFolders, files: userFiles };
     }
     
     const query = searchQuery.toLowerCase();
+    const matchesFileSearch = (file) => {
+      const fileName = (file.file_name || '').toLowerCase();
+      const languageName = (
+        file.lang?.language ||
+        languages.find(lang => lang.lang_id === file.lang_id)?.language ||
+        ''
+      ).toLowerCase();
+      const extension = getFileExtension(languageName);
+      const normalizedQuery = query.startsWith('.') ? query.slice(1) : query;
+
+      return (
+        fileName.includes(query) ||
+        languageName.includes(query) ||
+        (extension && (extension.includes(normalizedQuery) || `.${extension}`.includes(query)))
+      );
+    };
     
     // Recursively filter folders and their nested content
+    // Folder structure: { folder_id, folder_name, children: [subfolders], files: [files in this folder] }
     const filterFolder = (folder) => {
-      const matchesSearch = folder.folder_name?.toLowerCase().includes(query) || 
-                           folder.name?.toLowerCase().includes(query);
+      const matchesSearch = folder.folder_name?.toLowerCase().includes(query)
       
       // Filter files in this folder
       const filteredFiles = (folder.files || []).filter(file => 
-        file.file_name?.toLowerCase().includes(query)
+        matchesFileSearch(file)
       );
       
       // Recursively filter children folders
@@ -264,11 +286,11 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
       .filter(folder => folder !== null);
     
     const filteredFiles = userFiles.filter(file => 
-      !file.folder_id && file.file_name?.toLowerCase().includes(query)
+      !file.folder_id && matchesFileSearch(file)
     );
     
     return { folders: filteredFolders, files: filteredFiles };
-  }, [userFolders, userFiles, searchQuery]);
+  }, [userFolders, userFiles, searchQuery, languages]);
 
   const toggleFileDropdown = (folderName) => {
     setOpenDropdowns(prev => ({
@@ -349,7 +371,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
       });
       
       if (response.ok) {
-        loadUserFiles(true); // Force reload after creating
+        loadUserFiles(true, true); // Force silent reload after creating
         setModal(null);
       } else {
         const data = await response.json();
@@ -386,7 +408,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
       });
       
       if (response.ok) {
-        loadUserFiles(true); // Force reload after creating
+        loadUserFiles(true, true); // Force silent reload after creating
         setModal(null);
       }
     } catch (error) {
@@ -396,6 +418,23 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
 
   const handleDelete = async () => {
     if (!contextMenu) return;
+
+    const deletedFileId = contextMenu.type === 'file'
+      ? contextMenu.item.file_id
+      : null;
+
+    const itemName = contextMenu.type === 'folder'
+      ? (contextMenu.item.folder_name || contextMenu.item.name || 'this folder')
+      : (contextMenu.item.file_name || contextMenu.item.filename || 'this file');
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${itemName}?`
+    );
+
+    if (!confirmed) {
+      setContextMenu(null);
+      return;
+    }
     
     try {
       const endpoint = contextMenu.type === 'folder'
@@ -408,7 +447,13 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
       });
       
       if (response.ok) {
-        loadUserFiles(true); // Force reload after deleting
+        loadUserFiles(true, true); // Force silent reload after deleting
+        if (deletedFileId && selectedFileId === deletedFileId) {
+          setSelectedFileId(null);
+          if (onUserFileSelect) {
+            onUserFileSelect(null);
+          }
+        }
         setContextMenu(null);
       }
     } catch (error) {
@@ -447,7 +492,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
       if (response.ok) {
         const data = await response.json();
         console.log('Rename success:', data);
-        loadUserFiles(true); // Force reload after renaming
+        loadUserFiles(true, true); // Force silent reload after renaming
         setModal(null);
       } else {
         const errorData = await response.json();
@@ -597,16 +642,18 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
               <div style={{ color: '#888', padding: '1rem' }}>Loading files...</div>
             ) : (
               <>
-                <FileTree
-                  folders={filteredUserData.folders}
-                  files={filteredUserData.files.filter(f => !f.folder_id)}
-                  onFileClick={handleUserFileClick}
-                  onFolderClick={() => {}}
-                  onContextMenu={handleContextMenu}
-                  selectedFileId={selectedFileId}
-                  languages={languages}
-                  depth={0}
-                />
+                <div className="file-tree-scroll-container">
+                  <FileTree
+                    folders={filteredUserData.folders}
+                    files={filteredUserData.files.filter(f => !f.folder_id)}
+                    onFileClick={handleUserFileClick}
+                    onFolderClick={() => {}}
+                    onContextMenu={handleContextMenu}
+                    selectedFileId={selectedFileId}
+                    languages={languages}
+                    depth={0}
+                  />
+                </div>
                 {filteredUserData.folders.length === 0 && filteredUserData.files.filter(f => !f.folder_id).length === 0 && (
                   <div style={{ color: '#888', padding: '1rem', textAlign: 'center' }}>
                     {searchQuery ? `No results for "${searchQuery}"` : 'No files yet. Create a folder or file to get started!'}

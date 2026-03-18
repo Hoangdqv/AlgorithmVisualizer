@@ -1,5 +1,5 @@
-import Tracer from '../../tracers/tracer.js';
-import { swap } from './helpers.js';  // Helper function: swaps arr[i] and arr[j] in-place
+import Tracer from './tracers/tracer.js';
+import { swap } from './helpers.js';  // Helper function: swaps arr[i] and arr[j]
 
 // [ALGORITHM]
 function quickSort(arr, tracer, low = 0, high = arr.length - 1) {

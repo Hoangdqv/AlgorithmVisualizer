@@ -1,7 +1,12 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import EditorComponent from '../EditorComponent';
 
 const CodeEditor = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const hasPendingIncomingFile = Boolean(location.state?.openUserFile);
+
   // State declarations
   const [currentLanguage, setCurrentLanguage] = useState('Python');
   const [output, setOutput] = useState('Loading console...');
@@ -36,6 +41,12 @@ const CodeEditor = () => {
   const activeRunRef = useRef(false);
 
   const API_URL = import.meta.env.VITE_API_URL;
+
+  // Auto-detect whether user file code reads from stdin
+  const _codeNeedsInput = (src, lang) => {
+    if (lang === 'python') return /\binput\s*\(/.test(src);
+    return /readline|process\.stdin|prompt\s*\(/.test(src);
+  };
 
   // SSE Cleanup check
   const closeStream = useCallback(() => {
@@ -96,13 +107,7 @@ const CodeEditor = () => {
     }
   }, [currentLanguage, API_URL, forceStopExecution]);
 
-  // Auto-detect whether user file code reads from stdin
-  const _codeNeedsInput = (src, lang) => {
-    if (lang === 'python') return /\binput\s*\(/.test(src);
-    return /readline|process\.stdin|prompt\s*\(/.test(src);
-  };
-
-  const handleUserFileSelect = (file) => {
+  const handleUserFileSelect = useCallback((file) => {
     forceStopExecution();
     setSelectedUserFile(file);
     setCode(file.content || '');
@@ -113,7 +118,7 @@ const CodeEditor = () => {
       : 'Python';
     setCurrentLanguage(langName);
     setAwaitConsoleInput(_codeNeedsInput(file.content || '', langObj?.language ?? 'python'));
-  };
+  }, [forceStopExecution, languageData]);
 
   // Effects
   useEffect(() => {
@@ -135,10 +140,19 @@ const CodeEditor = () => {
     fetchLanguages();
   }, [API_URL]);
 
+  useEffect(() => {
+    const incomingFile = location.state?.openUserFile;
+    if (!incomingFile || languageData.length === 0) return;
+
+    handleUserFileSelect(incomingFile);
+    // Clear one-time route state after applying it to avoid re-opening on rerender.
+    navigate(location.pathname, { replace: true, state: {} });
+  }, [location.pathname, location.state, languageData, navigate, handleUserFileSelect]);
+
   // Load sample code when language changes
   useEffect(() => {
     // If a user file is selected, skip samples loading
-    if (selectedUserFile) return;
+    if (selectedUserFile || hasPendingIncomingFile) return;
 
     const cacheKey = currentLanguage;
 
@@ -168,7 +182,7 @@ const CodeEditor = () => {
       }
     };
     fetchSampleCode(currentLanguage);
-  }, [currentLanguage, selectedUserFile, handleFileSelect, API_URL]);
+  }, [currentLanguage, selectedUserFile, hasPendingIncomingFile, handleFileSelect, API_URL]);
 
   // Editor change handler
   const handleEditorChange = (value) => {
@@ -209,7 +223,7 @@ const CodeEditor = () => {
         const rid = body.run_id;
         runIdRef.current = rid;
 
-        // Open SSE stream — native browser API, no library needed
+        // Open SSE stream — native browser API
         const source = new EventSource(`${API_URL}/execute/${rid}/stream`);
         eventSourceRef.current = source;
 
@@ -247,7 +261,7 @@ const CodeEditor = () => {
         setOutput(`Error: ${err.message}`);
       }
     } else {
-      // Non-interactive mode — simple POST, returns output directly
+      // Non-interactive mode — simple POST
       try {
         const res = await fetch(`${API_URL}/execute`, {
           method: 'POST',
@@ -297,7 +311,7 @@ const CodeEditor = () => {
     }).catch(() => {});
   };
 
-  // ── Auto-save ─────────────────────────────────────────────────────────────
+  // Auto-save
   const saveUserFile = async (content) => {
     if (!selectedUserFile) return;
     setAutoSaving(true);
@@ -316,10 +330,15 @@ const CodeEditor = () => {
     }
   };
 
-  // ── UI handlers ───────────────────────────────────────────────────────────
-  const toggleDropdown = () => setIsOpen(!isOpen);
-  const handleLanguageSelect = (language) => { setCurrentLanguage(language); setIsOpen(false); };
-  const toggleSidebar = () => setShowSidebar(!showSidebar);
+  // UI toggle handlers
+  const toggleSidebar = () => setShowSidebar(prev => !prev);
+  const toggleDropdown = () => setIsOpen(prev => !prev);
+
+  // Language change handler
+  const handleLanguageSelect = (lang) => {
+    setCurrentLanguage(lang);
+    setIsOpen(false);
+  };
 
   return (
     <EditorComponent
@@ -349,6 +368,7 @@ const CodeEditor = () => {
       handleUserFileSelect={handleUserFileSelect}
       selectedUserFile={selectedUserFile}
       autoSaving={autoSaving}
+      initialSidebarTab={hasPendingIncomingFile || selectedUserFile ? 'myfiles' : 'samples'}
 
       // Interactive stdin props
       awaitConsoleInput={awaitConsoleInput}

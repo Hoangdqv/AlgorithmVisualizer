@@ -19,7 +19,7 @@ def delete_user(identifier):
             print(f"❌ User '{identifier}' not found")
             return False
         
-        print(f"\n🔍 Found user:")
+        print(f"\n Found user:")
         print(f"   ID: {user.id}")
         print(f"   Username: {user.username}")
         print(f"   Email: {user.email}")
@@ -30,12 +30,12 @@ def delete_user(identifier):
         file_count = File.query.filter_by(user_account_id=user.id).count()
         folder_count = Folder.query.filter_by(user_id=user.id).count()
         
-        print(f"\n📊 User data:")
+        print(f"\n User data:")
         print(f"   Files: {file_count}")
         print(f"   Folders: {folder_count}")
         
         # Confirm deletion
-        confirm = input(f"\n⚠️  Delete user '{user.username}' and all associated data? (yes/no): ")
+        confirm = input(f"\n Delete user '{user.username}' and all associated data? (yes/no): ")
         
         if confirm.lower() != 'yes':
             print("❌ Deletion cancelled")
@@ -44,7 +44,7 @@ def delete_user(identifier):
         try:
             # Delete user's files
             deleted_files = File.query.filter_by(user_account_id=user.id).delete()
-            print(f"🗑️  Deleted {deleted_files} file(s)")
+            print(f" Deleted {deleted_files} file(s)")
             
             # Get user's folder IDs
             folder_ids = [f.folder_id for f in Folder.query.filter_by(user_id=user.id).all()]
@@ -54,17 +54,17 @@ def delete_user(identifier):
                 deleted_closures = ClosureTable.query.filter(
                     ClosureTable.descendant.in_(folder_ids)
                 ).delete(synchronize_session=False)
-                print(f"🗑️  Deleted {deleted_closures} closure table entry(ies)")
+                print(f"  Deleted {deleted_closures} closure table entry(ies)")
             
             # Delete user's folders
             deleted_folders = Folder.query.filter_by(user_id=user.id).delete()
-            print(f"🗑️  Deleted {deleted_folders} folder(s)")
+            print(f"  Deleted {deleted_folders} folder(s)")
             
             # Delete user
             db.session.delete(user)
             db.session.commit()
             
-            print(f"\n✅ User '{user.username}' deleted successfully!")
+            print(f"\n User '{user.username}' deleted successfully!")
             return True
             
         except Exception as e:

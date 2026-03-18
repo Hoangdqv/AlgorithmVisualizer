@@ -38,6 +38,7 @@ const EditorComponent = ({
   handleUserFileSelect,
   selectedUserFile,
   autoSaving,
+  initialSidebarTab,
 
   // Interactive stdin props
   awaitConsoleInput,
@@ -49,6 +50,7 @@ const EditorComponent = ({
   // Algorithm-specific props
   category,
   selectedAlgorithmKey,
+  selectedAlgorithmName,
   viewMode,
   setViewMode,
   runMinimal,
@@ -61,9 +63,9 @@ const EditorComponent = ({
   // Auto-scroll the console output to the bottom when new output arrives
   const consoleScrollRef = useRef(null);
   useEffect(() => {
-    const el = consoleScrollRef.current;
-    if (el) {
-      el.scrollTop = el.scrollHeight;
+    const autoScroll = consoleScrollRef.current;
+    if (autoScroll) {
+      autoScroll.scrollTop = autoScroll.scrollHeight;
     }
   }, [output, isRunning, containerReady]);
 
@@ -143,6 +145,7 @@ const EditorComponent = ({
                 onFileSelect={handleFileSelect}
                 onUserFileSelect={handleUserFileSelect}
                 selectedLanguage={sidebarLanguageKey || currentLanguage}
+                initialTab={initialSidebarTab}
                 apiCache={apiCache} />
             </Panel>
             <PanelResizeHandle className='resizable-handle-horizontal' />
@@ -159,6 +162,7 @@ const EditorComponent = ({
                   <MinimalModePanel
                     category={category}
                     algorithmKey={selectedAlgorithmKey}
+                    algorithmName={selectedAlgorithmName}
                     onRun={runMinimal}
                     isRunning={isRunning}
                   />
@@ -220,7 +224,7 @@ const EditorComponent = ({
                   )}
                   </div>
 
-                  {/* Stdin input — only shown for code that explicitly awaits user input */}
+                  {/* Stdin input — awaits user input */}
                   {isRunning && sendStdin && awaitConsoleInput && containerReady && (
                     <div className='stdin-row'>
                       <span className='stdin-caret'>&gt;</span>

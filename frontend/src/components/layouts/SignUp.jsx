@@ -52,7 +52,7 @@ export default function SignUp() {
   return (
     <div className='auth-container'>
         <h2>Sign Up</h2>
-        {error && <div className="error">{error}</div>}
+        {error && <div className="error-alert">{error}</div>}
         <SignUpForm
             username={username}
             email={email}

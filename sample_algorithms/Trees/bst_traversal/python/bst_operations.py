@@ -44,7 +44,8 @@ def bst_operations(tree_nodes, root_id, operation, tracer, target=None):
         'preorder': lambda: preorder_traversal(tree_nodes, root_id, tracer),
         'postorder': lambda: postorder_traversal(tree_nodes, root_id, tracer),
         'search': lambda: bst_search(tree_nodes, root_id, target, tracer),
-        'insert': lambda: [bst_insert(tree_nodes, root_id, x, tracer) for x in target],
+        'insert': lambda: [bst_insert(tree_nodes, root_id, x, tracer)
+            for x in (target if isinstance(target, (list, tuple)) else [target])],
         'delete': lambda: bst_delete(tree_nodes, root_id, target, tracer),
     }
     

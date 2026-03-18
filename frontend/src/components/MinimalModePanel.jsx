@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import { algorithmParams } from '../data/algorithmParams';
 
-const MinimalModePanel = ({ category, algorithmKey, onRun, isRunning }) => {
+const MinimalModePanel = ({ category, algorithmKey, onRun, isRunning, algorithmName }) => {
   const schema = algorithmParams[category];
   const [formValues, setFormValues] = useState({});
-
   // Reset form to defaults when the algorithm or category changes
   useEffect(() => {
     if (!schema?.params) return;
@@ -25,6 +24,7 @@ const MinimalModePanel = ({ category, algorithmKey, onRun, isRunning }) => {
     const parsed = {};
     schema.params.forEach((param) => {
       const raw = formValues[param.key];
+      console.log(raw)
       if (param.type === 'array-int') {
         parsed[param.key] = String(raw)
           .split(',')
@@ -35,6 +35,7 @@ const MinimalModePanel = ({ category, algorithmKey, onRun, isRunning }) => {
       } else {
         parsed[param.key] = raw;
       }
+      console.log(`Parsed ${param.key}:`, parsed[param.key]);
     });
     onRun(parsed);
   };
@@ -50,37 +51,57 @@ const MinimalModePanel = ({ category, algorithmKey, onRun, isRunning }) => {
   return (
     <div className="minimal-panel">
       <div className="minimal-panel-header">
-        <h3>Algorithm Parameters</h3>
+        <h3>Parameters for {algorithmName}</h3>
         <p>Configure the input values and run the algorithm</p>
       </div>
 
       <form className="minimal-panel-form" onSubmit={handleSubmit}>
-        {schema.params.map((param) => (
-          <div key={param.key} className="minimal-panel-field">
-            <label htmlFor={`param-${param.key}`}>{param.label}</label>
-            <span className="minimal-panel-description">{param.description}</span>
-            {param.type === 'number' ? (
-              <input
-                id={`param-${param.key}`}
-                type="number"
-                min={param.min}
-                max={param.max}
-                value={formValues[param.key] ?? ''}
-                onChange={(e) => handleChange(param.key, e.target.value)}
-                className="minimal-panel-input"
-              />
-            ) : (
-              <input
-                id={`param-${param.key}`}
-                type="text"
-                value={formValues[param.key] ?? ''}
-                onChange={(e) => handleChange(param.key, e.target.value)}
-                placeholder={param.placeholder}
-                className="minimal-panel-input"
-              />
-            )}
-          </div>
-        ))}
+        {schema.params.map((param) => {
+  if (param.enabledWhen && !param.enabledWhen(formValues)) {
+    return null;
+  }
+
+  return (
+    <div key={param.key} className="minimal-panel-field">
+      <label htmlFor={`param-${param.key}`}>{param.label}</label>
+      <span className="minimal-panel-description">{param.description}</span>
+
+      {param.type === 'number' ? (
+        <input
+          id={`param-${param.key}`}
+          type="number"
+          min={param.min}
+          max={param.max}
+          value={formValues[param.key] ?? ''}
+          onChange={(e) => handleChange(param.key, e.target.value)}
+          className="minimal-panel-input"
+        />
+      ) : param.type === 'select' ? (
+        <select
+          id={`param-${param.key}`}
+          value={formValues[param.key] ?? ''}
+          onChange={(e) => handleChange(param.key, e.target.value)}
+          className="minimal-panel-input"
+        >
+          {param.options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          id={`param-${param.key}`}
+          type="text"
+          value={formValues[param.key] ?? ''}
+          onChange={(e) => handleChange(param.key, e.target.value)}
+          placeholder={param.placeholder}
+          className="minimal-panel-input"
+        />
+      )}
+    </div>
+  );
+})}
 
         <button
           type="submit"

@@ -8,6 +8,7 @@ const FileContextMenu = ({
   onClose, 
   onNewFile,
   onNewFolder,
+  onOpenInEditor,
   onRename,
   onDelete,
 }) => {
@@ -59,6 +60,15 @@ const FileContextMenu = ({
           </div>
           <div className="context-menu-item" onClick={(e) => handleAction(onNewFolder, e)}>
             📁 New Folder
+          </div>
+          <div className="context-menu-divider" />
+        </>
+      )}
+
+      {type === 'file' && onOpenInEditor && (
+        <>
+          <div className="context-menu-item" onClick={(e) => handleAction(onOpenInEditor, e)}>
+            Open in code editor
           </div>
           <div className="context-menu-divider" />
         </>

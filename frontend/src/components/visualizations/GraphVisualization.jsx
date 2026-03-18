@@ -12,12 +12,14 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
   const dataStructureType = tracerData?.metadata?.dataStructure || 'queue';
   const dataStructureLabel = tracerData?.metadata?.dataStructureLabel || 'Queue';
 
-  const [nodePositions, updateNodePositions] = useState([]);
-  const [dragState, setDragState] = useState({ nodeIndex: null, offset: [0, 0] });
+  const [nodePositions, updateNodePositions] = useState({});
+  const [dragState, setDragState] = useState({ nodeId: null, offset: [0, 0] });
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
+  const [graphState, resetGraphState] = useState(false);
+  const [autoFit, setAutoFit] = useState(false);
   const svgRef = useRef(null);
   const isDraggingRef = useRef(false);
   const isPanningRef = useRef(false);
@@ -35,33 +37,47 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
 
   // Function to calculate initial positions in a circle layout
   const calculateInitialPositions = useCallback((nodeCount) => {
-    if (nodeCount === 0) return [];
+    if (nodeCount === 0) return {};
 
-    const positions = [];
+    const positions = {};
     for (let i = 0; i < nodeCount; i++) {
       const angle = (i * 2 * Math.PI) / nodeCount - Math.PI / 2;
       const x = centerX + radius * Math.cos(angle);
       const y = centerY + radius * Math.sin(angle);
-      positions.push({ x, y });
+      positions[i] = { x, y };
     }
     return positions;
   }, []);
 
-  // Expose resetPositions to parent component
-  useImperativeHandle(ref, () => ({
-    resetPositions: () => {
-      const nodeCount = graphData.length;
-      updateNodePositions(calculateInitialPositions(nodeCount));
-      setPanOffset({ x: 0, y: 0 });
-      setZoom(1);
-    }
-  }));
-
-  // Initialize node positions
+  // Initialize/update node positions
   useEffect(() => {
     const nodeCount = graphData.length;
-    updateNodePositions(calculateInitialPositions(nodeCount));
-  }, [graphData.length, calculateInitialPositions]);
+    updateNodePositions((prev) => {
+      if (graphState) {
+        resetGraphState(false);
+        return calculateInitialPositions(nodeCount);
+      }
+
+      const prevNodeIds = new Set(Object.keys(prev).map((id) => parseInt(id)));
+      const newNodeIds = new Set(Array.from({ length: nodeCount }, (_, i) => i));
+      const hasNewNodes = Array.from(newNodeIds).some((id) => !prevNodeIds.has(id));
+
+      if (hasNewNodes || Object.keys(prev).length === 0) {
+        if (hasNewNodes) {
+          setAutoFit(true);
+        }
+        return calculateInitialPositions(nodeCount);
+      }
+
+      const cleaned = { ...prev };
+      Object.keys(cleaned).forEach((nodeId) => {
+        if (!newNodeIds.has(parseInt(nodeId))) {
+          delete cleaned[nodeId];
+        }
+      });
+      return cleaned;
+    });
+  }, [graphData.length, calculateInitialPositions, graphState]);
 
   const getSVGCoordinates = (e) => {
     if (!svgRef.current) return { x: 0, y: 0 };
@@ -79,22 +95,23 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
     };
   };
 
-  const onMouseDown = (e, nodeIndex) => {
+  const onMouseDown = (e, nodeId) => {
     e.preventDefault();
     e.stopPropagation();
     isDraggingRef.current = true;
     
     const svgCoords = getSVGCoordinates(e);
+    const nodePos = nodePositions[nodeId] || { x: 0, y: 0 };
     const offset = [
-      (svgCoords.x - panOffset.x) / zoom - nodePositions[nodeIndex].x,
-      (svgCoords.y - panOffset.y) / zoom - nodePositions[nodeIndex].y
+      (svgCoords.x - panOffset.x) / zoom - nodePos.x,
+      (svgCoords.y - panOffset.y) / zoom - nodePos.y
     ];
     
-    setDragState({ nodeIndex, offset });
+    setDragState({ nodeId, offset });
   };
 
   const onMouseMove = useCallback((e) => {
-    if (!isDraggingRef.current || dragState.nodeIndex === null) return;
+    if (!isDraggingRef.current || dragState.nodeId === null) return;
     
     const svgCoords = getSVGCoordinates(e);
     let newX = (svgCoords.x - panOffset.x) / zoom - dragState.offset[0];
@@ -111,19 +128,19 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
     newY = Math.max(minBoundY, Math.min(maxBoundY, newY));
     
     updateNodePositions(prev => {
-      const newPositions = [...prev];
-      newPositions[dragState.nodeIndex] = { x: newX, y: newY };
+      const newPositions = { ...prev };
+      newPositions[dragState.nodeId] = { x: newX, y: newY };
       return newPositions;
     });
-  }, [viewBox, dragState.nodeIndex, dragState.offset, panOffset.x, panOffset.y, zoom]);
+  }, [viewBox, dragState.nodeId, dragState.offset, panOffset.x, panOffset.y, zoom]);
 
   const onMouseUp = useCallback(() => {
     isDraggingRef.current = false;
-    setDragState({ nodeIndex: null, offset: [0, 0] });
+    setDragState({ nodeId: null, offset: [0, 0] });
   }, []);
 
   useEffect(() => {
-    if (dragState.nodeIndex !== null) {
+    if (dragState.nodeId !== null) {
       window.addEventListener('mousemove', onMouseMove);
       window.addEventListener('mouseup', onMouseUp);
       return () => {
@@ -131,7 +148,7 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
         window.removeEventListener('mouseup', onMouseUp);
       };
     }
-  }, [dragState.nodeIndex, onMouseMove, onMouseUp]);
+  }, [dragState.nodeId, onMouseMove, onMouseUp]);
 
   // Pan handlers
   const onPanStart = (e) => {
@@ -204,15 +221,16 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
     }
   }, [handleWheel]);
 
-  const fitToScreen = () => {
-    if (nodePositions.length === 0) return;
+  const fitToScreen = useCallback(() => {
+    const nodeIds = Object.keys(nodePositions);
+    if (nodeIds.length === 0) return;
     
     // Bounding box of all nodes
     const padding = 50;
     const nodeRadius = 20;
     
-    const xs = nodePositions.map(pos => pos.x);
-    const ys = nodePositions.map(pos => pos.y);
+    const xs = nodeIds.map(id => nodePositions[id].x);
+    const ys = nodeIds.map(id => nodePositions[id].y);
     
     const minX = Math.min(...xs) - nodeRadius - padding;
     const maxX = Math.max(...xs) + nodeRadius + padding;
@@ -240,27 +258,46 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
     
     setZoom(newZoom);
     setPanOffset({ x: newPanX, y: newPanY });
-  };
+  }, [nodePositions, viewBox.height, viewBox.width]);
 
-  const getNodeClass = (nodeIndex) => {
+  // Expose resetPositions to parent component
+  useImperativeHandle(ref, () => ({
+    resetPositions: () => {
+      resetGraphState(true);
+      setPanOffset({ x: 0, y: 0 });
+      setZoom(1);
+    },
+    fit: () => {
+      fitToScreen();
+    }
+  }), [fitToScreen]);
+
+  useEffect(() => {
+    if (!autoFit) return;
+    fitToScreen();
+    setAutoFit(false);
+  }, [nodePositions, autoFit, fitToScreen]);
+
+  const getNodeClass = (nodeId) => {
     let classes = 'graph-node';
     
-    if (processingNode === nodeIndex) {
+    if (processingNode === nodeId) {
       classes += ' graph-node-processing';
-    } else if (discoveredNode === nodeIndex) {
+    } else if (discoveredNode === nodeId) {
       classes += ' graph-node-discovered';
-    } else if (visited[nodeIndex]) {
+    } else if (visited[nodeId]) {
       classes += ' graph-node-visited';
     }
     
-    if (queue.includes(nodeIndex) || stack.includes(nodeIndex)) {
+    if (queue.includes(nodeId) || stack.includes(nodeId)) {
       classes += ' graph-node-queued';
     }
     return classes;
   };
 
   const renderGraph = () => {
-    if (nodePositions.length === 0) return null;
+    const nodeIds = Object.keys(nodePositions).map(id => parseInt(id));
+    if (nodeIds.length === 0) return null;
 
     return (
       <svg 
@@ -284,8 +321,10 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
         />
         <g transform={`translate(${panOffset.x}, ${panOffset.y}) scale(${zoom})`}>
           {graphData.map((row, i) =>
+          // graphData is an adjacency matrix, check for edges between nodes
             row.map((connected, j) => {
-              if (connected === 1 && i < j) {
+              // For undirected graphs, only render edge once (i < j)
+              if (connected === 1 && i < j && nodePositions[i] && nodePositions[j]) {
                 return (
                   <line
                     key={`edge-${i}-${j}`}
@@ -301,30 +340,33 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
             })
           )}
           
-          {nodePositions.map((pos, i) => (
-            <g 
-              key={`node-${i}`}
-              onMouseDown={(e) => onMouseDown(e, i)}
-              style={{ cursor: dragState.nodeIndex === i ? 'grabbing' : 'grab' }}
-            >
-              <circle
-                cx={pos.x}
-                cy={pos.y}
-                r={20}
-                className={getNodeClass(i)}
-              />
-              <text
-                x={pos.x}
-                y={pos.y}
-                className="graph-node-text"
-                textAnchor="middle"
-                dominantBaseline="middle"
-                pointerEvents="none"
+          {nodeIds.map((nodeId) => {
+            const pos = nodePositions[nodeId];
+            return (
+              <g 
+                key={`node-${nodeId}`}
+                onMouseDown={(e) => onMouseDown(e, nodeId)}
+                style={{ cursor: dragState.nodeId === nodeId ? 'grabbing' : 'grab' }}
               >
-                {i}
-              </text>
-            </g>
-          ))}
+                <circle
+                  cx={pos.x}
+                  cy={pos.y}
+                  r={20}
+                  className={getNodeClass(nodeId)}
+                />
+                <text
+                  x={pos.x}
+                  y={pos.y}
+                  className="graph-node-text"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  pointerEvents="none"
+                >
+                  {nodeId}
+                </text>
+              </g>
+            );
+          })}
         </g>
       </svg>
     );

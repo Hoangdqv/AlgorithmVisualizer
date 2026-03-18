@@ -1,5 +1,6 @@
 // FileTree.jsx - Recursive tree component for folders and files
 import { useState } from 'react';
+import getFileExtension from '../scripts/getFileExtension';
 
 const FileTree = ({ 
   folders = [], 
@@ -15,21 +16,7 @@ const FileTree = ({
   const [expandedFolders, setExpandedFolders] = useState({});
   
   // Dynamic file extension mapper
-  const getFileExtension = (languageName) => {
-    const extensionMap = {
-      'python': 'py',
-      'javascript': 'js',
-      'java': 'java',
-      'cpp': 'cpp',
-      'c': 'c',
-      'go': 'go',
-      'rust': 'rs',
-      'typescript': 'ts',
-      'ruby': 'rb',
-      'php': 'php'
-    };
-    return extensionMap[languageName.toLowerCase()] || 'txt';
-  };
+
 
   const toggleFolder = (folderId, e) => {
     e.stopPropagation();
@@ -67,7 +54,7 @@ const FileTree = ({
     return lang ? getFileExtension(lang.language) : 'txt';
   }
 
-  const indent = depth * 16;
+  const indent = 5 + depth * 16;
 
   return (
     <div className="file-tree">

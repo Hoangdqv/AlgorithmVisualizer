@@ -21,8 +21,10 @@ const AlgorithmSelect = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [viewMode, setViewMode] = useState('detailed');
   const [selectedAlgorithmKey, setSelectedAlgorithmKey] = useState(null);
+  const [selectedAlgorithmName, setSelectedAlgorithmName] = useState('N/A');
   const [languageData, setLanguageData] = useState([]);
 
+  // Fetch languages
   const languages = useMemo(() => {
     return languageData.map(lang => {
       const name = lang.language;
@@ -45,6 +47,7 @@ const AlgorithmSelect = () => {
       const cached = apiCache.current.code[codeKey];
       setCode(cached.code);
       setExplanation(cached.explanation || '');
+      setSelectedAlgorithmName(cached.name || 'N/A');
       setOutput('');
       return;
     }
@@ -60,17 +63,18 @@ const AlgorithmSelect = () => {
       }
 
       const data = await response.json();
-
       if (data.code) {
         // Cache the code and explanation
         apiCache.current.code[codeKey] = {
           code: data.code,
-          explanation: data.explanation || ''
+          explanation: data.explanation || '',
+          name: data.name || 'N/A'
         };
         
         setCode(data.code);
         setOutput('');
         setExplanation(data.explanation || '');
+        setSelectedAlgorithmName(data.name || 'N/A');
       } else {
         console.error('Error loading algorithm code:', data.error);
         setCode(`// Error loading algorithm code`);
@@ -124,6 +128,9 @@ const AlgorithmSelect = () => {
 
   useEffect(() => {
     const cacheKey = `${category}_${currentLanguage}`;
+
+    setSelectedAlgorithmName('N/A');
+    setSelectedAlgorithmKey(null);
 
     // Check if algorithm list is cached
     if (apiCache.current.lists[cacheKey]) {
@@ -211,8 +218,9 @@ const AlgorithmSelect = () => {
   }, [currentLanguage, code]);
 
   const runMinimal = useCallback(async (params) => {
+    console.log('Running with params:', params);
     const paramsBlock = buildParamsBlock(category, currentLanguage.toLowerCase(), params);
-
+    console.log('Generated params block:', paramsBlock);
     setIsRunning(true);
     setOutput('Running...');
     setTracerData(null);
@@ -293,6 +301,7 @@ const AlgorithmSelect = () => {
       // Algorithm-specific props
       category={category}
       selectedAlgorithmKey={selectedAlgorithmKey}
+      selectedAlgorithmName={selectedAlgorithmName}
       viewMode={viewMode}
       setViewMode={handleViewModeChange}
       runMinimal={runMinimal}

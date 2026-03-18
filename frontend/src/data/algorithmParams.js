@@ -86,7 +86,7 @@ export const algorithmParams = {
         default: 6,
         min: 2,
         max: 20,
-        description: 'Total number of nodes in the graph',
+        description: 'Total number of nodes in the graph (Starts from 0 to n-1)',
       },
       {
         key: 'edges',
@@ -117,6 +117,30 @@ export const algorithmParams = {
         description:
           'Comma-separated values inserted into BST in order (first value becomes root)',
       },
+      {
+        key: 'operation',
+        label: 'Operation',
+        type: 'select',
+        default: 'inorder',
+        options: [
+          { value: 'inorder', label: 'Traversal - In-order' },
+          { value: 'preorder', label: 'Traversal - Pre-order' },
+          { value: 'postorder', label: 'Traversal - Post-order' },
+          { value: 'insert', label: 'Insert Values' },
+          { value: 'delete', label: 'Delete Values' },
+          { value: 'search', label: 'Search Values' },
+        ],
+        description: 'Operation for the tree',
+      },
+      {
+        key: 'target',
+        label: 'Target Value',
+        type: 'number-optional',
+        enabledWhen: (values) =>
+          !['preorder','inorder','postorder'].includes(values.operation),
+        default: '',
+        description: 'Value used in search/insert/delete operations',
+      }
     ],
   },
 };
@@ -148,13 +172,15 @@ function buildGraphBlock(language, params) {
 function buildTreeBlock(language, params) {
   const nodes = buildBSTNodes(params.values);
   if (language === 'python') {
+    if(!params.target) params.target = "None";
     const rows = nodes
       .map((n) => `    {"id": ${n.id}, "value": ${n.value}, "children": [${n.children.join(', ')}]}`)
       .join(',\n');
-    return `tree_nodes = [\n${rows}\n]\nroot_id = 1`;
+    return `tree_nodes = [\n${rows}\n]\nroot_id = 1\noperation = "${params.operation}"\ntarget = ${params.target}`;
   }
+  if (!params.target) params.target = "null";
   const rows = nodes
     .map((n) => `    { id: ${n.id}, value: ${n.value}, children: [${n.children.join(', ')}] }`)
     .join(',\n');
-  return `const treeNodes = [\n${rows}\n];\nconst rootId = 1;`;
+  return `const treeNodes = [\n${rows}\n];\nconst rootId = 1;\nconst operation = "${params.operation}";\nconst target = ${params.target};`;
 }

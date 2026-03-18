@@ -280,20 +280,18 @@ export function bstSearch(treeNodes, rootId, target, tracer) {
 }
 
 
-export function bstInsert(treeNodes, rootId, value, tracer) {
+export function bstInsert(treeNodes, rootId, value, tracer, visited = null) {
     /**
      * Insert a new value into BST and update the tree structure.
-     * Returns the ID of the newly inserted node.
+     * Returns tuple of [newNodeId, visitedList].
      */
-    // Work with a deep copy to avoid modifying the original
-    treeNodes = JSON.parse(JSON.stringify(treeNodes));
-    
+    // Modify tree in-place to support multiple insertions
     const nodeMap = {};
     treeNodes.forEach(node => {
         nodeMap[node.id] = node;
     });
     
-    const visited = [];
+    visited = visited !== null ? visited : [];
     const newNodeId = Math.max(...treeNodes.map(n => n.id)) + 1;
     let parentId = null;
     let insertPosition = null; // 'left' or 'right'
@@ -384,11 +382,11 @@ export function bstInsert(treeNodes, rootId, value, tracer) {
     
     // Final state
     tracer.addState([], {
-        tree: JSON.parse(JSON.stringify(treeNodes)), visited: visited, current: null,
+        tree: JSON.parse(JSON.stringify(treeNodes)), visited: [], current: null,
         depth: 0
     });
     
-    return parentId ? newNodeId : null;
+    return [parentId ? newNodeId : null, visited];
 }
 
 
@@ -581,12 +579,6 @@ export function bstDelete(treeNodes, rootId, target, tracer) {
                 message: `Replaced with successor value ${successorValue} and removed old successor node`
             });
         }
-        
-        // Show the tree after deletion (already modified)
-        tracer.addState([], {
-            tree: JSON.parse(JSON.stringify(treeNodes)), visited: [...visited], current: null,
-            depth: 0
-        });
     }
     
     // Final state

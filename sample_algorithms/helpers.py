@@ -347,7 +347,7 @@ def bst_delete(tree_nodes, root_id, target, tracer):
     parent_id = None
     node_depth = 0  # Track the depth of the node to be deleted
     
-    def find_delete_node(node_id, parent, depth, path):
+    def find_delete_node(node_id, parent, depth):
         nonlocal found_node, parent_id, node_depth
         
         if node_id is None or found_node is not None:
@@ -357,13 +357,12 @@ def bst_delete(tree_nodes, root_id, target, tracer):
         if not node:
             return
         
-        current_path = path + [node_id]
         visited.append(node_id)
         
         # Show current node being examined
         tracer.add_state([],
             tree=copy.deepcopy(tree_nodes), visited=visited.copy(), current=node_id,
-            depth=depth, path=current_path)
+            depth=depth)
         
         # Found the target
         if node.get('value') == target:
@@ -377,14 +376,14 @@ def bst_delete(tree_nodes, root_id, target, tracer):
         # Go left if target is smaller
         if target < node.get('value', float('inf')) and len(children) > 0:
             left_child = children[0]
-            find_delete_node(left_child, node_id, depth + 1, current_path)
+            find_delete_node(left_child, node_id, depth + 1)
         # Go right if target is larger
         elif target > node.get('value', float('-inf')) and len(children) > 1:
             right_child = children[1]
-            find_delete_node(right_child, node_id, depth + 1, current_path)
+            find_delete_node(right_child, node_id, depth + 1)
     
     # Find the node to delete
-    find_delete_node(root_id, None, 0, [])
+    find_delete_node(root_id, None, 0)
     
     # delete if found
     if found_node is not None:
@@ -396,10 +395,11 @@ def bst_delete(tree_nodes, root_id, target, tracer):
             # Show state before deletion
             tracer.add_state([],
                 tree=copy.deepcopy(tree_nodes), visited=visited.copy(), current=found_node,
-                depth=node_depth, path=[found_node],
+                depth=node_depth,
                 message=f"Deleting leaf node {node_to_delete.get('value')}")
             
             if parent_id is not None:
+                # Get parent and its children through the respective parent_id
                 parent = node_map[parent_id]
                 parent_children = parent.get('children', [])
                 # Remove from parent's children
@@ -414,7 +414,7 @@ def bst_delete(tree_nodes, root_id, target, tracer):
             # Show state before deletion
             tracer.add_state([],
                 tree=copy.deepcopy(tree_nodes), visited=visited.copy(), current=found_node,
-                depth=node_depth, path=[found_node, child_id],
+                depth=node_depth,
                 message=f"Replacing node {node_to_delete.get('value')} with its child")
             
             if parent_id is not None:
@@ -433,18 +433,18 @@ def bst_delete(tree_nodes, root_id, target, tracer):
             # Show initial state
             tracer.add_state([],
                 tree=copy.deepcopy(tree_nodes), visited=visited.copy(), current=found_node,
-                depth=node_depth, path=[found_node],
+                depth=node_depth,
                 message=f"Node {node_to_delete.get('value')} has two children, finding successor...")
             
             # Find inorder successor (minimum in right subtree)
             successor_id = children[1]
             successor_parent_id = found_node
-            successor_path = [found_node, successor_id]
+            successor_depth_count = 1
             
             # Show traversal to find successor
             tracer.add_state([],
                 tree=copy.deepcopy(tree_nodes), visited=visited.copy(), current=successor_id,
-                depth=node_depth + 1, path=successor_path.copy(),
+                depth=node_depth + 1,
                 message="Looking for successor (minimum in right subtree)")
             
             while True:
@@ -453,30 +453,30 @@ def bst_delete(tree_nodes, root_id, target, tracer):
                 if len(successor_children) > 0 and successor_children[0] is not None:
                     successor_parent_id = successor_id
                     successor_id = successor_children[0]
-                    successor_path.append(successor_id)
+                    successor_depth_count += 1
                     
                     # Show each step in finding successor
-                    successor_depth = node_depth + len(successor_path) - 1
+                    successor_depth = node_depth + successor_depth_count
                     tracer.add_state([],
                         tree=copy.deepcopy(tree_nodes), visited=visited.copy(), current=successor_id,
-                        depth=successor_depth, path=successor_path.copy(),
+                        depth=successor_depth,
                         message="Going left to find minimum")
                 else:
                     break
             
             # Highlight the successor found
             successor_value = node_map[successor_id].get('value')
-            successor_depth = node_depth + len(successor_path) - 1
+            successor_depth = node_depth + successor_depth_count
             tracer.add_state([],
                 tree=copy.deepcopy(tree_nodes), visited=visited.copy() + [successor_id], current=successor_id,
-                depth=successor_depth, path=successor_path.copy(),
+                depth=successor_depth,
                 message=f"Found successor: {successor_value}")
             
-            # Show the swap about to happen
+            # Show the swap
             original_value = node_to_delete.get('value')
             tracer.add_state([],
                 tree=copy.deepcopy(tree_nodes), visited=visited.copy() + [successor_id, found_node], current=found_node,
-                depth=node_depth, path=[found_node],
+                depth=node_depth,
                 message=f"Swapping value {original_value} with successor value {successor_value}")
             
             # Replace node's value with successor's value
@@ -498,13 +498,13 @@ def bst_delete(tree_nodes, root_id, target, tracer):
             # Show state after value replacement and successor removal
             tracer.add_state([],
                 tree=copy.deepcopy(tree_nodes), visited=visited.copy() + [successor_id, found_node], current=found_node,
-                depth=node_depth, path=[found_node],
+                depth=node_depth,
                 message=f"Replaced with successor value {successor_value} and removed old successor node")
 
     
     # Final state
     tracer.add_state([],
         tree=copy.deepcopy(tree_nodes), visited=visited, current=None,
-        depth=0, path=[])
+        depth=0)
     
     return found_node

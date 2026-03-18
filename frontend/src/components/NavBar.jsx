@@ -18,6 +18,9 @@ export default function NavBar() {
         <Link to='/algorithms'><li>Algorithms</li></Link>
         <Link to='/playground'><li>Code Editor</li></Link>
         <Link to='/about'><li>About</li></Link>
+        {user && user.role === 'admin' && (
+          <Link to='/admin'><li>Admin</li></Link>
+        )}
       </ul>
       
         <>
@@ -26,7 +29,8 @@ export default function NavBar() {
               <div>
                 <span style={{ borderRadius: '5px', boxSizing: 'border-box'}}>Welcome, {user.username}!</span>
               </div>
-                <a className="logout-btn" href='javascript:void(0)' onClick={handleLogout}>Logout</a>
+              <Link to='/profile' className='sign-in-btn'>Profile</Link>
+              <a className="logout-btn" href='javascript:void(0)' onClick={handleLogout}>Logout</a>
             </div>
           ) : (
             <div style={{ display: 'flex', gap: '2rem' }}>

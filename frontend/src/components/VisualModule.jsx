@@ -4,12 +4,13 @@ import GraphVisualization from './visualizations/GraphVisualization';
 import TreeVisualization from './visualizations/TreeVisualization';
 
 const VisualModule = ({ tracerData, isRunning, currentLanguage }) => {
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentStep, setCurrentStep] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speedMultiplier, setSpeedMultiplier] = useState(1); // 0.5x to 2x
   const graphVisualizationRef = useRef(null);
 
   const [displayData, setDisplayData] = useState(tracerData);
+  console.log('Current displayData:', displayData);
   const displayStates = displayData?.states || [];
   const displayTotalSteps = displayStates.length;
   
@@ -59,14 +60,16 @@ const VisualModule = ({ tracerData, isRunning, currentLanguage }) => {
     return () => clearInterval(interval);
   }, [isPlaying, currentStep, displayTotalSteps, playSpeed]);
 
-  const handleNext = () => {
+
+
+  const handleNextManual = () => {
     if (currentStep < displayTotalSteps - 1) {
       setCurrentStep(currentStep + 1);
       setIsPlaying(false);
     }
   };
 
-  const handlePrev = () => {
+  const handlePrevManual = () => {
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
       setIsPlaying(false);
@@ -138,7 +141,7 @@ const VisualModule = ({ tracerData, isRunning, currentLanguage }) => {
                     ⟲ Reset
                 </button>
                 <button
-                    onClick={handlePrev}
+                    onClick={handlePrevManual}
                     disabled={currentStep === 0}
                     className="visual-module-button"
                 >
@@ -151,7 +154,7 @@ const VisualModule = ({ tracerData, isRunning, currentLanguage }) => {
                     {isPlaying ? '⏸ Pause' : '▶ Play'}
                 </button>
                 <button
-                    onClick={handleNext}
+                    onClick={handleNextManual}
                     disabled={currentStep === displayTotalSteps - 1}
                     className="visual-module-button"
                 >

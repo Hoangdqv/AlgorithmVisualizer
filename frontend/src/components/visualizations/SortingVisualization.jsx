@@ -11,7 +11,7 @@ const SortingVisualization = ({ currentState }) => {
   const pivot = useMemo(() => currentState?.pivot, [currentState]);
   const range = useMemo(() => currentState?.range || null, [currentState]);
 
-  // Bucket support (radix sort and similar)
+  // Bucket support
   const buckets = useMemo(() => currentState?.buckets || null, [currentState]);
   
   // Convert arrays to Sets for O(1)
