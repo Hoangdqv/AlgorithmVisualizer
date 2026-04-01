@@ -9,6 +9,38 @@ def swap(arr, i, j):
     arr[i], arr[j] = arr[j], arr[i]
 
 
+def normalize_targets(value):
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    if value is None:
+        return []
+    return [value]
+
+
+def run_targets(target, fn, mutate=False):
+    targets = normalize_targets(target)
+    if len(targets) > 1:
+        if mutate:
+            return [fn(x, True) for x in targets]
+        return [fn(x) for x in targets]
+
+    single_target = targets[0] if targets else None
+    if mutate:
+        return fn(single_target, False)
+    return fn(single_target)
+
+
+def build_tree_only(tree_nodes, tracer):
+    import copy
+
+    snapshot = copy.deepcopy(tree_nodes)
+    tracer.add_state([], tree=snapshot, current=None, depth=0)
+    return {
+        'operation': 'build',
+        'message': f"Tree generated with {len(tree_nodes)} node(s)"
+    }
+
+
 # ===== Binary Search Tree Operations  =====
 
 def inorder_traversal(tree_nodes, root_id, tracer):
@@ -65,6 +97,11 @@ def inorder_traversal(tree_nodes, root_id, tracer):
         tree=copy.deepcopy(tree_nodes), visited=visited, current=None,
         depth=0)
 
+    return {
+        'operation': 'inorder',
+        'message': 'Completed in-order traversal'
+    }
+
 
 def preorder_traversal(tree_nodes, root_id, tracer):
     """
@@ -119,6 +156,11 @@ def preorder_traversal(tree_nodes, root_id, tracer):
     tracer.add_state([],
         tree=copy.deepcopy(tree_nodes), visited=visited, current=None,
         depth=0)
+
+    return {
+        'operation': 'preorder',
+        'message': 'Completed pre-order traversal'
+    }
 
 
 def postorder_traversal(tree_nodes, root_id, tracer):
@@ -175,6 +217,11 @@ def postorder_traversal(tree_nodes, root_id, tracer):
         tree=copy.deepcopy(tree_nodes), visited=visited, current=None,
         depth=0)
 
+    return {
+        'operation': 'postorder',
+        'message': 'Completed post-order traversal'
+    }
+
 
 def bst_search(tree_nodes, root_id, target, tracer):
     """
@@ -228,7 +275,12 @@ def bst_search(tree_nodes, root_id, target, tracer):
         tree=copy.deepcopy(tree_nodes), visited=visited, current=None,
         depth=0)
     
-    return found
+    return {
+        'operation': 'search',
+        'value': target,
+        'found': found,
+        'message': f"Found node with value {target}" if found else f"Cannot find node with value {target}"
+    }
 
 
 def bst_insert(tree_nodes, root_id, value, tracer, visited=None):
@@ -329,17 +381,25 @@ def bst_insert(tree_nodes, root_id, value, tracer, visited=None):
         tree=copy.deepcopy(tree_nodes), visited=[], current=None,
         depth=0)
     
-    return (new_node_id if parent_id else None, visited)
+    inserted_node_id = new_node_id if parent_id else None
+    return {
+        'operation': 'insert',
+        'value': value,
+        'inserted_node_id': inserted_node_id,
+        'visited': visited,
+        'message': f"Inserted node with value {value}" if inserted_node_id else f"Cannot insert node with value {value}"
+    }
 
 
-def bst_delete(tree_nodes, root_id, target, tracer):
+def bst_delete(tree_nodes, root_id, target, tracer, mutate_in_place=False):
     """
     Delete a node from BST and update the tree structure.
     Handles three cases: leaf node, one child, two children.
     """
     import copy
     
-    # Work with a deep copy
+    original_tree_nodes = tree_nodes
+    # a deep copy
     tree_nodes = copy.deepcopy(tree_nodes)
     node_map = {node['id']: node for node in tree_nodes}
     visited = []
@@ -507,4 +567,12 @@ def bst_delete(tree_nodes, root_id, target, tracer):
         tree=copy.deepcopy(tree_nodes), visited=visited, current=None,
         depth=0)
     
-    return found_node
+    if mutate_in_place:
+        original_tree_nodes[:] = tree_nodes
+
+    return {
+        'operation': 'delete',
+        'value': target,
+        'deleted_node_id': found_node,
+        'message': f"Deleted node with value {target}" if found_node is not None else f"Cannot find node with value {target} to delete"
+    }

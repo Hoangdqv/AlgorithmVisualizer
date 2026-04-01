@@ -16,6 +16,7 @@ const CodeEditor = () => {
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedUserFile, setSelectedUserFile] = useState(null);
+  const [isBlankEditorMode, setIsBlankEditorMode] = useState(false);
   const [autoSaving, setAutoSaving] = useState(false);
   const [languageData, setLanguageData] = useState([]);
   const [stdinValue, setStdinValue] = useState('');
@@ -35,12 +36,20 @@ const CodeEditor = () => {
     inputFlags: {}
   });
   const autoSaveTimeout = useRef(null);
+  const AUTOSAVE_TIMEOUT_MS = 3000; // 3s
   const runIdRef = useRef(null);
   const eventSourceRef = useRef(null);
+  const preferredSampleKeyRef = useRef(null);
   
   const activeRunRef = useRef(false);
 
   const API_URL = import.meta.env.VITE_API_URL;
+
+  const getLanguageTemplate = useCallback((language) => {
+    const lang = (language || '').toLowerCase();
+    if (lang === 'python') return '# Write your first line of code here!';
+    else return '// Write your first line of code here!';
+  }, []);
 
   // Auto-detect whether user file code reads from stdin
   const _codeNeedsInput = (src, lang) => {
@@ -73,8 +82,10 @@ const CodeEditor = () => {
 
   // File selection handlers
   const handleFileSelect = useCallback(async (sampleKey) => {
+    preferredSampleKeyRef.current = sampleKey;
     forceStopExecution();
     setSelectedUserFile(null);
+    setIsBlankEditorMode(false);
     const codeKey = `${currentLanguage}_${sampleKey}`;
 
     if (apiCache.current.code[codeKey]) {
@@ -109,16 +120,34 @@ const CodeEditor = () => {
 
   const handleUserFileSelect = useCallback((file) => {
     forceStopExecution();
+
+    if (!file) {
+      setSelectedUserFile(null);
+      setIsBlankEditorMode(true);
+      setCode(getLanguageTemplate(currentLanguage));
+      setOutput('');
+      setAwaitConsoleInput(false);
+      return;
+    }
+
+    setIsBlankEditorMode(false);
     setSelectedUserFile(file);
-    setCode(file.content || '');
-    setOutput('');
     const langObj = languageData.find(lang => lang.lang_id === file.lang_id);
     const langName = langObj
       ? langObj.language.charAt(0).toUpperCase() + langObj.language.slice(1)
       : 'Python';
+
+    const fileContent = typeof file.content === 'string' ? file.content : '';
+
+    setCode(fileContent.trim().length > 0 ? fileContent : getLanguageTemplate(langName));
+    setOutput('');
     setCurrentLanguage(langName);
-    setAwaitConsoleInput(_codeNeedsInput(file.content || '', langObj?.language ?? 'python'));
-  }, [forceStopExecution, languageData]);
+  }, [forceStopExecution, languageData, getLanguageTemplate, currentLanguage]);
+
+  useEffect(() => {
+    if (!isBlankEditorMode) return;
+    setCode(getLanguageTemplate(currentLanguage));
+  }, [isBlankEditorMode, currentLanguage, getLanguageTemplate]);
 
   // Effects
   useEffect(() => {
@@ -144,22 +173,34 @@ const CodeEditor = () => {
     const incomingFile = location.state?.openUserFile;
     if (!incomingFile || languageData.length === 0) return;
 
+    setShowSidebar(true);
     handleUserFileSelect(incomingFile);
     // Clear one-time route state after applying it to avoid re-opening on rerender.
     navigate(location.pathname, { replace: true, state: {} });
   }, [location.pathname, location.state, languageData, navigate, handleUserFileSelect]);
 
+  useEffect(() => {
+    if (!selectedUserFile) return;
+    setAwaitConsoleInput(_codeNeedsInput(code || '', currentLanguage.toLowerCase()));
+  }, [selectedUserFile, code, currentLanguage]);
+
   // Load sample code when language changes
   useEffect(() => {
     // If a user file is selected, skip samples loading
-    if (selectedUserFile || hasPendingIncomingFile) return;
+    if (selectedUserFile || hasPendingIncomingFile || isBlankEditorMode) return;
 
     const cacheKey = currentLanguage;
+    const preferredSampleKey = preferredSampleKeyRef.current;
 
     // Check if sample list is cached
     if (apiCache.current.lists[cacheKey]) {
       const cached = apiCache.current.lists[cacheKey];
-      if (cached.length > 0) handleFileSelect(cached[0].key);
+      if (cached.length > 0) {
+        const preferredSample = preferredSampleKey
+          ? cached.find((item) => item.key === preferredSampleKey)
+          : null;
+        handleFileSelect((preferredSample || cached[0]).key);
+      }
       return;
     }
     setLoading(true);
@@ -170,7 +211,10 @@ const CodeEditor = () => {
         const listData = await response.json();
         if (listData.samples && listData.samples.length > 0) {
           apiCache.current.lists[cacheKey] = listData.samples;
-          handleFileSelect(listData.samples[0].key);
+          const preferredSample = preferredSampleKey
+            ? listData.samples.find((item) => item.key === preferredSampleKey)
+            : null;
+          handleFileSelect((preferredSample || listData.samples[0]).key);
         } else {
           apiCache.current.lists[cacheKey] = [];
           setCode(`// No ${language} samples available`);
@@ -182,7 +226,7 @@ const CodeEditor = () => {
       }
     };
     fetchSampleCode(currentLanguage);
-  }, [currentLanguage, selectedUserFile, hasPendingIncomingFile, handleFileSelect, API_URL]);
+  }, [currentLanguage, selectedUserFile, hasPendingIncomingFile, isBlankEditorMode, handleFileSelect, API_URL]);
 
   // Editor change handler
   const handleEditorChange = (value) => {
@@ -191,7 +235,7 @@ const CodeEditor = () => {
 
     if (selectedUserFile) {
       if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current);
-      autoSaveTimeout.current = setTimeout(() => saveUserFile(value || ''), 10000);
+      autoSaveTimeout.current = setTimeout(() => saveUserFile(value || ''), AUTOSAVE_TIMEOUT_MS);
     }
   };
 
@@ -276,9 +320,7 @@ const CodeEditor = () => {
           return;
         }
 
-        let result = body.output || '';
-        if (body.stderr) result += (result ? '\n' : '') + body.stderr;
-        setOutput(result || '(no output)');
+        setOutput(body.output || '(no output)');
       } catch (err) {
         setIsRunning(false);
         setOutput(`Error: ${err.message}`);

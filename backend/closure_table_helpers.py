@@ -2,7 +2,7 @@
 """Helper functions for closure table operations"""
 from datetime import datetime
 from database import db
-from models import Folder, ClosureTable, Language
+from models import Folder, ClosureTable, Language, File
 
 def create_folder_with_closure(folder_name, path, user_id, parent_folder_id=None, folder_type='user-defined', created_at=datetime.now()):
     """
@@ -209,3 +209,100 @@ def get_all_languages():
     """
     languages = Language.query.distinct().all()
     return [lang.language for lang in languages]
+
+
+def move_folder(folder_id, new_parent_id, user_id):
+    """
+    Move a folder to a new parent and update the closure table and paths.
+
+    Args:
+        folder_id: Folder to move
+        new_parent_id: New parent folder id (None for root)
+        user_id: ID of the user
+
+    Returns:
+        True when move succeeds
+    """
+    folder = Folder.query.filter_by(folder_id=folder_id, user_id=user_id).first()
+    if not folder:
+        raise ValueError('Folder not found')
+
+    if new_parent_id == folder_id:
+        raise ValueError('Cannot move folder into itself')
+
+    if new_parent_id is not None:
+        new_parent = Folder.query.filter_by(folder_id=new_parent_id, user_id=user_id).first()
+        if not new_parent:
+            raise ValueError('Destination folder not found')
+        if is_descendant(folder_id, new_parent_id, user_id):
+            raise ValueError('Cannot move folder into its descendant')
+    else:
+        new_parent = None
+
+    # Collect subtree descendants including self.
+    subtree_entries = ClosureTable.query.filter_by(
+        ancestor=folder_id,
+        user_account_id=user_id
+    ).all()
+    descendant_ids = [entry.descendant for entry in subtree_entries]
+
+    # Remove old ancestor relationships outside the subtree.
+    old_ancestors = ClosureTable.query.filter(
+        ClosureTable.descendant == folder_id,
+        ClosureTable.ancestor != folder_id,
+        ClosureTable.user_account_id == user_id
+    ).all()
+    old_ancestor_ids = [entry.ancestor for entry in old_ancestors]
+
+    if old_ancestor_ids:
+        ClosureTable.query.filter(
+            ClosureTable.ancestor.in_(old_ancestor_ids),
+            ClosureTable.descendant.in_(descendant_ids),
+            ClosureTable.user_account_id == user_id
+        ).delete(synchronize_session=False)
+
+    # Insert new ancestor relationships from the new parent.
+    if new_parent is not None:
+        new_ancestors = ClosureTable.query.filter(
+            ClosureTable.descendant == new_parent_id,
+            ClosureTable.user_account_id == user_id
+        ).all()
+
+        for ancestor_entry in new_ancestors:
+            for subtree_entry in subtree_entries:
+                new_depth = ancestor_entry.depth + 1 + subtree_entry.depth
+                db.session.add(ClosureTable(
+                    ancestor=ancestor_entry.ancestor,
+                    descendant=subtree_entry.descendant,
+                    depth=new_depth,
+                    user_account_id=user_id
+                ))
+
+    # Update parent reference and paths.
+    old_path = folder.path
+    if new_parent is not None:
+        new_path = f"{new_parent.path}/{folder.folder_name}"
+    else:
+        new_path = f"/{folder.folder_name}"
+
+    folder.parent_folder_id = new_parent_id
+    folder.path = new_path
+
+    if descendant_ids:
+        descendant_folders = Folder.query.filter(
+            Folder.folder_id.in_(descendant_ids)
+        ).all()
+        for descendant in descendant_folders:
+            if descendant.folder_id == folder_id:
+                continue
+            descendant.path = descendant.path.replace(old_path, new_path, 1)
+
+        descendant_files = File.query.filter(
+            File.folder_id.in_(descendant_ids),
+            File.user_account_id == user_id
+        ).all()
+        for file in descendant_files:
+            file.path = file.path.replace(old_path, new_path, 1)
+
+    db.session.commit()
+    return True

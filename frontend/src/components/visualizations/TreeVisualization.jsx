@@ -19,6 +19,7 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
   const svgRef = useRef(null);
   const isDraggingRef = useRef(false);
   const isPanningRef = useRef(false);
+  const previousStructureSignatureRef = useRef('');
 
   const viewBox = useMemo(() => ({
     minX: 0,
@@ -117,12 +118,29 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
       }))
   }, [treeData]);
 
+  const treeStructureSignature = useMemo(() => {
+    // Copy the tree structure and sort it to create a consistent signature string
+    const normalized = [...treeStructure]
+      .sort((a, b) => a.id - b.id)
+      .map(node => {
+        const children = [...node.children].sort((a, b) => a - b);
+        return `${node.id}:${children.join(',')}`;
+      });
+    return normalized.join('|');
+    // Output is a string like "1:2,3|2:4|3:5,6|4:|5:|6:" representing the tree structure
+  }, [treeStructure]);
+
   useEffect(() => {
     updateNodePositions(prev => {
       if (graphState) {
         resetGraphState(false);
+        previousStructureSignatureRef.current = treeStructureSignature;
         return calculateTreePositions(treeStructure);
       }
+
+      // Check if the structure of the tree changed
+      const structureChanged = previousStructureSignatureRef.current !== treeStructureSignature;
+      previousStructureSignatureRef.current = treeStructureSignature;
 
       const prevNodeIds = new Set(Object.keys(prev).map(id => parseInt(id)));
       const newNodeIds = new Set(treeStructure.map(n => n.id));
@@ -130,11 +148,11 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
       // Check if any nodes were added
       const hasNewNodes = Array.from(newNodeIds).some(id => !prevNodeIds.has(id));
       
-      if (hasNewNodes || Object.keys(prev).length === 0) {
+      if (hasNewNodes || structureChanged || Object.keys(prev).length === 0) {
         if (hasNewNodes) {
           setAutoFit(true);
         }
-        // Nodes were added/first render - recalculate positions
+        // Structure changed/new nodes/first render - recalculate positions
         return calculateTreePositions(treeStructure);
       } else {
         // Keep existing positions, just remove deleted nodes
@@ -147,7 +165,7 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
         return cleaned;
       }
     });
-  }, [treeStructure, calculateTreePositions, graphState]);
+  }, [treeStructure, treeStructureSignature, calculateTreePositions, graphState]);
 
   const getSVGCoordinates = (e) => {
     if (!svgRef.current) return { x: 0, y: 0 };

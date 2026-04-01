@@ -3,7 +3,7 @@ import SortingVisualization from './visualizations/SortingVisualization';
 import GraphVisualization from './visualizations/GraphVisualization';
 import TreeVisualization from './visualizations/TreeVisualization';
 
-const VisualModule = ({ tracerData, isRunning, currentLanguage }) => {
+const VisualModule = ({ tracerData, isRunning, currentLanguage, suppressRunningOverlay = false }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speedMultiplier, setSpeedMultiplier] = useState(1); // 0.5x to 2x
@@ -34,7 +34,16 @@ const VisualModule = ({ tracerData, isRunning, currentLanguage }) => {
   useEffect(() => {
       if (tracerData && tracerData.states && tracerData.states.length > 0) {
         setDisplayData(tracerData);
-        setCurrentStep(0);
+        // If is waiting for append
+        if (tracerData.__append) {
+          // Start from the step where new states begin
+          const appendStart = Number.isInteger(tracerData.__appendStart)
+            ? tracerData.__appendStart
+            : 0;
+          setCurrentStep(Math.max(0, appendStart));
+        } else {
+          setCurrentStep(0);
+        }
         setIsPlaying(false);
       } else if (!tracerData || (tracerData && (!tracerData.states || tracerData.states.length === 0))) {
         // Clear display data when tracerData is empty/null
@@ -97,7 +106,7 @@ const VisualModule = ({ tracerData, isRunning, currentLanguage }) => {
     setIsPlaying(false);
   };
 
-  if (isRunning) {
+  if (isRunning && !suppressRunningOverlay) {
     return (
       <div className="visual-module-empty">
         Code is running...

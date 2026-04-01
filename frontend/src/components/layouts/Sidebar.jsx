@@ -6,8 +6,9 @@ import SearchBar from '../SearchBar';
 import FileTree from '../FileTree';
 import FileContextMenu from '../FileContextMenu';
 import NewItemModal from '../NewItemModal';
+import useFileTreeMoveHandlers from '../../hooks/useFileTreeMoveHandlers';
 
-const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, onUserFileSelect, initialTab = 'samples' }) => {
+const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, onUserFileSelect, initialTab = 'samples', selectedUserFileId = null }) => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState(initialTab); // 'samples' or 'myfiles'
   const [openDropdowns, setOpenDropdowns] = useState({});
@@ -21,12 +22,6 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
   const [contextMenu, setContextMenu] = useState(null);
   const [modal, setModal] = useState(null);
   const [languages, setLanguages] = useState([]);
-  
-  // Cache for user files and folders
-  const [userFilesCache, setUserFilesCache] = useState({
-    folders: null,
-    files: null,
-  });
 
   const API_URL = import.meta.env.VITE_API_URL;
 
@@ -71,7 +66,12 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
         const items = data.samples || data.algorithms || [];
         setSamples(items);
         apiCache.current.lists[currentLanguage] = items;
-        setSelectedSampleKey(items[0]?.key || null);
+        setSelectedSampleKey((prevKey) => {
+          if (prevKey && items.some((item) => item.key === prevKey)) {
+            return prevKey;
+          }
+          return null;
+        });
         setOpenDropdowns({ 'samples': true });
       } else {
         console.error('Failed to load samples:', data.error);
@@ -86,10 +86,18 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
   }, [currentLanguage, apiCache, API_URL]);
 
   const loadUserFiles = useCallback(async (forceReload = false, silent = false) => {
-    // Check cache first
-    if (!forceReload && userFilesCache.folders && userFilesCache.files) {
-      setUserFolders(userFilesCache.folders);
-      setUserFiles(userFilesCache.files);
+    if (!apiCache.current.userFilesData) {
+      apiCache.current.userFilesData = { folders: null, files: null };
+    }
+
+    if (!apiCache.current.userFileContent) {
+      apiCache.current.userFileContent = {};
+    }
+
+    // Check shared cache first
+    if (!forceReload && apiCache.current.userFilesData.folders && apiCache.current.userFilesData.files) {
+      setUserFolders(apiCache.current.userFilesData.folders);
+      setUserFiles(apiCache.current.userFilesData.files);
       return;
     }
     
@@ -144,12 +152,12 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
         allFiles = filesData.files || [];
         setUserFiles(allFiles);
       }
-      
-      // Update cache
-      setUserFilesCache({
+
+      // Update shared cache
+      apiCache.current.userFilesData = {
         folders: allFolders,
         files: allFiles,
-      });
+      };
     } catch (error) {
       console.error('Error loading user files:', error);
     } finally {
@@ -157,14 +165,22 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
         setLoading(false);
       }
     }
-  }, [userFilesCache, API_URL]);
+  }, [apiCache, API_URL]);
 
     // Load samples when on samples tab
   useEffect(() => {
     if (activeTab === 'samples') {
       if (apiCache.current.lists[currentLanguage]) {
-        setSamples(apiCache.current.lists[currentLanguage]);
-        setSelectedSampleKey(apiCache.current.lists[currentLanguage][0]?.key || null);
+        //Cache the current list that was fetched for the selected lang
+        const cachedItems = apiCache.current.lists[currentLanguage];
+        setSamples(cachedItems);
+        // If the previously selected sample still exists in the new list, keep it selected when lang changes
+        setSelectedSampleKey((prevKey) => {
+          if (prevKey && cachedItems.some((item) => item.key === prevKey)) {
+            return prevKey;
+          }
+          return null;
+        });
         setOpenDropdowns({ 'samples': true });
         return;
       }
@@ -217,6 +233,13 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
   useEffect(() => {
     setSearchQuery('');
   }, [currentLanguage, activeTab]);
+
+  useEffect(() => {
+    if (!selectedUserFileId) return;
+    setActiveTab('myfiles');
+    setSelectedFileId(selectedUserFileId);
+    setOpenDropdowns(prev => ({ ...prev, samples: false }));
+  }, [selectedUserFileId]);
 
   const filteredSamples = useMemo(() => {
     if (!searchQuery.trim()) {
@@ -308,6 +331,15 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
 
   const handleUserFileClick = useCallback(async (fileId) => {
     setSelectedFileId(fileId);
+
+    const cachedFile = apiCache.current.userFileContent?.[fileId];
+    if (cachedFile) {
+      if (onUserFileSelect) {
+        onUserFileSelect(cachedFile);
+      }
+      return;
+    }
+
     try {
       const response = await fetch(`${API_URL}/user/files/${fileId}`, {
         credentials: 'include'
@@ -315,6 +347,10 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
       
       if (response.ok) {
         const data = await response.json();
+        if (!apiCache.current.userFileContent) {
+          apiCache.current.userFileContent = {};
+        }
+        apiCache.current.userFileContent[fileId] = data.file;
         if (onUserFileSelect) {
           onUserFileSelect(data.file);
         }
@@ -322,7 +358,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
     } catch (error) {
       console.error('Error loading user file:', error);
     }
-  }, [API_URL, onUserFileSelect]);
+  }, [API_URL, onUserFileSelect, apiCache]);
 
   const handleContextMenu = (e, item, type) => {
     e.preventDefault();
@@ -371,6 +407,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
       });
       
       if (response.ok) {
+        apiCache.current.userFilesData = { folders: null, files: null };
         loadUserFiles(true, true); // Force silent reload after creating
         setModal(null);
       } else {
@@ -408,6 +445,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
       });
       
       if (response.ok) {
+        apiCache.current.userFilesData = { folders: null, files: null };
         loadUserFiles(true, true); // Force silent reload after creating
         setModal(null);
       }
@@ -415,6 +453,20 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
       console.error('Error creating file:', error);
     }
   };
+
+  const { handleMoveFile, handleMoveFolder } = useFileTreeMoveHandlers({
+    API_URL,
+    userFiles,
+    userFolders,
+    onAfterMove: async ({ type, fileId }) => {
+      apiCache.current.userFilesData = { folders: null, files: null };
+      if (type === 'file' && apiCache.current.userFileContent?.[fileId]) {
+        delete apiCache.current.userFileContent[fileId];
+      }
+      // force reload + silent to avoid loading
+      await loadUserFiles(true, true);
+    },
+  });
 
   const handleDelete = async () => {
     if (!contextMenu) return;
@@ -447,6 +499,10 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
       });
       
       if (response.ok) {
+        apiCache.current.userFilesData = { folders: null, files: null };
+        if (contextMenu.type === 'file' && contextMenu.item?.file_id && apiCache.current.userFileContent) {
+          delete apiCache.current.userFileContent[contextMenu.item.file_id];
+        }
         loadUserFiles(true, true); // Force silent reload after deleting
         if (deletedFileId && selectedFileId === deletedFileId) {
           setSelectedFileId(null);
@@ -492,6 +548,13 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
       if (response.ok) {
         const data = await response.json();
         console.log('Rename success:', data);
+        apiCache.current.userFilesData = { folders: null, files: null };
+        if (itemType === 'file' && item.file_id && apiCache.current.userFileContent?.[item.file_id]) {
+          apiCache.current.userFileContent[item.file_id] = {
+            ...apiCache.current.userFileContent[item.file_id],
+            file_name: newName,
+          };
+        }
         loadUserFiles(true, true); // Force silent reload after renaming
         setModal(null);
       } else {
@@ -579,7 +642,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
                           key={sample.key}
                           onClick={() => handleFileClick(sample.key)}
                           className={`file-button ${selectedSampleKey === sample.key ? 'selected' : ''}`}
-                          title={sample.description}
+                          title={`${sample.name}: ${sample.description}`}
                         >
                           <div>📄 {sample.name}</div>
                           {sample.description && (
@@ -603,7 +666,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
         ) : (
           // My Files Tab Content
           <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'center', marginBottom: '1rem' }}
             onContextMenu={handleContextMenu}>
               <h3 style={{ color: 'white', fontSize: '16px', margin: 0 }}>
                 My Files
@@ -642,13 +705,15 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
               <div style={{ color: '#888', padding: '1rem' }}>Loading files...</div>
             ) : (
               <>
-                <div className="file-tree-scroll-container">
+                <div className="file-tree-scroll-container hidden-scrollbar">
                   <FileTree
                     folders={filteredUserData.folders}
                     files={filteredUserData.files.filter(f => !f.folder_id)}
                     onFileClick={handleUserFileClick}
                     onFolderClick={() => {}}
                     onContextMenu={handleContextMenu}
+                    onMoveFile={handleMoveFile}
+                    onMoveFolder={handleMoveFolder}
                     selectedFileId={selectedFileId}
                     languages={languages}
                     depth={0}

@@ -1,11 +1,13 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../../context/useAuth';
 import SearchBar from '../SearchBar';
 import FileTree from '../FileTree';
 import FileContextMenu from '../FileContextMenu';
 import NewItemModal from '../NewItemModal';
 import getFileExtension from '../../scripts/getFileExtension';
+import useFileTreeMoveHandlers from '../../hooks/useFileTreeMoveHandlers';
 
 export default function UserProfile() {
   const { user, checkAuth } = useAuth();
@@ -41,6 +43,7 @@ export default function UserProfile() {
   });
 
   const API_URL = import.meta.env.VITE_API_URL;
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
   useEffect(() => {
     if (user) {
@@ -334,6 +337,16 @@ export default function UserProfile() {
     }
   };
 
+  const { handleMoveFile, handleMoveFolder } = useFileTreeMoveHandlers({
+    API_URL,
+    userFiles,
+    userFolders,
+    onAfterMove: async () => {
+      setUserFilesCache({ folders: null, files: null });
+      await loadUserFiles(true, true);
+    },
+  });
+
   const handleDelete = async () => {
     if (!contextMenu) return;
 
@@ -485,6 +498,43 @@ export default function UserProfile() {
     }
   };
 
+  const handleGoogleLinkSuccess = async (credentialResponse) => {
+    setLoading(true);
+    setError('');
+    setMessage('');
+
+    try {
+      const response = await fetch(`${API_URL}/auth/link-google`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          credential: credentialResponse.credential,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage('Google account linked successfully!');
+        await checkAuth();
+      } else {
+        setError(data.error || 'Failed to link Google account');
+      }
+    } catch (linkError) {
+      console.error('Google account linking failed:', linkError);
+      setError('An error occurred while linking Google account');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLinkError = () => {
+    setError('Google linking failed. Please try again.');
+  };
+
   const cancelEdit = () => {
     setEditing(false);
     setUsername(user.username);
@@ -536,10 +586,6 @@ export default function UserProfile() {
                       <div className="info-row">
                         <span className="info-label">Email:</span>
                         <span className="info-value">{user.email}</span>
-                      </div>
-                      <div className="info-row">
-                        <span className="info-label">Role:</span>
-                        <span className="info-value">{user.role}</span>
                       </div>
                       <div className="info-row">
                         <span className="info-label">Member Since:</span>
@@ -608,75 +654,31 @@ export default function UserProfile() {
                   )}
                 </div>
 
-                {/* Change Password Section - Only for non-OAuth users */}
+                {/* Native Account Security - Only for non-OAuth users */}
                 {!isOAuthUser && (
                   <div className="profile-section">
-                    <h3>Change Password</h3>
-                    
-                    {!changingPassword ? (
-                      <button 
-                        className="profile-button primary"
-                        onClick={() => setChangingPassword(true)}
-                      >
-                        Change Password
-                      </button>
-                    ) : (
-                      <form onSubmit={handleChangePassword} className="profile-form">
-                        <div className="form-group">
-                          <label htmlFor="current-password">Current Password:</label>
-                          <input
-                            type="password"
-                            id="current-password"
-                            className="modal-input"
-                            value={currentPassword}
-                            onChange={(e) => setCurrentPassword(e.target.value)}
-                            required
+                    <h3>Link Google Account</h3>
+                    {googleClientId && (
+                      <div style={{ marginBottom: '1rem', display: 'flex', colorScheme: 'light' }}>
+                        <GoogleOAuthProvider clientId={googleClientId || ''}>
+                          <GoogleLogin
+                            onSuccess={handleGoogleLinkSuccess}
+                            onError={handleGoogleLinkError}
+                            text="continue_with"
+                            shape="rectangular"
+                            width="300"
+                            locale="en"
                           />
-                        </div>
-                        
-                        <div className="form-group">
-                          <label htmlFor="new-password">New Password:</label>
-                          <input
-                            type="password"
-                            id="new-password"
-                            className="modal-input"
-                            value={newPassword}
-                            onChange={(e) => setNewPassword(e.target.value)}
-                            required
-                          />
-                        </div>
-                        
-                        <div className="form-group">
-                          <label htmlFor="confirm-password">Confirm New Password:</label>
-                          <input
-                            type="password"
-                            id="confirm-password"
-                            className="modal-input"
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            required
-                          />
-                        </div>
-                        
-                        <div className="profile-actions">
-                          <button 
-                            type="submit" 
-                            className="profile-button primary"
-                            disabled={loading}
-                          >
-                            {loading ? 'Changing...' : 'Update Password'}
-                          </button>
-                          <button 
-                            type="button" 
-                            className="profile-button secondary"
-                            onClick={cancelPasswordChange}
-                            disabled={loading}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </form>
+                        </GoogleOAuthProvider>
+                      </div>
                     )}
+                    <h3>Account Security</h3>
+                    <button
+                      className="profile-button primary"
+                      onClick={() => setChangingPassword(true)}
+                    >
+                      Change Password
+                    </button>
                   </div>
                 )}
           </div>
@@ -684,7 +686,7 @@ export default function UserProfile() {
         <div className="profile-file-storage-management">
           <div className="profile-file-storage-card">
             <h2>File Storage Management</h2>
-            <h3>Manage your uploaded files and storage usage.</h3>
+            <h3>Manage your personal files here.</h3>
 
             <SearchBar
               value={searchQuery}
@@ -722,6 +724,8 @@ export default function UserProfile() {
                     onFileClick={setSelectedFileId}
                     onFolderClick={() => {}}
                     onContextMenu={handleContextMenu}
+                    onMoveFile={handleMoveFile}
+                    onMoveFolder={handleMoveFolder}
                     selectedFileId={selectedFileId}
                     languages={languages}
                     depth={0}
@@ -790,6 +794,73 @@ export default function UserProfile() {
           </div>
         </div>
       </div>
+
+      {changingPassword && (
+        <div className="modal-overlay" onClick={cancelPasswordChange}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Change Password</h3>
+              <button className="modal-close" onClick={cancelPasswordChange}>x</button>
+            </div>
+
+            <form onSubmit={handleChangePassword} className="modal-body">
+              <div className="form-group">
+                <label htmlFor="current-password">Current Password:</label>
+                <input
+                  type="password"
+                  id="current-password"
+                  className="modal-input"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="new-password">New Password:</label>
+                <input
+                  type="password"
+                  id="new-password"
+                  className="modal-input"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="confirm-password">Confirm New Password:</label>
+                <input
+                  type="password"
+                  id="confirm-password"
+                  className="modal-input"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="modal-button secondary"
+                  onClick={cancelPasswordChange}
+                  disabled={loading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="modal-button primary"
+                  disabled={loading}
+                >
+                  {loading ? 'Changing...' : 'Update Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

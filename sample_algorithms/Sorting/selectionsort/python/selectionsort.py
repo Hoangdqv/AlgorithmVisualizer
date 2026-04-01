@@ -1,6 +1,6 @@
 # Simple Selection Sort in Python
 from tracers.tracer import Tracer
-from helpers import swap  # Helper function: swaps arr[i] and arr[j] in-place
+from helpers import swap
 
 # [ALGORITHM]
 def selection_sort(arr, tracer):

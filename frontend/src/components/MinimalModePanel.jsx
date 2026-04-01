@@ -1,9 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { algorithmParams } from '../data/algorithmParams';
 
-const MinimalModePanel = ({ category, algorithmKey, onRun, isRunning, algorithmName }) => {
+const MinimalModePanel = ({ category, algorithmKey, onRun, onRunContinue, isRunning, algorithmName, hasTreeSession = false }) => {
   const schema = algorithmParams[category];
   const [formValues, setFormValues] = useState({});
+  const canRunContinuously = useMemo(
+    () => category === 'trees' && typeof onRunContinue === 'function',
+    [category, onRunContinue]
+  );
+  const shouldShowResetLabel = category === 'trees' && hasTreeSession;
+  
   // Reset form to defaults when the algorithm or category changes
   useEffect(() => {
     if (!schema?.params) return;
@@ -19,25 +25,47 @@ const MinimalModePanel = ({ category, algorithmKey, onRun, isRunning, algorithmN
     setFormValues((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const parseFormValues = () => {
     const parsed = {};
     schema.params.forEach((param) => {
       const raw = formValues[param.key];
-      console.log(raw)
+      // Parse array of integers
       if (param.type === 'array-int') {
         parsed[param.key] = String(raw)
           .split(',')
           .map((s) => parseInt(s.trim(), 10))
           .filter((n) => !isNaN(n));
-      } else if (param.type === 'number') {
+      } else if (param.type === 'number' || param.type === 'number-optional') {
+        if (raw === '' || raw === null || raw === undefined) {
+          parsed[param.key] = null;
+          return;
+        }
+        // Parse target as array for multi-value tree operations
+        if (param.key === 'target' && ['insert', 'delete', 'search'].includes(parsed.operation)) {
+          parsed[param.key] = String(raw)
+            .split(',')
+            .map((s) => parseInt(s.trim(), 10))
+            .filter((n) => !isNaN(n));
+          return;
+        }
         parsed[param.key] = parseInt(raw, 10) || 0;
       } else {
         parsed[param.key] = raw;
       }
-      console.log(`Parsed ${param.key}:`, parsed[param.key]);
     });
+    return parsed;
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const parsed = parseFormValues();
     onRun(parsed);
+  };
+
+  const handleContinueRun = () => {
+    if (!canRunContinuously) return;
+    const parsed = parseFormValues();
+    onRunContinue(parsed);
   };
 
   if (!schema) {
@@ -103,13 +131,26 @@ const MinimalModePanel = ({ category, algorithmKey, onRun, isRunning, algorithmN
   );
 })}
 
-        <button
-          type="submit"
-          className="minimal-panel-run-btn"
-          disabled={isRunning}
-        >
-          {isRunning ? 'Running...' : '▶ Run Algorithm'}
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button
+            type="submit"
+            className="minimal-panel-run-btn"
+            disabled={isRunning}
+          >
+            {shouldShowResetLabel ? '↺ Reset and Run Algorithm' : '▶ Run Algorithm'}
+          </button>
+
+          {canRunContinuously && (
+            <button
+              type="button"
+              className="minimal-panel-run-btn"
+              disabled={isRunning || !hasTreeSession}
+              onClick={handleContinueRun}
+            >
+              ⟳ Run Next Operation
+            </button>
+          )}
+        </div>
       </form>
     </div>
   );

@@ -10,6 +10,45 @@ export function swap(arr, i, j) {
 }
 
 
+export function normalizeTargets(value) {
+    if (Array.isArray(value)) return value;
+    if (value === null || value === undefined) return [];
+    return [value];
+}
+
+
+export function runTargets(target, fn, mutate = false) {
+    const targets = normalizeTargets(target);
+    if (targets.length > 1) {
+        if (mutate) {
+            return targets.map((x) => fn(x, true));
+        }
+        return targets.map((x) => fn(x));
+    }
+
+    const singleTarget = targets.length > 0 ? targets[0] : null;
+    if (mutate) {
+        return fn(singleTarget, false);
+    }
+    return fn(singleTarget);
+}
+
+
+export function buildTreeOnly(treeNodes, tracer) {
+    const snapshot = JSON.parse(JSON.stringify(treeNodes));
+    tracer.addState([], {
+        tree: snapshot,
+        visited: [],
+        current: null,
+        depth: 0,
+    });
+    return {
+        operation: 'build',
+        message: `Tree generated with ${treeNodes.length} node(s)`
+    };
+}
+
+
 // ===== Binary Search Tree Operations =====
 
 export function inorderTraversal(treeNodes, rootId, tracer) {
@@ -77,6 +116,11 @@ export function inorderTraversal(treeNodes, rootId, tracer) {
         tree: JSON.parse(JSON.stringify(treeNodes)), visited: visited, current: null,
         depth: 0
     });
+
+    return {
+        operation: 'inorder',
+        message: 'Completed in-order traversal'
+    }
 }
 
 
@@ -145,6 +189,11 @@ export function preorderTraversal(treeNodes, rootId, tracer) {
         tree: JSON.parse(JSON.stringify(treeNodes)), visited: visited, current: null,
         depth: 0
     });
+
+    return {
+        operation: 'preorder',
+        message: 'Completed pre-order traversal'
+    }
 }
 
 
@@ -213,13 +262,18 @@ export function postorderTraversal(treeNodes, rootId, tracer) {
         tree: JSON.parse(JSON.stringify(treeNodes)), visited: visited, current: null,
         depth: 0
     });
+
+    return {
+        operation: 'postorder',
+        message: 'Completed post-order traversal'
+    };
 }
 
 
 export function bstSearch(treeNodes, rootId, target, tracer) {
     /**
      * Search for a target value in BST.
-     * Returns true if found, false otherwise.
+    * Returns a structured result containing found state and summary message.
      */
     const nodeMap = {};
     treeNodes.forEach(node => {
@@ -276,14 +330,21 @@ export function bstSearch(treeNodes, rootId, target, tracer) {
         depth: 0
     });
     
-    return found;
+    return {
+        operation: 'search',
+        value: target,
+        found,
+        message: found
+            ? `Found node with value ${target}`
+            : `Cannot find node with value ${target}`,
+    };
 }
 
 
 export function bstInsert(treeNodes, rootId, value, tracer, visited = null) {
     /**
      * Insert a new value into BST and update the tree structure.
-     * Returns tuple of [newNodeId, visitedList].
+    * Returns a structured result containing inserted node and summary message.
      */
     // Modify tree in-place to support multiple insertions
     const nodeMap = {};
@@ -386,16 +447,26 @@ export function bstInsert(treeNodes, rootId, value, tracer, visited = null) {
         depth: 0
     });
     
-    return [parentId ? newNodeId : null, visited];
+    const insertedNodeId = parentId ? newNodeId : null;
+    return {
+        operation: 'insert',
+        value,
+        insertedNodeId,
+        visited,
+        message: insertedNodeId
+            ? `Inserted node with value ${value}`
+            : `Cannot insert node with value ${value}`,
+    };
 }
 
 
-export function bstDelete(treeNodes, rootId, target, tracer) {
+export function bstDelete(treeNodes, rootId, target, tracer, mutateInPlace = false) {
     /**
      * Delete a node from BST and update the tree structure.
      * Handles three cases: leaf node, one child, two children.
      */
     // Work with a deep copy
+    const originalTreeNodes = treeNodes;
     treeNodes = JSON.parse(JSON.stringify(treeNodes));
     
     const nodeMap = {};
@@ -587,5 +658,16 @@ export function bstDelete(treeNodes, rootId, target, tracer) {
         depth: 0
     });
     
-    return foundNode;
+    if (mutateInPlace) {
+        originalTreeNodes.splice(0, originalTreeNodes.length, ...treeNodes);
+    }
+
+    return {
+        operation: 'delete',
+        value: target,
+        deletedNodeId: foundNode,
+        message: foundNode !== null
+            ? `Deleted node with value ${target}`
+            : `Cannot find node with value ${target} to delete`,
+    };
 }

@@ -1,5 +1,5 @@
 import Tracer from './tracers/tracer.js';
-import { swap } from './helpers.js';  // Helper function: swaps arr[i] and arr[j] in-place
+import { swap } from './helpers.js';
 
 // [ALGORITHM]
 function selectionSort(arr, tracer) {

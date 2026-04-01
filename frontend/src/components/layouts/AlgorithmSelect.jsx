@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import EditorComponent from '../EditorComponent';
 import { buildParamsBlock } from '../../data/algorithmParams';
+import { getTracerGuideWithDetection } from '../../data/tracerGuideTemplates';
 
 const AlgorithmSelect = () => {
   // Router hooks
@@ -19,10 +20,14 @@ const AlgorithmSelect = () => {
   const [showSidebar, setShowSidebar] = useState(true);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [showTracerGuide, setShowTracerGuide] = useState(false);
   const [viewMode, setViewMode] = useState('detailed');
   const [selectedAlgorithmKey, setSelectedAlgorithmKey] = useState(null);
   const [selectedAlgorithmName, setSelectedAlgorithmName] = useState('N/A');
   const [languageData, setLanguageData] = useState([]);
+  const [treeSession, setTreeSession] = useState(null);
+  const [isLiveAppendingRun, setIsLiveAppendingRun] = useState(false);
+  const preferredAlgorithmKeyRef = useRef(null);
 
   // Fetch languages
   const languages = useMemo(() => {
@@ -37,9 +42,18 @@ const AlgorithmSelect = () => {
     code: {}    // Cache by algorithmKey
   });
 
+  const tracerGuide = useMemo(() => {
+    return getTracerGuideWithDetection(category, currentLanguage.toLowerCase(), code);
+  }, [category, currentLanguage, code]);
+
   // File selection handlers
   const handleFileSelect = useCallback(async (algorithmKey) => {
-    setSelectedAlgorithmKey(algorithmKey);
+    setSelectedAlgorithmKey((prevKey) => {
+      if (prevKey && prevKey !== algorithmKey) {
+        setTreeSession(null);
+      }
+      return algorithmKey;
+    });
     const codeKey = `${category}_${currentLanguage}_${algorithmKey}`;
     
     if (apiCache.current.code[codeKey]) {
@@ -87,6 +101,10 @@ const AlgorithmSelect = () => {
     }
   }, [category, currentLanguage]);
 
+  useEffect(() => {
+    preferredAlgorithmKeyRef.current = selectedAlgorithmKey;
+  }, [selectedAlgorithmKey]);
+
   const handleViewModeChange = useCallback((newMode) => {
     // When switching to minimal mode, restore original code from cache
     if (newMode === 'minimal' && selectedAlgorithmKey) {
@@ -130,13 +148,16 @@ const AlgorithmSelect = () => {
     const cacheKey = `${category}_${currentLanguage}`;
 
     setSelectedAlgorithmName('N/A');
-    setSelectedAlgorithmKey(null);
 
     // Check if algorithm list is cached
     if (apiCache.current.lists[cacheKey]) {
       const cached = apiCache.current.lists[cacheKey];
       if (cached.length > 0) {
-        handleFileSelect(cached[0].key);
+        const preferredKey = preferredAlgorithmKeyRef.current;
+        const preferredItem = preferredKey
+          ? cached.find((item) => item.key === preferredKey)
+          : null;
+        handleFileSelect((preferredItem || cached[0]).key);
       }
       return;
     }
@@ -157,10 +178,15 @@ const AlgorithmSelect = () => {
         if (data.algorithms && data.algorithms.length > 0) {
           // Cache the algorithm list
           apiCache.current.lists[cacheKey] = data.algorithms;
-          // Auto-load first algorithm
-          handleFileSelect(data.algorithms[0].key);
+          // Keep the current algorithm selected if it exists in the new language list.
+          const preferredKey = preferredAlgorithmKeyRef.current;
+          const preferredItem = preferredKey
+            ? data.algorithms.find((item) => item.key === preferredKey)
+            : null;
+          handleFileSelect((preferredItem || data.algorithms[0]).key);
         } else {
           apiCache.current.lists[cacheKey] = [];
+          setSelectedAlgorithmKey(null);
           setCode(`// No ${currentLanguage} algorithms available in ${category} category`);
         }
       } catch (error) {
@@ -174,14 +200,52 @@ const AlgorithmSelect = () => {
     fetchAlgorithms();
   }, [category, currentLanguage, handleFileSelect]);
 
+  useEffect(() => {
+    // Reset session when language/category context changes.
+    setTreeSession(null);
+  }, [category, currentLanguage]);
+
   const handleEditorChange = (value) => {
-    setCode(value || '');
+    const cleaned = (value || '').replace(/\\?\$\{?0\}?/g, '');
+    setCode(cleaned);
   };
+
+  const inferRootId = useCallback((nodes, fallback = 1) => {
+    if (!Array.isArray(nodes) || nodes.length === 0) return fallback;
+
+    const allIds = new Set(nodes.map(node => node.id));
+    const childIds = new Set();
+
+    nodes.forEach(node => {
+      (node.children || []).forEach(childId => {
+        if (childId !== null && childId !== undefined) {
+          childIds.add(childId);
+        }
+      });
+    });
+
+    const rootCandidate = [...allIds].find(id => !childIds.has(id));
+    return rootCandidate ?? fallback;
+  }, []);
+
+  const getLatestTreeSnapshot = useCallback((statesPayload) => {
+    const states = statesPayload?.states || [];
+    for (let i = states.length - 1; i >= 0; i -= 1) {
+      if (Array.isArray(states[i]?.tree) && states[i].tree.length > 0) {
+        return states[i].tree;
+      }
+    }
+    return null;
+  }, []);
 
   // Code execution
   const runCode = useCallback(async () => {
     setIsRunning(true);
     setOutput('Running...');
+    // Keep non-tree categories stateless; tree category can seed minimal continuation.
+    if (category !== 'trees') {
+      setTreeSession(null);
+    }
     setTracerData(null);
     
     try {
@@ -199,13 +263,25 @@ const AlgorithmSelect = () => {
       const data = await response.json();
 
       if (data.success) {
-        const outputText = data.output || 'No output';
-        const errorText = data.stderr ? `\nErrors:\n${data.stderr}` : '';
-        setOutput(outputText + errorText);
+        setOutput(data.output || 'No output');
         
         // Store tracer data for visualization
         if (data.states) {
           setTracerData(data.states);
+
+          if (category === 'trees') {
+            const latestTree = getLatestTreeSnapshot(data.states);
+            if (latestTree) {
+              setTreeSession({
+                nodes: latestTree,
+                rootId: inferRootId(latestTree, 1),
+              });
+            } else {
+              setTreeSession(null);
+            }
+          }
+        } else if (category === 'trees') {
+          setTreeSession(null);
         }
       } else {
         setOutput(`Error: ${data.error}`);
@@ -215,15 +291,32 @@ const AlgorithmSelect = () => {
     } finally {
       setIsRunning(false);
     }
-  }, [currentLanguage, code]);
+  }, [currentLanguage, code, category, getLatestTreeSnapshot, inferRootId]);
 
-  const runMinimal = useCallback(async (params) => {
-    console.log('Running with params:', params);
-    const paramsBlock = buildParamsBlock(category, currentLanguage.toLowerCase(), params);
-    console.log('Generated params block:', paramsBlock);
+  const runMinimalInternal = useCallback(async (params, continueFromTreeSession = false) => {
+    const baseTreeNodes = treeSession?.nodes?.length ? treeSession.nodes : null;
+    const baseRootId = treeSession?.rootId || 1;
+
+    const canUseTreeSession = continueFromTreeSession
+      && category === 'trees'
+      && baseTreeNodes
+      && baseTreeNodes.length > 0;
+
+    const effectiveParams = canUseTreeSession
+      ? {
+          ...params,
+          existingTreeNodes: baseTreeNodes,
+          existingRootId: baseRootId,
+        }
+      : params;
+
+    const paramsBlock = buildParamsBlock(category, currentLanguage.toLowerCase(), effectiveParams);
+    setIsLiveAppendingRun(continueFromTreeSession);
     setIsRunning(true);
     setOutput('Running...');
-    setTracerData(null);
+    if (!continueFromTreeSession) {
+      setTracerData(null);
+    }
 
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/execute/algorithm`, {
@@ -239,12 +332,36 @@ const AlgorithmSelect = () => {
       const data = await response.json();
 
       if (data.success) {
-        const outputText = data.output || 'No output';
-        const errorText = data.stderr ? `\nErrors:\n${data.stderr}` : '';
-        setOutput(outputText + errorText);
+        setOutput(data.output || 'No output');
 
         if (data.states) {
-          setTracerData(data.states);
+          const previousStates = tracerData?.states || [];
+          const nextStates = data.states.states || [];
+
+          if (continueFromTreeSession && previousStates.length > 0 && nextStates.length > 0) {
+            const mergedStatesPayload = {
+              ...data.states,
+              metadata: data.states.metadata || tracerData.metadata,
+              states: [...previousStates, ...nextStates],
+              // Expecting append?
+              __append: true,
+              // Append to what step? Final step before new states start
+              __appendStart: previousStates.length,
+            };
+            setTracerData(mergedStatesPayload);
+          } else {
+            setTracerData(data.states);
+          }
+
+          if (category === 'trees') {
+            const latestTree = getLatestTreeSnapshot(data.states);
+            if (latestTree) {
+              setTreeSession({
+                nodes: latestTree,
+                rootId: inferRootId(latestTree, baseRootId),
+              });
+            }
+          }
         }
       } else {
         setOutput(`Error: ${data.error}`);
@@ -253,8 +370,17 @@ const AlgorithmSelect = () => {
       setOutput(`Failed to run code: ${error.message}`);
     } finally {
       setIsRunning(false);
+      setIsLiveAppendingRun(false);
     }
-  }, [code, category, currentLanguage]);
+  }, [code, category, currentLanguage, treeSession, tracerData, getLatestTreeSnapshot, inferRootId]);
+
+  const runMinimal = useCallback(async (params) => {
+    await runMinimalInternal(params, false);
+  }, [runMinimalInternal]);
+
+  const runMinimalContinue = useCallback(async (params) => {
+    await runMinimalInternal(params, true);
+  }, [runMinimalInternal]);
 
   // UI toggle handlers
   const toggleDropdown = () => {
@@ -293,6 +419,7 @@ const AlgorithmSelect = () => {
       toggleDropdown={toggleDropdown}
       loading={loading}
       isRunning={isRunning}
+      suppressRunningOverlay={isLiveAppendingRun}
       
       // File/content handling
       handleFileSelect={handleFileSelect}
@@ -305,8 +432,13 @@ const AlgorithmSelect = () => {
       viewMode={viewMode}
       setViewMode={handleViewModeChange}
       runMinimal={runMinimal}
+      runMinimalContinue={runMinimalContinue}
+      hasTreeSession={Boolean(treeSession?.nodes?.length)}
       explanation={explanation}
       tracerData={tracerData}
+      tracerGuide={tracerGuide}
+      showTracerGuide={showTracerGuide}
+      toggleTracerGuide={() => setShowTracerGuide(prev => !prev)}
       onBack={handleBack}
     />
   );

@@ -11,7 +11,9 @@ import {
     postorderTraversal,
     bstSearch,
     bstInsert,
-    bstDelete
+    bstDelete,
+    runTargets,
+    buildTreeOnly,
 } from './helpers.js';
 
 // [ALGORITHM]
@@ -22,6 +24,7 @@ function bstOperations(treeNodes, rootId, operation, tracer, target = null) {
      * @param {Array} treeNodes - List of tree nodes [{id: 1, value: 10, children: [left, right]}, ...]
      * @param {number} rootId - ID of the root node
      * @param {string} operation - Operation to perform:
+    *   - 'build': Generate tree only (no traversal/modification)
      *   - 'inorder': In-order traversal (left -> root -> right)
      *   - 'preorder': Pre-order traversal (root -> left -> right)
      *   - 'postorder': Post-order traversal (left -> right -> root)
@@ -30,19 +33,16 @@ function bstOperations(treeNodes, rootId, operation, tracer, target = null) {
      *   - 'delete': Find node to delete
      * @param {Tracer} tracer - Tracer instance
      * @param {number} target - Target value for search/insert/delete operations (optional)
-     * @returns {*} Depends on operation:
-     *   - Traversals: undefined (states recorded in tracer)
-     *   - search: boolean (found or not)
-     *   - insert: Array of node IDs in insertion path
-     *   - delete: Node ID if found, null otherwise
      */
+    
     const operations = {
+        'build': () => buildTreeOnly(treeNodes, tracer),
         'inorder': () => inorderTraversal(treeNodes, rootId, tracer),
         'preorder': () => preorderTraversal(treeNodes, rootId, tracer),
         'postorder': () => postorderTraversal(treeNodes, rootId, tracer),
-        'search': () => bstSearch(treeNodes, rootId, target, tracer),
-        'insert': () => bstInsert(treeNodes, rootId, target, tracer),
-        'delete': () => bstDelete(treeNodes, rootId, target, tracer),
+        'search': () => runTargets(target, (x) => bstSearch(treeNodes, rootId, x, tracer)),
+        'insert': () => runTargets(target, (x) => bstInsert(treeNodes, rootId, x, tracer)),
+        'delete': () => runTargets(target, (x, m) => bstDelete(treeNodes, rootId, x, tracer, m), true),
     };
     
     if (!(operation in operations)) {
@@ -64,19 +64,13 @@ const treeNodes = [
     { id: 7, value: 20, children: [] }
 ];
 const rootId = 1;
-const operation = 'inorder'; // Options: 'inorder', 'preorder', 'postorder', 'search', 'insert', 'delete'
+const operation = 'inorder'; // Options: 'build', 'inorder', 'preorder', 'postorder', 'search', 'insert', 'delete'
 const target = 7;            // For search/insert/delete operations
 // [/PARAMS]
 
 const tracer = new Tracer('trees', 'BST', 'Binary Search Tree');
 const result = bstOperations(treeNodes, rootId, operation, tracer, target);
+console.log(Array.isArray(result) ? result.map(r => r.message).join('\n') : result.message || 'Operation completed.');
 
-if (operation === 'search') {
-    console.log(`Searching for ${target}: ${result ? 'Found' : 'Not found'}`);
-} else if (operation === 'insert') {
-    console.log(`Insertion path for ${target}: [${result.join(', ')}]`);
-} else if (operation === 'delete') {
-    console.log(`Node to delete (value=${target}): ${result}`);
-}
 
 tracer.finalize();

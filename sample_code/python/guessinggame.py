@@ -7,6 +7,8 @@
 # higher or lower than your guess.
 #
 # The game ends when you get it right. Good luck!
+# This code is meant to showcase the capability of utilizing SSE Streams 
+# to create interactive command-line applications.
 
 import random
 

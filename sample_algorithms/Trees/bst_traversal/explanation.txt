@@ -47,6 +47,5 @@ Change the 'operation' parameter to select which operation to visualize:
 
 - Orange (Current): The node currently being processed
 - Green (Visited): Nodes that have been visited
-- Active Path: Shows the path being traversed
 
 Space Complexity: O(h) - recursive call stack where h is tree height

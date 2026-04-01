@@ -1,6 +1,6 @@
 # Quick Sort (Hoare Partition) in Python
 from tracers.tracer import Tracer
-from helpers import swap  # Helper function: swaps arr[i] and arr[j] in-place
+from helpers import swap
 
 # [ALGORITHM]
 def quick_sort_hoare(arr, tracer, low=0, high=None):

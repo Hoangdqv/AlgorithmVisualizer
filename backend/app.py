@@ -222,31 +222,31 @@ def get_sample_code(language, sample_key):
 # EDUCATIONAL ALGORITHMS ROUTES
 # ============================================
 
-@app.route('/api/algorithms', methods=['GET'])
-def get_all_algorithm_categories():
-    """Get all algorithm categories"""
-    categories = [
-        {
-            'key': key,
-            'name': config['display_name'],
-            'languages': list(config['algorithms'].keys())
-        }
-        for key, config in ALGORITHM_MAP.items()
-    ]
-    return jsonify({'categories': categories})
+# @app.route('/api/algorithms', methods=['GET'])
+# def get_all_algorithm_categories():
+#     """Get all algorithm categories"""
+#     categories = [
+#         {
+#             'key': key,
+#             'name': config['display_name'],
+#             'languages': list(config['algorithms'].keys())
+#         }
+#         for key, config in ALGORITHM_MAP.items()
+#     ]
+#     return jsonify({'categories': categories})
 
-@app.route('/api/algorithms/<category>', methods=['GET'])
-def get_category_info(category):
-    """Get category info with all algorithms across all languages"""
-    category_config = ALGORITHM_MAP.get(category.lower())
+# @app.route('/api/algorithms/<category>', methods=['GET'])
+# def get_category_info(category):
+#     """Get category info with all algorithms across all languages"""
+#     category_config = ALGORITHM_MAP.get(category.lower())
     
-    if not category_config:
-        return jsonify({'error': 'Category not found'}), 404
+#     if not category_config:
+#         return jsonify({'error': 'Category not found'}), 404
     
-    return jsonify({
-        'category': category_config['display_name'],
-        'algorithms': category_config['algorithms']
-    })
+#     return jsonify({
+#         'category': category_config['display_name'],
+#         'algorithms': category_config['algorithms']
+#     })
 
 @app.route('/api/algorithms/<category>/<language>', methods=['GET'])
 def get_category_algorithms(category, language):
@@ -393,32 +393,32 @@ def execute_algorithm():
         print(f"[API] EXCEPTION: {str(e)}\n")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/process', methods=['POST'])
-def process_json():
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "Invalid or missing JSON payload"}), 400
+# @app.route('/process', methods=['POST'])
+# def process_json():
+#     data = request.get_json()
+#     if not data:
+#         return jsonify({"error": "Invalid or missing JSON payload"}), 400
 
-    try:
-        states = data.get("states", [])
-        if not states:
-            return jsonify({"error": "No states found in data"}), 400
+#     try:
+#         states = data.get("states", [])
+#         if not states:
+#             return jsonify({"error": "No states found in data"}), 400
         
-        processed_data = []
-        for step_data in states:
-            if isinstance(step_data, dict):
-                step_info = {
-                    "step": step_data.get("step", None),
-                    "state": step_data.get("data", [])  # Changed from "array" to "data"
-                }
-                processed_data.append(step_info)
-            else:
-                return jsonify({"error": "Data should consist of one pair of state and step."}), 400
+#         processed_data = []
+#         for step_data in states:
+#             if isinstance(step_data, dict):
+#                 step_info = {
+#                     "step": step_data.get("step", None),
+#                     "state": step_data.get("data", [])  # Changed from "array" to "data"
+#                 }
+#                 processed_data.append(step_info)
+#             else:
+#                 return jsonify({"error": "Data should consist of one pair of state and step."}), 400
         
-        return jsonify({"processed_data": processed_data}), 200
+#         return jsonify({"processed_data": processed_data}), 200
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
 
 
 # ============================================
@@ -586,6 +586,68 @@ def google_login():
         return jsonify({'error': 'Authentication failed'}), 500
 
 
+@app.route('/api/auth/link-google', methods=['POST'])
+@login_required
+def link_google_account():
+    """Link a logged-in native account to Google OAuth."""
+    from models import User
+    from google.oauth2 import id_token
+    from google.auth.transport import requests as google_requests
+
+    data = request.get_json()
+    token = data.get('credential') if data else None
+
+    if not token:
+        return jsonify({'error': 'No credential provided'}), 400
+
+    user_id = session.get('user_id')
+    user = User.query.get(user_id)
+
+    if not user:
+        session.clear()
+        return jsonify({'error': 'User not found'}), 404
+
+    if user.oauth_provider == 'google' and user.oauth_id:
+        return jsonify({'message': 'Google account already linked', 'user': user.to_dict()}), 200
+
+    try:
+        client_id = os.environ.get('GOOGLE_CLIENT_ID')
+        if not client_id:
+            return jsonify({'error': 'Google OAuth not configured'}), 500
+
+        idinfo = id_token.verify_oauth2_token(
+            token,
+            google_requests.Request(),
+            client_id,
+            clock_skew_in_seconds=30
+        )
+
+        google_id = idinfo.get('sub')
+        email = idinfo.get('email')
+
+        if not google_id or not email:
+            return jsonify({'error': 'Invalid Google account data'}), 400
+
+        if email.lower() != (user.email or '').lower():
+            return jsonify({'error': 'Google account email must match your profile email'}), 400
+
+        existing_google_user = User.query.filter_by(oauth_provider='google', oauth_id=google_id).first()
+        if existing_google_user and existing_google_user.id != user.id:
+            return jsonify({'error': 'This Google account is already linked to another user'}), 409
+
+        user.oauth_provider = 'google'
+        user.oauth_id = google_id
+        db.session.commit()
+
+        return jsonify({'message': 'Google account linked successfully', 'user': user.to_dict()}), 200
+    except ValueError:
+        return jsonify({'error': 'Invalid Google token'}), 401
+    except Exception as e:
+        db.session.rollback()
+        print(f"Google link error: {str(e)}")
+        return jsonify({'error': 'Failed to link Google account'}), 500
+
+
 @app.route('/api/auth/check', methods=['GET'])
 def check_session():
     """Check if user has active session (returns 200 regardless)"""
@@ -605,23 +667,23 @@ def check_session():
     return jsonify({'authenticated': True, 'user': user.to_dict()}), 200
 
 
-@app.route('/api/auth/me', methods=['GET'])
-def get_current_user():
-    """Get current logged-in user"""
-    from models import User
+# @app.route('/api/auth/me', methods=['GET'])
+# def get_current_user():
+#     """Get current logged-in user"""
+#     from models import User
     
-    user_id = session.get('user_id')
+#     user_id = session.get('user_id')
     
-    if not user_id:
-        return jsonify({'error': 'Not authenticated'}), 401
+#     if not user_id:
+#         return jsonify({'error': 'Not authenticated'}), 401
     
-    user = User.query.get(user_id)
+#     user = User.query.get(user_id)
     
-    if not user:
-        session.clear()
-        return jsonify({'error': 'User not found'}), 404
+#     if not user:
+#         session.clear()
+#         return jsonify({'error': 'User not found'}), 404
     
-    return jsonify({'user': user.to_dict()}), 200
+#     return jsonify({'user': user.to_dict()}), 200
 
 
 # ============================================
@@ -798,66 +860,66 @@ def confirm_reset():
     return response, 200
 
 
-@app.route('/api/auth/verify-reset-token', methods=['POST'])
-def verify_reset_token():
-    """Verify reset token and create a reset session"""
-    from models import ResetTokens
-    import uuid
+# @app.route('/api/auth/verify-reset-token', methods=['POST'])
+# def verify_reset_token():
+#     """Verify reset token and create a reset session"""
+#     from models import ResetTokens
+#     import uuid
     
-    data = request.get_json()
-    token = data.get('token')
+#     data = request.get_json()
+#     token = data.get('token')
     
-    if not token:
-        return jsonify({'error': 'Token is required'}), 400
+#     if not token:
+#         return jsonify({'error': 'Token is required'}), 400
     
-    reset_token = ResetTokens.query.filter_by(token=token).first()
+#     reset_token = ResetTokens.query.filter_by(token=token).first()
     
-    if not reset_token:
-        return jsonify({'error': 'Invalid or expired token'}), 400
+#     if not reset_token:
+#         return jsonify({'error': 'Invalid or expired token'}), 400
     
-    # Check if token is expired
-    token_expires_at = _to_aware_datetime(reset_token.expires_at)
-    if not token_expires_at or _utcnow() > token_expires_at:
-        db.session.delete(reset_token)
-        db.session.commit()
-        return jsonify({'error': 'Token has expired'}), 400
+#     # Check if token is expired
+#     token_expires_at = _to_aware_datetime(reset_token.expires_at)
+#     if not token_expires_at or _utcnow() > token_expires_at:
+#         db.session.delete(reset_token)
+#         db.session.commit()
+#         return jsonify({'error': 'Token has expired'}), 400
     
-    # Token is valid - create a reset session
-    # Generate session ID for this reset attempt
-    reset_session_id = str(uuid.uuid4())
+#     # Token is valid - create a reset session
+#     # Generate session ID for this reset attempt
+#     reset_session_id = str(uuid.uuid4())
     
-    # Store session data (valid for 15 minutes)
-    reset_session = {
-        'user_id': reset_token.user_id,
-        'created_at': _utcnow().isoformat(),
-        'expires_at': (_utcnow() + timedelta(minutes=15)).isoformat()
-    }
+#     # Store session data (valid for 15 minutes)
+#     reset_session = {
+#         'user_id': reset_token.user_id,
+#         'created_at': _utcnow().isoformat(),
+#         'expires_at': (_utcnow() + timedelta(minutes=15)).isoformat()
+#     }
     
-    # Store in Flask session
-    session[f'reset_{reset_session_id}'] = reset_session
+#     # Store in Flask session
+#     session[f'reset_{reset_session_id}'] = reset_session
     
-    # Delete the token immediately after verification (single use)
-    db.session.delete(reset_token)
-    db.session.commit()
+#     # Delete the token immediately after verification (single use)
+#     db.session.delete(reset_token)
+#     db.session.commit()
     
-    # Return session ID (not the token)
-    response = jsonify({
-        'valid': True,
-        'message': 'Token verified. You can now reset your password.',
-        'session_id': reset_session_id
-    })
+#     # Return session ID (not the token)
+#     response = jsonify({
+#         'valid': True,
+#         'message': 'Token verified. You can now reset your password.',
+#         'session_id': reset_session_id
+#     })
     
-    # Set secure session cookie
-    response.set_cookie(
-        'reset_session',
-        reset_session_id,
-        max_age=900,  # 15 minutes
-        secure=app.config.get('SESSION_COOKIE_SECURE', False),
-        httponly=True,  # Not accessible via JavaScript
-        samesite='Lax'
-    )
+#     # Set secure session cookie
+#     response.set_cookie(
+#         'reset_session',
+#         reset_session_id,
+#         max_age=900,  # 15 minutes
+#         secure=app.config.get('SESSION_COOKIE_SECURE', False),
+#         httponly=True,  # Not accessible via JavaScript
+#         samesite='Lax'
+#     )
     
-    return response, 200
+#     return response, 200
 
 
 @app.route('/api/auth/reset-password', methods=['POST'])
@@ -914,19 +976,19 @@ def reset_password():
 # USER PROFILE ROUTES
 # ============================================
 
-@app.route('/api/user/profile', methods=['GET'])
-@login_required
-def get_profile():
-    """Get current user profile"""
-    from models import User
+# @app.route('/api/user/profile', methods=['GET'])
+# @login_required
+# def get_profile():
+#     """Get current user profile"""
+#     from models import User
     
-    user_id = session.get('user_id')
-    user = User.query.get(user_id)
+#     user_id = session.get('user_id')
+#     user = User.query.get(user_id)
     
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
+#     if not user:
+#         return jsonify({'error': 'User not found'}), 404
     
-    return jsonify({'user': user.to_dict()}), 200
+#     return jsonify({'user': user.to_dict()}), 200
 
 
 @app.route('/api/user/profile', methods=['PUT'])
@@ -1372,20 +1434,20 @@ def get_user_folders():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/user/folders/<int:folder_id>', methods=['GET'])
-def get_folder_details(folder_id):
-    """Get folder details including files"""
-    from models import Folder
+# @app.route('/api/user/folders/<int:folder_id>', methods=['GET'])
+# def get_folder_details(folder_id):
+#     """Get folder details including files"""
+#     from models import Folder
     
-    user_id = session.get('user_id')
-    if not user_id:
-        return jsonify({'error': 'Not authenticated'}), 401
+#     user_id = session.get('user_id')
+#     if not user_id:
+#         return jsonify({'error': 'Not authenticated'}), 401
     
-    folder = Folder.query.get(folder_id)
-    if not folder:
-        return jsonify({'error': 'Folder not found'}), 404
+#     folder = Folder.query.get(folder_id)
+#     if not folder:
+#         return jsonify({'error': 'Folder not found'}), 404
     
-    return jsonify({'folder': folder.to_dict(include_files=True)}), 200
+#     return jsonify({'folder': folder.to_dict(include_files=True)}), 200
 
 
 @app.route('/api/user/folders/<int:folder_id>/tree', methods=['GET'])
@@ -1717,7 +1779,7 @@ def create_file():
 
 @app.route('/api/user/files/<int:file_id>', methods=['PUT'])
 def update_file(file_id):
-    """Update file content or rename file"""
+    """Update file content, rename file, or move file"""
     from models import File, Folder
     from datetime import datetime
     
@@ -1736,18 +1798,43 @@ def update_file(file_id):
         return jsonify({'error': 'File not found'}), 404
     
     try:
+        target_folder_id = file.folder_id
+        if 'folder_id' in data:
+            target_folder_id = data.get('folder_id')
+
+            # Validate destination folder ownership when moving into a folder.
+            if target_folder_id is not None:
+                target_folder = Folder.query.get(target_folder_id)
+                if not target_folder:
+                    return jsonify({'error': 'Destination folder not found'}), 404
+                if target_folder.user_id != user_id:
+                    return jsonify({'error': 'Access denied'}), 403
+
+        new_name = data.get('file_name', file.file_name)
+
+        # Prevent duplicate file names in the destination folder (or root).
+        duplicate = File.query.filter(
+            File.user_account_id == user_id,
+            File.folder_id.is_(None) if target_folder_id is None else File.folder_id == target_folder_id,
+            File.file_name == new_name,
+            File.file_id != file.file_id
+        ).first()
+
+        if duplicate:
+            return jsonify({'error': f'A file named "{new_name}" already exists in this location'}), 409
+
         # Update content if provided
         if 'content' in data:
             file.content = data['content']
         
-        # Update file name if provided
-        if 'file_name' in data:
-            old_name = file.file_name
-            new_name = data['file_name']
-            file.file_name = new_name
-            
-            # Update path
-            file.path = file.path.replace(old_name, new_name)
+        # Update name/folder/path as a single operation to keep path consistent.
+        file.file_name = new_name
+        file.folder_id = target_folder_id
+        if target_folder_id is not None:
+            target_folder = Folder.query.get(target_folder_id)
+            file.path = f"{target_folder.path}/{new_name}"
+        else:
+            file.path = f"/{new_name}"
         
         file.last_updated = datetime.now()
         db.session.commit()
@@ -1791,34 +1878,34 @@ def delete_file(file_id):
 # SAMPLE FILES ROUTES (READ-ONLY)
 # ============================================
 
-@app.route('/api/samples/folders', methods=['GET'])
-def get_sample_folders():
-    """Get sample folder tree (read-only)"""
-    from models import Folder
+# @app.route('/api/samples/folders', methods=['GET'])
+# def get_sample_folders():
+#     """Get sample folder tree (read-only)"""
+#     from models import Folder
     
-    try:
-        sample_folders = Folder.query.filter_by(folder_type='sample').all()
-        return jsonify({
-            'folders': [f.to_dict(include_files=True) for f in sample_folders]
-        }), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+#     try:
+#         sample_folders = Folder.query.filter_by(folder_type='sample').all()
+#         return jsonify({
+#             'folders': [f.to_dict(include_files=True) for f in sample_folders]
+#         }), 200
+#     except Exception as e:
+#         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/samples/files/<int:file_id>', methods=['GET'])
-def get_sample_file(file_id):
-    """Get sample file content (read-only)"""
-    from models import File
+# @app.route('/api/samples/files/<int:file_id>', methods=['GET'])
+# def get_sample_file(file_id):
+#     """Get sample file content (read-only)"""
+#     from models import File
     
-    file = File.query.filter_by(
-        file_id=file_id,
-        file_type='sample'
-    ).first()
+#     file = File.query.filter_by(
+#         file_id=file_id,
+#         file_type='sample'
+#     ).first()
     
-    if not file:
-        return jsonify({'error': 'Sample file not found'}), 404
+#     if not file:
+#         return jsonify({'error': 'Sample file not found'}), 404
     
-    return jsonify({'file': file.to_dict(include_content=True)}), 200
+#     return jsonify({'file': file.to_dict(include_content=True)}), 200
 
 
 # ============================================

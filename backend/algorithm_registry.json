@@ -97,13 +97,6 @@
             "name": "Depth-First Search",
             "description": "DFS traversal using adjacency matrix",
             "explanation_file": "Graphs/dfs/explanation.txt"
-          },
-          "aa": {
-            "file": "Graphs/aa/python/aa.py",
-            "name": "Aa",
-            "description": "Aa algorithm",
-            "explanation_file": "Graphs/aa/explanation.txt",
-            "await_console_input": false
           }
         },
         "javascript": {
@@ -118,13 +111,6 @@
             "name": "Depth-First Search",
             "description": "DFS traversal using adjacency matrix",
             "explanation_file": "Graphs/dfs/explanation.txt"
-          },
-          "aa": {
-            "file": "Graphs/aa/javascript/aa.js",
-            "name": "Aa",
-            "description": "Aa algorithm",
-            "explanation_file": "Graphs/aa/explanation.txt",
-            "await_console_input": false
           }
         }
       }

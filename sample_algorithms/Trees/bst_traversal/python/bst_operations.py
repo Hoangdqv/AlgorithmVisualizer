@@ -11,7 +11,9 @@ from helpers import (
     postorder_traversal,
     bst_search,
     bst_insert,
-    bst_delete
+    bst_delete,
+    run_targets,
+    build_tree_only,
 )
 
 # [ALGORITHM]
@@ -23,6 +25,7 @@ def bst_operations(tree_nodes, root_id, operation, tracer, target=None):
         tree_nodes: List of tree nodes [{"id": 1, "value": 10, "children": [left, right]}, ...]
         root_id: ID of the root node
         operation: Operation to perform:
+            - 'build': Generate tree only (no traversal/modification)
             - 'inorder': In-order traversal (left -> root -> right)
             - 'preorder': Pre-order traversal (root -> left -> right)
             - 'postorder': Post-order traversal (left -> right -> root)
@@ -31,22 +34,16 @@ def bst_operations(tree_nodes, root_id, operation, tracer, target=None):
             - 'delete': Find node to delete
         tracer: Tracer instance
         target: Target value for search/insert/delete operations (optional)
-    
-    Returns:
-        Depends on operation:
-        - Traversals: None (states recorded in tracer)
-        - search: Boolean (found or not)
-        - insert: List of node IDs in insertion path
-        - delete: Node ID if found, None otherwise
     """
+    
     operations = {
+        'build': lambda: build_tree_only(tree_nodes, tracer),
         'inorder': lambda: inorder_traversal(tree_nodes, root_id, tracer),
         'preorder': lambda: preorder_traversal(tree_nodes, root_id, tracer),
         'postorder': lambda: postorder_traversal(tree_nodes, root_id, tracer),
-        'search': lambda: bst_search(tree_nodes, root_id, target, tracer),
-        'insert': lambda: [bst_insert(tree_nodes, root_id, x, tracer)
-            for x in (target if isinstance(target, (list, tuple)) else [target])],
-        'delete': lambda: bst_delete(tree_nodes, root_id, target, tracer),
+        'search': lambda: run_targets(target, lambda x: bst_search(tree_nodes, root_id, x, tracer)),
+        'insert': lambda: run_targets(target, lambda x: bst_insert(tree_nodes, root_id, x, tracer)),
+        'delete': lambda: run_targets(target, lambda x, m: bst_delete(tree_nodes, root_id, x, tracer, mutate_in_place=m), mutate=True),
     }
     
     if operation not in operations:
@@ -68,20 +65,18 @@ if __name__ == "__main__":
         {"id": 7, "value": 20, "children": []}
     ]
     root_id = 1
-    operation = 'inorder'  # Options: 'inorder', 'preorder', 'postorder', 'search', 'insert', 'delete'
+    operation = 'inorder'  # Options: 'build', 'inorder', 'preorder', 'postorder', 'search', 'insert', 'delete'
     target = 7             # For search/insert/delete operations
     # [/PARAMS]
     
     tracer = Tracer("trees", "list", "List")
     result = bst_operations(tree_nodes, root_id, operation, tracer, target)
-    
-    if operation == 'search':
-        print(f"Search for {target}: {'Found' if result else 'Not found'}")
-    elif operation == 'insert':
-        print(f"Insertion path for {target}: {result}")
-    elif operation == 'delete':
-        print(f"Node to delete (value={target}): {result}")
-    elif operation in ['inorder', 'preorder', 'postorder']:
-        print(f"{operation.capitalize()} traversal completed.")
-    
+    if isinstance(result, list):
+        output = "\n".join(r.get("message") for r in result)
+    else:
+        output = result.get("message") if isinstance(result, dict) else None
+        if not output:
+            output = "Operation completed."
+
+    print(output)
     tracer.finalize()

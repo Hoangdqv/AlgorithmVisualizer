@@ -1,5 +1,6 @@
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Editor from '@monaco-editor/react';
 import Sidebar from './layouts/Sidebar';
 import VisualModule from './VisualModule';
@@ -29,6 +30,7 @@ const EditorComponent = ({
   toggleDropdown,
   loading,
   isRunning,
+  suppressRunningOverlay,
 
   // File/content handling
   handleFileSelect,
@@ -36,7 +38,7 @@ const EditorComponent = ({
 
   // Playground-specific props
   handleUserFileSelect,
-  selectedUserFile,
+  selectedUserFile, // object with { file_id, file_name, content }
   autoSaving,
   initialSidebarTab,
 
@@ -54,11 +56,88 @@ const EditorComponent = ({
   viewMode,
   setViewMode,
   runMinimal,
+  runMinimalContinue,
+  hasTreeSession,
   explanation,
   tracerData,
+  tracerGuide,
+  showTracerGuide,
+  toggleTracerGuide,
   onBack,
 }) => {
   const sidebarLanguageKey = category ? `${category}_${currentLanguage}` : currentLanguage;
+
+
+  const handleCopySnippet = async (snippet) => {
+    try {
+      await navigator.clipboard.writeText(snippet);
+    } catch {
+      // no-op fallback; snippet remains selectable for manual copy
+    }
+  };
+
+  const [metadataTooltip, setMetadataTooltip] = useState(null);
+  const [isTracerGuideMounted, setIsTracerGuideMounted] = useState(false);
+  const [isTracerGuideClosing, setIsTracerGuideClosing] = useState(false);
+
+  const updateMetadataTooltip = (event, key) => {
+    const targetRect = event.currentTarget.getBoundingClientRect();
+    const preferredLeft = targetRect.left + targetRect.width / 2;
+    const minLeft = 170;
+    const maxLeft = window.innerWidth - 170;
+    const clampedLeft = Math.min(Math.max(preferredLeft, minLeft), maxLeft);
+
+    setMetadataTooltip({
+      key,
+      text: tracerGuide?.metadataHints?.[key] || 'No example available yet.',
+      left: clampedLeft,
+      top: Math.max(8, targetRect.top - 8),
+    });
+  };
+
+  const hideMetadataTooltip = () => {
+    setMetadataTooltip(null);
+  };
+
+  useEffect(() => {
+    if (!metadataTooltip) {
+      return undefined;
+    }
+
+    const handleWindowChange = () => {
+      setMetadataTooltip(null);
+    };
+
+    window.addEventListener('scroll', handleWindowChange, true);
+    window.addEventListener('resize', handleWindowChange);
+
+    return () => {
+      window.removeEventListener('scroll', handleWindowChange, true);
+      window.removeEventListener('resize', handleWindowChange);
+    };
+  }, [metadataTooltip]);
+
+  useEffect(() => {
+    if (showTracerGuide && tracerGuide) {
+      setIsTracerGuideMounted(true);
+      setIsTracerGuideClosing(false);
+      return undefined;
+    }
+
+    if (isTracerGuideMounted) {
+      setIsTracerGuideClosing(true);
+      setMetadataTooltip(null);
+
+      const timer = setTimeout(() => {
+        setIsTracerGuideMounted(false);
+        setIsTracerGuideClosing(false);
+      }, 220);
+
+      return () => clearTimeout(timer);
+    }
+
+    return undefined;
+  }, [showTracerGuide, tracerGuide, isTracerGuideMounted]);
 
   // Auto-scroll the console output to the bottom when new output arrives
   const consoleScrollRef = useRef(null);
@@ -99,7 +178,12 @@ const EditorComponent = ({
         <div className="mode-toggle">
           <button
             className={viewMode === 'minimal' ? 'active' : ''}
-            onClick={() => setViewMode('minimal')}
+            onClick={() => {
+              setViewMode('minimal');
+              if (showTracerGuide) {
+                toggleTracerGuide();
+              }
+            }}
           >
             Minimal
           </button>
@@ -117,6 +201,15 @@ const EditorComponent = ({
             runCode={runCode}
             isRunning={isRunning}
             loading={loading} />
+          {tracerGuide && toggleTracerGuide && (
+            <button
+              onClick={toggleTracerGuide}
+              className='compile-button tracer-guide-button'
+              title='Open tracer guide'
+            >
+              Tracer Guide
+            </button>
+          )}
           {isRunning && stopExecution && (
             <button
               onClick={stopExecution}
@@ -144,6 +237,7 @@ const EditorComponent = ({
               <Sidebar
                 onFileSelect={handleFileSelect}
                 onUserFileSelect={handleUserFileSelect}
+                selectedUserFileId={selectedUserFile?.file_id ?? null}
                 selectedLanguage={sidebarLanguageKey || currentLanguage}
                 initialTab={initialSidebarTab}
                 apiCache={apiCache} />
@@ -164,6 +258,8 @@ const EditorComponent = ({
                     algorithmKey={selectedAlgorithmKey}
                     algorithmName={selectedAlgorithmName}
                     onRun={runMinimal}
+                    onRunContinue={runMinimalContinue}
+                    hasTreeSession={hasTreeSession}
                     isRunning={isRunning}
                   />
                 ) : (
@@ -256,12 +352,126 @@ const EditorComponent = ({
           <>
             <PanelResizeHandle className='resizable-handle-horizontal' />
             <Panel minSize={35} defaultSize={46} className='panel-border-white' id='visualization-panel' order={3}>
-              <VisualModule tracerData={tracerData} isRunning={isRunning} currentLanguage={currentLanguage} />
+              <VisualModule
+                tracerData={tracerData}
+                isRunning={isRunning}
+                currentLanguage={currentLanguage}
+                suppressRunningOverlay={suppressRunningOverlay}
+              />
             </Panel>
           </>
         )}
       </PanelGroup>
     </div>
+
+    {isTracerGuideMounted && tracerGuide && (
+      <>
+        <aside
+          className={`tracer-guide-drawer ${isTracerGuideClosing ? 'is-closing' : 'is-open'}`}
+          role='dialog'
+          aria-label='Tracer guide panel'
+        >
+          <div className='tracer-guide-header'>
+            <span>{tracerGuide.title} ({tracerGuide.languageLabel})</span>
+            <button
+              type='button'
+              className='tracer-guide-close-btn'
+              onClick={toggleTracerGuide}
+              title='Close tracer guide'
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className='tracer-guide-section'>
+            <div className='tracer-guide-label'>Add tracer calls at these key moments:</div>
+            <ul className='tracer-guide-list'>
+              {tracerGuide.moments.map((moment) => (
+                <li key={moment}>{moment}</li>
+              ))}
+            </ul>
+          </div>
+
+          <div className='tracer-guide-section'>
+            <div className='tracer-guide-label'>Detected tracer lines for this code:</div>
+            <ol className='tracer-guide-line-list'>
+              {tracerGuide.detectedLines?.map((line) => (
+                <li key={line.id} className='tracer-guide-line-item'>
+                  {(() => {
+                    return (
+                      <>
+                  <div className='tracer-guide-line-title'>{line.title}</div>
+                  <div className='tracer-guide-line-row'>
+                    <textarea
+                      className='tracer-guide-line-snippet'
+                      readOnly
+                      value={line.snippet}
+                      rows={Math.max(2, (line.snippet.match(/\n/g) || []).length + 1)}
+                      onFocus={(event) => event.target.select()}
+                      draggable={true}
+                      onDragStart={(event) => {
+                        event.dataTransfer.setData('text/plain', line.snippet);
+                        event.dataTransfer.effectAllowed = 'copy';
+                      }}
+                      style={{ resize: 'none' }}
+                    />
+                    <button
+                      type='button'
+                      className='tracer-guide-line-copy-btn'
+                      onClick={() => handleCopySnippet(line.snippet)}
+                      title='Copy to clipboard'
+                    >
+                      📋
+                    </button>
+                  </div>
+                      </>
+                    );
+                  })()}
+                </li>
+              ))}
+            </ol>
+          </div>
+
+          <div className='tracer-guide-section'>
+            <div className='tracer-guide-label'>Common tracer metadata:</div>
+            <div className='tracer-guide-metadata-list'>
+              {tracerGuide.metadata.map((key) => (
+                <span
+                  key={key}
+                  className='tracer-guide-metadata-chip'
+                  onMouseEnter={(event) => updateMetadataTooltip(event, key)}
+                  onMouseMove={(event) => updateMetadataTooltip(event, key)}
+                  onMouseLeave={hideMetadataTooltip}
+                >
+                  {key}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className='tracer-guide-section'>
+            <div className='tracer-guide-label'>State API:</div>
+            <pre className='tracer-guide-inline'>
+              {`tracer.${tracerGuide.tracerMethod}(stateData, {...metadata})`}
+            </pre>
+          </div>
+
+        </aside>
+        {metadataTooltip && createPortal(
+          <div
+            className='tracer-guide-floating-tooltip'
+            role='tooltip'
+            style={{
+              left: `${metadataTooltip.left}px`,
+              top: `${metadataTooltip.top}px`,
+            }}
+          >
+            {metadataTooltip.text}
+          </div>,
+          document.body
+        )}
+      </>
+    )}
   </div>
   );
 }

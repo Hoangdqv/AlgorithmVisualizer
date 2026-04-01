@@ -1,5 +1,5 @@
 from tracers.tracer import Tracer
-from helpers import swap  # Helper function: swaps arr[i] and arr[j] in-place
+from helpers import swap
 
 # [ALGORITHM]
 def bubble_sort(arr, tracer):

@@ -123,6 +123,7 @@ export const algorithmParams = {
         type: 'select',
         default: 'inorder',
         options: [
+          { value: 'build', label: 'Generate Tree Only' },
           { value: 'inorder', label: 'Traversal - In-order' },
           { value: 'preorder', label: 'Traversal - Pre-order' },
           { value: 'postorder', label: 'Traversal - Post-order' },
@@ -137,7 +138,7 @@ export const algorithmParams = {
         label: 'Target Value',
         type: 'number-optional',
         enabledWhen: (values) =>
-          !['preorder','inorder','postorder'].includes(values.operation),
+          !['build', 'preorder', 'inorder', 'postorder'].includes(values.operation),
         default: '',
         description: 'Value used in search/insert/delete operations',
       }
@@ -170,17 +171,35 @@ function buildGraphBlock(language, params) {
 }
 
 function buildTreeBlock(language, params) {
-  const nodes = buildBSTNodes(params.values);
+  const nodes = params.existingTreeNodes || buildBSTNodes(params.values);
+  const rootId = params.existingRootId || 1;
+
   if (language === 'python') {
-    if(!params.target) params.target = "None";
+    const target = (params.target === '' || params.target === null || params.target === undefined)
+      ? 'None'
+      : JSON.stringify(params.target);
     const rows = nodes
-      .map((n) => `    {"id": ${n.id}, "value": ${n.value}, "children": [${n.children.join(', ')}]}`)
+      .map((n) => {
+        const children = (n.children || []).map((child) => (
+          child === null || child === undefined ? 'None' : child
+        ));
+        return `    {"id": ${n.id}, "value": ${n.value}, "children": [${children.join(', ')}]}`;
+      })
       .join(',\n');
-    return `tree_nodes = [\n${rows}\n]\nroot_id = 1\noperation = "${params.operation}"\ntarget = ${params.target}`;
+    return `tree_nodes = [\n${rows}\n]\nroot_id = ${rootId}\noperation = "${params.operation}"\ntarget = ${target}`;
   }
-  if (!params.target) params.target = "null";
+
+  const target = (params.target === '' || params.target === null || params.target === undefined)
+    ? 'null'
+    : JSON.stringify(params.target);
+
   const rows = nodes
-    .map((n) => `    { id: ${n.id}, value: ${n.value}, children: [${n.children.join(', ')}] }`)
+    .map((n) => {
+      const children = (n.children || []).map((child) => (
+        child === null || child === undefined ? 'null' : child
+      ));
+      return `    { id: ${n.id}, value: ${n.value}, children: [${children.join(', ')}] }`;
+    })
     .join(',\n');
-  return `const treeNodes = [\n${rows}\n];\nconst rootId = 1;\nconst operation = "${params.operation}";\nconst target = ${params.target};`;
+  return `const treeNodes = [\n${rows}\n];\nconst rootId = ${rootId};\nconst operation = "${params.operation}";\nconst target = ${target};`;
 }
