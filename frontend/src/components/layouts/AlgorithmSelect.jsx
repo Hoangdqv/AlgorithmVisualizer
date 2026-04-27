@@ -23,11 +23,10 @@ const AlgorithmSelect = () => {
   const [showTracerGuide, setShowTracerGuide] = useState(false);
   const [viewMode, setViewMode] = useState('detailed');
   const [selectedAlgorithmKey, setSelectedAlgorithmKey] = useState(null);
-  const [selectedAlgorithmName, setSelectedAlgorithmName] = useState('N/A');
+  const [selectedAlgorithmName, setSelectedAlgorithmName] = useState('Loading...');
   const [languageData, setLanguageData] = useState([]);
   const [treeSession, setTreeSession] = useState(null);
   const [isLiveAppendingRun, setIsLiveAppendingRun] = useState(false);
-  const preferredAlgorithmKeyRef = useRef(null);
 
   // Fetch languages
   const languages = useMemo(() => {
@@ -61,7 +60,7 @@ const AlgorithmSelect = () => {
       const cached = apiCache.current.code[codeKey];
       setCode(cached.code);
       setExplanation(cached.explanation || '');
-      setSelectedAlgorithmName(cached.name || 'N/A');
+      setSelectedAlgorithmName(cached.name || 'Loading...');
       setOutput('');
       return;
     }
@@ -82,13 +81,13 @@ const AlgorithmSelect = () => {
         apiCache.current.code[codeKey] = {
           code: data.code,
           explanation: data.explanation || '',
-          name: data.name || 'N/A'
+          name: data.name || 'Loading...'
         };
         
         setCode(data.code);
         setOutput('');
         setExplanation(data.explanation || '');
-        setSelectedAlgorithmName(data.name || 'N/A');
+        setSelectedAlgorithmName(data.name || 'Loading...');
       } else {
         console.error('Error loading algorithm code:', data.error);
         setCode(`// Error loading algorithm code`);
@@ -100,10 +99,6 @@ const AlgorithmSelect = () => {
       setLoading(false);
     }
   }, [category, currentLanguage]);
-
-  useEffect(() => {
-    preferredAlgorithmKeyRef.current = selectedAlgorithmKey;
-  }, [selectedAlgorithmKey]);
 
   const handleViewModeChange = useCallback((newMode) => {
     // When switching to minimal mode, restore original code from cache
@@ -147,17 +142,14 @@ const AlgorithmSelect = () => {
   useEffect(() => {
     const cacheKey = `${category}_${currentLanguage}`;
 
-    setSelectedAlgorithmName('N/A');
+    setSelectedAlgorithmName('Loading...');
+    setSelectedAlgorithmKey(null);
 
     // Check if algorithm list is cached
     if (apiCache.current.lists[cacheKey]) {
       const cached = apiCache.current.lists[cacheKey];
       if (cached.length > 0) {
-        const preferredKey = preferredAlgorithmKeyRef.current;
-        const preferredItem = preferredKey
-          ? cached.find((item) => item.key === preferredKey)
-          : null;
-        handleFileSelect((preferredItem || cached[0]).key);
+        handleFileSelect(cached[0].key);
       }
       return;
     }
@@ -178,15 +170,10 @@ const AlgorithmSelect = () => {
         if (data.algorithms && data.algorithms.length > 0) {
           // Cache the algorithm list
           apiCache.current.lists[cacheKey] = data.algorithms;
-          // Keep the current algorithm selected if it exists in the new language list.
-          const preferredKey = preferredAlgorithmKeyRef.current;
-          const preferredItem = preferredKey
-            ? data.algorithms.find((item) => item.key === preferredKey)
-            : null;
-          handleFileSelect((preferredItem || data.algorithms[0]).key);
+          // Auto-load first algorithm
+          handleFileSelect(data.algorithms[0].key);
         } else {
           apiCache.current.lists[cacheKey] = [];
-          setSelectedAlgorithmKey(null);
           setCode(`// No ${currentLanguage} algorithms available in ${category} category`);
         }
       } catch (error) {
@@ -242,10 +229,8 @@ const AlgorithmSelect = () => {
   const runCode = useCallback(async () => {
     setIsRunning(true);
     setOutput('Running...');
-    // Keep non-tree categories stateless; tree category can seed minimal continuation.
-    if (category !== 'trees') {
-      setTreeSession(null);
-    }
+    // Keep non-tree categories stateless; tree can seed minimal continuation.
+    if (category !== 'trees') setTreeSession(null);
     setTracerData(null);
     
     try {
@@ -293,16 +278,16 @@ const AlgorithmSelect = () => {
     }
   }, [currentLanguage, code, category, getLatestTreeSnapshot, inferRootId]);
 
-  const runMinimalInternal = useCallback(async (params, continueFromTreeSession = false) => {
+  const runMinimalInternal = useCallback(async (params, continueSession = false) => {
     const baseTreeNodes = treeSession?.nodes?.length ? treeSession.nodes : null;
     const baseRootId = treeSession?.rootId || 1;
 
-    const canUseTreeSession = continueFromTreeSession
+    const useTreeSession = continueSession
       && category === 'trees'
       && baseTreeNodes
       && baseTreeNodes.length > 0;
 
-    const effectiveParams = canUseTreeSession
+    const effectiveParams = useTreeSession
       ? {
           ...params,
           existingTreeNodes: baseTreeNodes,
@@ -311,10 +296,10 @@ const AlgorithmSelect = () => {
       : params;
 
     const paramsBlock = buildParamsBlock(category, currentLanguage.toLowerCase(), effectiveParams);
-    setIsLiveAppendingRun(continueFromTreeSession);
+    setIsLiveAppendingRun(useTreeSession);
     setIsRunning(true);
     setOutput('Running...');
-    if (!continueFromTreeSession) {
+    if (!useTreeSession) {
       setTracerData(null);
     }
 
@@ -338,7 +323,7 @@ const AlgorithmSelect = () => {
           const previousStates = tracerData?.states || [];
           const nextStates = data.states.states || [];
 
-          if (continueFromTreeSession && previousStates.length > 0 && nextStates.length > 0) {
+          if (useTreeSession && previousStates.length > 0 && nextStates.length > 0) {
             const mergedStatesPayload = {
               ...data.states,
               metadata: data.states.metadata || tracerData.metadata,
@@ -396,6 +381,81 @@ const AlgorithmSelect = () => {
     setShowSidebar(!showSidebar);
   };
 
+  const downloadCapture = useCallback((blob, fileName) => {
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(objectUrl);
+  }, []);
+
+  const handleSaveVisualizationCapture = useCallback(async (capture) => {
+    if (!capture?.blob) {
+      return false;
+    }
+
+    const now = new Date();
+    const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
+    const rawAlgoName = (selectedAlgorithmName || 'algorithm').toString();
+    const sanitizedAlgoName = rawAlgoName
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '') || 'algorithm';
+    const stepNumber = capture.step || 1;
+    // Zero-pad step index so file listings and image navigation keep numeric order.
+    const totalSteps = Math.max(capture.totalSteps || stepNumber, stepNumber);
+    const paddedStep = String(stepNumber).padStart(String(totalSteps).length, '0');
+    const fileName = `${sanitizedAlgoName}-step-${paddedStep}-${stamp}.png`;
+
+    const languageMatch = languageData.find((lang) => lang.language?.toLowerCase() === currentLanguage.toLowerCase());
+    const fallbackLanguageId = languageData[0]?.lang_id;
+    const languageId = languageMatch?.lang_id || fallbackLanguageId;
+
+    if (!languageId) {
+      downloadCapture(capture.blob, fileName);
+      setOutput('Could not resolve a language id for file storage, snapshot downloaded locally instead.');
+      return false;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('file', capture.blob, fileName);
+      formData.append('file_name', fileName);
+      formData.append('language_id', String(languageId));
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/user/files/upload-image`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+
+      if (response.ok) {
+        setOutput(`Saved snapshot to My Files: ${fileName}`);
+        return true;
+      }
+
+      if (response.status === 401) {
+        downloadCapture(capture.blob, fileName);
+        setOutput('You are not logged in, so the snapshot was downloaded locally.');
+        return false;
+      }
+
+      const errorData = await response.json().catch(() => ({}));
+      setOutput(`Failed to save snapshot to My Files (${errorData.error || response.statusText}). Downloaded locally instead.`);
+      downloadCapture(capture.blob, fileName);
+      return false;
+    } catch (error) {
+      console.error('Failed to persist visualization capture:', error);
+      setOutput(`Failed to save snapshot online (${error.message}). Downloaded locally instead.`);
+      downloadCapture(capture.blob, fileName);
+      return false;
+    }
+  }, [currentLanguage, languageData, downloadCapture, selectedAlgorithmName]);
+
   // Navigation handlers
   const handleBack = () => {
     navigate('/algorithms');
@@ -439,6 +499,7 @@ const AlgorithmSelect = () => {
       tracerGuide={tracerGuide}
       showTracerGuide={showTracerGuide}
       toggleTracerGuide={() => setShowTracerGuide(prev => !prev)}
+      onSaveVisualizationCapture={handleSaveVisualizationCapture}
       onBack={handleBack}
     />
   );

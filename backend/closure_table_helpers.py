@@ -1,8 +1,18 @@
 # closure_table_helpers.py
-"""Helper functions for closure table operations"""
 from datetime import datetime
+from sqlalchemy.orm import aliased
 from database import db
-from models import Folder, ClosureTable, Language, File
+from models import Folder, ClosureTable, Language, File, FileSystemItem
+
+
+def _owned_closure_query(user_id):
+    """Scope closure rows to descendants owned by the given user."""
+    return ClosureTable.query.join(
+        FileSystemItem,
+        ClosureTable.descendant == FileSystemItem.item_id
+    ).filter(
+        FileSystemItem.user_account_id == user_id
+    )
 
 def create_folder_with_closure(folder_name, path, user_id, parent_folder_id=None, folder_type='user-defined', created_at=datetime.now()):
     """
@@ -33,8 +43,7 @@ def create_folder_with_closure(folder_name, path, user_id, parent_folder_id=None
     # Check if self-reference already exists
     existing_self_ref = ClosureTable.query.filter_by(
         ancestor=new_folder.folder_id,
-        descendant=new_folder.folder_id,
-        user_account_id=user_id
+        descendant=new_folder.folder_id
     ).first()
     
     # Insert self-reference (depth=0) only if it doesn't exist
@@ -42,17 +51,15 @@ def create_folder_with_closure(folder_name, path, user_id, parent_folder_id=None
         self_ref = ClosureTable(
             ancestor=new_folder.folder_id,
             descendant=new_folder.folder_id,
-            depth=0,
-            user_account_id=user_id
+            depth=0
         )
         db.session.add(self_ref)
     
     # If has parent, copy all parent's ancestors
     if parent_folder_id:
         # Get all ancestors of parent
-        parent_ancestors = ClosureTable.query.filter_by(
-            descendant=parent_folder_id,
-            user_account_id=user_id
+        parent_ancestors = _owned_closure_query(user_id).filter(
+            ClosureTable.descendant == parent_folder_id
         ).all()
         
         # Create closure entries for each ancestor
@@ -60,8 +67,7 @@ def create_folder_with_closure(folder_name, path, user_id, parent_folder_id=None
             new_entry = ClosureTable(
                 ancestor=ancestor_entry.ancestor,
                 descendant=new_folder.folder_id,
-                depth=ancestor_entry.depth + 1,
-                user_account_id=user_id
+                depth=ancestor_entry.depth + 1
             )
             db.session.add(new_entry)
     
@@ -85,7 +91,7 @@ def get_folder_tree(root_folder_id, user_id):
         ClosureTable, Folder.folder_id == ClosureTable.descendant
     ).filter(
         ClosureTable.ancestor == root_folder_id,
-        ClosureTable.user_account_id == user_id
+        Folder.user_id == user_id
     ).order_by(ClosureTable.depth, Folder.folder_name)
     
     return query.all()
@@ -102,10 +108,9 @@ def get_all_descendants(folder_id, user_id):
     Returns:
         List of folder IDs
     """
-    descendants = ClosureTable.query.filter(
+    descendants = _owned_closure_query(user_id).filter(
         ClosureTable.ancestor == folder_id,
-        ClosureTable.depth > 0,
-        ClosureTable.user_account_id == user_id
+        ClosureTable.depth > 0
     ).all()
     
     return [d.descendant for d in descendants]
@@ -123,11 +128,15 @@ def get_folder_path_list(folder_id, user_id):
         List of Folder objects from root to target
     """
     # Get all ancestors ordered by depth (descending = root first)
+    owned_descendant = aliased(FileSystemItem)
     ancestors = db.session.query(Folder).join(
         ClosureTable, Folder.folder_id == ClosureTable.ancestor
+    ).join(
+        owned_descendant, ClosureTable.descendant == owned_descendant.item_id
     ).filter(
         ClosureTable.descendant == folder_id,
-        ClosureTable.user_account_id == user_id
+        owned_descendant.user_account_id == user_id,
+        Folder.user_id == user_id
     ).order_by(ClosureTable.depth.desc()).all()
     
     return ancestors
@@ -145,10 +154,9 @@ def is_descendant(ancestor_id, descendant_id, user_id):
     Returns:
         Boolean
     """
-    entry = ClosureTable.query.filter_by(
-        ancestor=ancestor_id,
-        descendant=descendant_id,
-        user_account_id=user_id
+    entry = _owned_closure_query(user_id).filter(
+        ClosureTable.ancestor == ancestor_id,
+        ClosureTable.descendant == descendant_id
     ).first()
     
     return entry is not None
@@ -240,32 +248,28 @@ def move_folder(folder_id, new_parent_id, user_id):
         new_parent = None
 
     # Collect subtree descendants including self.
-    subtree_entries = ClosureTable.query.filter_by(
-        ancestor=folder_id,
-        user_account_id=user_id
+    subtree_entries = _owned_closure_query(user_id).filter(
+        ClosureTable.ancestor == folder_id
     ).all()
     descendant_ids = [entry.descendant for entry in subtree_entries]
 
     # Remove old ancestor relationships outside the subtree.
-    old_ancestors = ClosureTable.query.filter(
+    old_ancestors = _owned_closure_query(user_id).filter(
         ClosureTable.descendant == folder_id,
-        ClosureTable.ancestor != folder_id,
-        ClosureTable.user_account_id == user_id
+        ClosureTable.ancestor != folder_id
     ).all()
     old_ancestor_ids = [entry.ancestor for entry in old_ancestors]
 
     if old_ancestor_ids:
         ClosureTable.query.filter(
             ClosureTable.ancestor.in_(old_ancestor_ids),
-            ClosureTable.descendant.in_(descendant_ids),
-            ClosureTable.user_account_id == user_id
+            ClosureTable.descendant.in_(descendant_ids)
         ).delete(synchronize_session=False)
 
     # Insert new ancestor relationships from the new parent.
     if new_parent is not None:
-        new_ancestors = ClosureTable.query.filter(
-            ClosureTable.descendant == new_parent_id,
-            ClosureTable.user_account_id == user_id
+        new_ancestors = _owned_closure_query(user_id).filter(
+            ClosureTable.descendant == new_parent_id
         ).all()
 
         for ancestor_entry in new_ancestors:
@@ -274,8 +278,7 @@ def move_folder(folder_id, new_parent_id, user_id):
                 db.session.add(ClosureTable(
                     ancestor=ancestor_entry.ancestor,
                     descendant=subtree_entry.descendant,
-                    depth=new_depth,
-                    user_account_id=user_id
+                    depth=new_depth
                 ))
 
     # Update parent reference and paths.

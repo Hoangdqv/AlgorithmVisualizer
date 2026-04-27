@@ -1,4 +1,4 @@
-QUICK SORT - Algorithm Explanation
+QUICK SORT - Algorithm Explanation new edit
 ==================================
 
 What is Quick Sort?

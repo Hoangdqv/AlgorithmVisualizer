@@ -194,7 +194,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
       loadUserFiles();
     }
   }, [activeTab, user, loadUserFiles, API_URL]);
-  
+
   const buildFolderHierarchy = (treeNodes) => {
     if (!treeNodes || treeNodes.length === 0) return null;
     
@@ -448,9 +448,13 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
         apiCache.current.userFilesData = { folders: null, files: null };
         loadUserFiles(true, true); // Force silent reload after creating
         setModal(null);
+      } else {
+        const data = await response.json();
+        alert(`Error: ${data.error || 'Failed to create file'}`);
       }
     } catch (error) {
       console.error('Error creating file:', error);
+      alert('Failed to create file. Please try again.');
     }
   };
 
@@ -615,7 +619,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
                   className='folder-button'
                 >
                   <span>
-                    📁 {currentLanguage.includes('_') ? 'Algorithms' : 'Code Samples'} 
+                    📁 {currentLanguage.includes('_') ? 'Algorithms' : 'Code Samples '} 
                     ({filteredSamples.length}{searchQuery && samples.length !== filteredSamples.length ? ` of ${samples.length}` : ''})
                   </span>
                 </button>
@@ -705,7 +709,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
               <div style={{ color: '#888', padding: '1rem' }}>Loading files...</div>
             ) : (
               <>
-                <div className="file-tree-scroll-container hidden-scrollbar">
+                <div className="file-tree-scroll-container hidden-scrollbar sidebar-bottom-padding">
                   <FileTree
                     folders={filteredUserData.folders}
                     files={filteredUserData.files.filter(f => !f.folder_id)}

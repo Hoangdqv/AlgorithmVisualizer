@@ -10,13 +10,13 @@ const GUIDE_CONFIG = {
     ],
     metadata: ['comparing', 'swapped', 'selected', 'pivot', 'range', 'variables', 'indexVars'],
     metadataHints: {
-      comparing: 'Common values: [i, j], [left, right]',
-      swapped: 'Common values: [i, j]',
-      selected: 'Common values: [pivotIndex], [minIndex]',
-      pivot: 'Common values: pivotIndex, pivotValue',
-      range: 'Common values: [left, right], [start, end], [low, high]',
-      variables: `Common values: { 'i': i, 'j': j, 'pivotIndex': pivotIndex, 'minIndex': minIndex }`,
-      indexVars: "Common values: ['i', 'j'], ['left', 'right']"
+      comparing: ' [i, j], [left, right]',
+      swapped: ' [i, j]',
+      selected: ' [pivotIndex], [minIndex]',
+      pivot: ' pivotIndex, pivotValue',
+      range: ' [left, right], [start, end], [low, high]',
+      variables: ` { 'i': i, 'j': j, 'pivotIndex': pivotIndex, 'minIndex': minIndex }`,
+      indexVars: " ['i', 'j'], ['left', 'right']"
     },
     tracerLines: [
       {
@@ -122,13 +122,13 @@ const GUIDE_CONFIG = {
     ],
     metadata: ['graph', 'queue', 'stack', 'visited', 'processing', 'discovered', 'variables'],
     metadataHints: {
-      graph: 'Common values: adjacency list / matrix object',
-      queue: 'Common values: [0, 1, 2], [...queue]',
-      stack: 'Common values: [start], [...stack]',
-      visited: 'Common values: [0, 2, 3], [...visited]',
-      processing: 'Common values: currentNode',
-      discovered: 'Common values: neighbor',
-      variables: `Common values: { 'currentNode': currentNode, 'neighbor': neighbor, 'step': step }`
+      graph: ' adjacency list / matrix object',
+      queue: ' [0, 1, 2], [...queue]',
+      stack: ' [start], [...stack]',
+      visited: ' [0, 2, 3], [...visited]',
+      processing: ' currentNode',
+      discovered: ' neighbor',
+      variables: ` { 'currentNode': currentNode, 'neighbor': neighbor, 'step': step }`
     },
     tracerLines: [
       {
@@ -239,11 +239,11 @@ const GUIDE_CONFIG = {
     ],
     metadata: ['tree', 'current', 'visited', 'depth', 'variables'],
     metadataHints: {
-      tree: 'Common values: tree node array (current structure snapshot)',
-      current: 'Common values: nodeId, null',
-      visited: 'Common values: [1, 2, 5], [...visited]',
-      depth: 'Common values: 0, 1, 2 (current depth)',
-      variables: `Common values: { 'target': target, 'parent': parent, 'action': action, 'result': result }`
+      tree: ' tree node array (current structure snapshot)',
+      current: ' nodeId, null',
+      visited: ' [1, 2, 5], [...visited]',
+      depth: ' 0, 1, 2 (current depth)',
+      variables: ` { 'target': target, 'parent': parent, 'action': action, 'result': result }`
     },
     tracerLines: [
       {
@@ -348,7 +348,7 @@ const fallbackConfig = {
   ],
   metadata: ['variables'],
   metadataHints: {
-    variables: 'Common values: { phase, step, current, result }'
+    variables: ' { phase, step, current, result }'
   },
   tracerLines: [
     {

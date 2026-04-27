@@ -1,6 +1,5 @@
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { useRef, useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
 import Editor from '@monaco-editor/react';
 import Sidebar from './layouts/Sidebar';
 import VisualModule from './VisualModule';
@@ -38,9 +37,17 @@ const EditorComponent = ({
 
   // Playground-specific props
   handleUserFileSelect,
-  selectedUserFile, // object with { file_id, file_name, content }
+  selectedUserFile,
+  selectedUserFileId,
+  selectedImageUrl,
+  selectedImageName,
+  onImagePreviewPrev,
+  onImagePreviewNext,
+  hasPrevImagePreview,
+  hasNextImagePreview,
   autoSaving,
   initialSidebarTab,
+  onSaveVisualizationCapture,
 
   // Interactive stdin props
   awaitConsoleInput,
@@ -66,6 +73,10 @@ const EditorComponent = ({
   onBack,
 }) => {
   const sidebarLanguageKey = category ? `${category}_${currentLanguage}` : currentLanguage;
+  const TRACER_GUIDE_ANIMATION_MS = 350;
+  const [isTracerGuideRendered, setIsTracerGuideRendered] = useState(showTracerGuide);
+  const [isTracerGuideClosing, setIsTracerGuideClosing] = useState(false);
+  const editorInstanceRef = useRef(null);
 
 
   const handleCopySnippet = async (snippet) => {
@@ -76,69 +87,6 @@ const EditorComponent = ({
     }
   };
 
-  const [metadataTooltip, setMetadataTooltip] = useState(null);
-  const [isTracerGuideMounted, setIsTracerGuideMounted] = useState(false);
-  const [isTracerGuideClosing, setIsTracerGuideClosing] = useState(false);
-
-  const updateMetadataTooltip = (event, key) => {
-    const targetRect = event.currentTarget.getBoundingClientRect();
-    const preferredLeft = targetRect.left + targetRect.width / 2;
-    const minLeft = 170;
-    const maxLeft = window.innerWidth - 170;
-    const clampedLeft = Math.min(Math.max(preferredLeft, minLeft), maxLeft);
-
-    setMetadataTooltip({
-      key,
-      text: tracerGuide?.metadataHints?.[key] || 'No example available yet.',
-      left: clampedLeft,
-      top: Math.max(8, targetRect.top - 8),
-    });
-  };
-
-  const hideMetadataTooltip = () => {
-    setMetadataTooltip(null);
-  };
-
-  useEffect(() => {
-    if (!metadataTooltip) {
-      return undefined;
-    }
-
-    const handleWindowChange = () => {
-      setMetadataTooltip(null);
-    };
-
-    window.addEventListener('scroll', handleWindowChange, true);
-    window.addEventListener('resize', handleWindowChange);
-
-    return () => {
-      window.removeEventListener('scroll', handleWindowChange, true);
-      window.removeEventListener('resize', handleWindowChange);
-    };
-  }, [metadataTooltip]);
-
-  useEffect(() => {
-    if (showTracerGuide && tracerGuide) {
-      setIsTracerGuideMounted(true);
-      setIsTracerGuideClosing(false);
-      return undefined;
-    }
-
-    if (isTracerGuideMounted) {
-      setIsTracerGuideClosing(true);
-      setMetadataTooltip(null);
-
-      const timer = setTimeout(() => {
-        setIsTracerGuideMounted(false);
-        setIsTracerGuideClosing(false);
-      }, 220);
-
-      return () => clearTimeout(timer);
-    }
-
-    return undefined;
-  }, [showTracerGuide, tracerGuide, isTracerGuideMounted]);
-
   // Auto-scroll the console output to the bottom when new output arrives
   const consoleScrollRef = useRef(null);
   useEffect(() => {
@@ -147,6 +95,49 @@ const EditorComponent = ({
       autoScroll.scrollTop = autoScroll.scrollHeight;
     }
   }, [output, isRunning, containerReady]);
+
+  // Tracer guide effects and animation
+  useEffect(() => {
+    if (showTracerGuide) {
+      setIsTracerGuideRendered(true);
+      setIsTracerGuideClosing(false);
+      return undefined;
+    }
+
+    if (!isTracerGuideRendered) {
+      return undefined;
+    }
+
+    setIsTracerGuideClosing(true);
+    const closeTimer = window.setTimeout(() => {
+      setIsTracerGuideRendered(false);
+      setIsTracerGuideClosing(false);
+    }, TRACER_GUIDE_ANIMATION_MS);
+
+    return () => window.clearTimeout(closeTimer);
+  }, [showTracerGuide, isTracerGuideRendered, TRACER_GUIDE_ANIMATION_MS]);
+
+  useEffect(() => {
+    if (selectedImageUrl || viewMode === 'minimal') {
+      return undefined;
+    }
+
+    const editorInstance = editorInstanceRef.current;
+    if (!editorInstance) {
+      return undefined;
+    }
+
+    // Layout the editor when the component mounts or when the selected image URL changes
+    const rafId = window.requestAnimationFrame(() => {
+      editorInstance.layout();
+    });
+
+    return () => window.cancelAnimationFrame(rafId);
+  }, [selectedImageUrl, viewMode]);
+
+  const getCurrentEditorRef = (editor) => {
+    editorInstanceRef.current = editor;
+  };
 
   return (
   <div className="layout-editor">
@@ -195,7 +186,7 @@ const EditorComponent = ({
           </button>
         </div>
       )}
-      {viewMode !== 'minimal' && (
+      {viewMode !== 'minimal' && !selectedImageUrl && (
         <>
           <CompileBtn
             runCode={runCode}
@@ -237,9 +228,10 @@ const EditorComponent = ({
               <Sidebar
                 onFileSelect={handleFileSelect}
                 onUserFileSelect={handleUserFileSelect}
-                selectedUserFileId={selectedUserFile?.file_id ?? null}
                 selectedLanguage={sidebarLanguageKey || currentLanguage}
                 initialTab={initialSidebarTab}
+                // Propagates selection state so tree highlight follows image arrow navigation.
+                selectedUserFileId={selectedUserFileId}
                 apiCache={apiCache} />
             </Panel>
             <PanelResizeHandle className='resizable-handle-horizontal' />
@@ -263,25 +255,69 @@ const EditorComponent = ({
                     isRunning={isRunning}
                   />
                 ) : (
-                  <div style={{ height: '100%' }}>
-                    <Editor
-                      height="100%"
-                      theme="vs-dark"
-                      language={currentLanguage.toLowerCase()}
-                      value={code}
-                      onChange={handleEditorChange}
-                      options={{
-                        fontSize: 14,
-                        minimap: { enabled: false },
-                        automaticLayout: true,
-                        suggestOnTriggerCharacters: true,
-                        quickSuggestions: true,
-                        parameterHints: { enabled: true },
-                        hover: { enabled: true },
-                        "semanticHighlighting.enabled": true,
-                        "autoClosingBrackets": "always",
-                        "autoClosingComments": "always",
-                      }} />
+                  <div className='editor-preview-stack'>
+                    <div
+                      className={`editor-surface${selectedImageUrl ? ' is-hidden' : ' is-visible'}`}
+                      aria-hidden={Boolean(selectedImageUrl)}
+                    >
+                      <Editor
+                        height="100%"
+                        theme="vs-dark"
+                        language={currentLanguage.toLowerCase()}
+                        value={code}
+                        onMount={getCurrentEditorRef}
+                        onChange={handleEditorChange}
+                        options={{
+                          fontSize: 14,
+                          minimap: { enabled: false },
+                          automaticLayout: true,
+                          suggestOnTriggerCharacters: true,
+                          quickSuggestions: true,
+                          parameterHints: { enabled: true },
+                          hover: { enabled: true },
+                          "semanticHighlighting.enabled": true,
+                          "autoClosingBrackets": "always",
+                          "autoClosingComments": "always",
+                        }} />
+                    </div>
+                    <div
+                      className={`image-preview-surface${selectedImageUrl ? ' is-visible' : ' is-hidden'}`}
+                      aria-hidden={!selectedImageUrl}
+                    >
+                      {selectedImageUrl && (
+                        <div className='image-preview-panel'>
+                          <div className='image-preview-header'>
+                            <div className='image-preview-header-main'>
+                              <span>Previewing image</span>
+                              {selectedImageName && <span className='image-preview-filename'>{selectedImageName}</span>}
+                            </div>
+                            <div className='image-preview-nav-controls'>
+                              <button
+                                type='button'
+                                className='image-preview-nav-button'
+                                onClick={onImagePreviewPrev}
+                                disabled={!hasPrevImagePreview}
+                                title='Previous image (Left Arrow)'
+                              >
+                                ←
+                              </button>
+                              <button
+                                type='button'
+                                className='image-preview-nav-button'
+                                onClick={onImagePreviewNext}
+                                disabled={!hasNextImagePreview}
+                                title='Next image (Right Arrow)'
+                              >
+                                →
+                              </button>
+                            </div>
+                          </div>
+                          <div className='image-preview-body'>
+                            <img src={selectedImageUrl} alt={selectedImageName || 'User image file'} className='image-preview-content' />
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </Panel>
@@ -357,6 +393,7 @@ const EditorComponent = ({
                 isRunning={isRunning}
                 currentLanguage={currentLanguage}
                 suppressRunningOverlay={suppressRunningOverlay}
+                onSaveVisualizationCapture={onSaveVisualizationCapture}
               />
             </Panel>
           </>
@@ -364,13 +401,9 @@ const EditorComponent = ({
       </PanelGroup>
     </div>
 
-    {isTracerGuideMounted && tracerGuide && (
+    {isTracerGuideRendered && tracerGuide && (
       <>
-        <aside
-          className={`tracer-guide-drawer ${isTracerGuideClosing ? 'is-closing' : 'is-open'}`}
-          role='dialog'
-          aria-label='Tracer guide panel'
-        >
+        <aside className={`tracer-guide-drawer${isTracerGuideClosing ? ' is-closing' : ' is-open'}`} role='dialog' aria-label='Tracer guide panel'>
           <div className='tracer-guide-header'>
             <span>{tracerGuide.title} ({tracerGuide.languageLabel})</span>
             <button
@@ -419,9 +452,8 @@ const EditorComponent = ({
                       type='button'
                       className='tracer-guide-line-copy-btn'
                       onClick={() => handleCopySnippet(line.snippet)}
-                      title='Copy to clipboard'
                     >
-                      📋
+                      Copy
                     </button>
                   </div>
                       </>
@@ -434,19 +466,23 @@ const EditorComponent = ({
 
           <div className='tracer-guide-section'>
             <div className='tracer-guide-label'>Common tracer metadata:</div>
-            <div className='tracer-guide-metadata-list'>
-              {tracerGuide.metadata.map((key) => (
-                <span
-                  key={key}
-                  className='tracer-guide-metadata-chip'
-                  onMouseEnter={(event) => updateMetadataTooltip(event, key)}
-                  onMouseMove={(event) => updateMetadataTooltip(event, key)}
-                  onMouseLeave={hideMetadataTooltip}
-                >
-                  {key}
-                </span>
-              ))}
-            </div>
+            <pre className='tracer-guide-inline'>{tracerGuide.metadata.join(', ')}</pre>
+            {tracerGuide.metadataHints && (
+              <div style={{ marginTop: '0.45rem' }}>
+                <div className='tracer-guide-label' style={{ marginBottom: '0.2rem' }}>Possible values:</div>
+                <ul className='tracer-guide-list'>
+                  {tracerGuide.metadata.map((metaKey) => {
+                    const hint = tracerGuide.metadataHints[metaKey];
+                    if (!hint) return null;
+                    return (
+                      <li key={metaKey}>
+                        <strong>{metaKey}</strong>: {hint}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
           </div>
 
           <div className='tracer-guide-section'>
@@ -457,19 +493,6 @@ const EditorComponent = ({
           </div>
 
         </aside>
-        {metadataTooltip && createPortal(
-          <div
-            className='tracer-guide-floating-tooltip'
-            role='tooltip'
-            style={{
-              left: `${metadataTooltip.left}px`,
-              top: `${metadataTooltip.top}px`,
-            }}
-          >
-            {metadataTooltip.text}
-          </div>,
-          document.body
-        )}
       </>
     )}
   </div>

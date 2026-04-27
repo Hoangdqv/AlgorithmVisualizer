@@ -17,6 +17,10 @@ const CodeEditor = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedUserFile, setSelectedUserFile] = useState(null);
   const [isBlankEditorMode, setIsBlankEditorMode] = useState(false);
+  const [selectedImageUrl, setSelectedImageUrl] = useState(null);
+  const [selectedImageName, setSelectedImageName] = useState('');
+  const [imagePreviewIndex, setImagePreviewIndex] = useState(-1);
+  const [imagePreviewList, setImagePreviewList] = useState([]);
   const [autoSaving, setAutoSaving] = useState(false);
   const [languageData, setLanguageData] = useState([]);
   const [stdinValue, setStdinValue] = useState('');
@@ -42,6 +46,14 @@ const CodeEditor = () => {
   const preferredSampleKeyRef = useRef(null);
   
   const activeRunRef = useRef(false);
+  // Image preview performance/state refs:
+  // - cache blob URLs so arrow navigation does not refetch previous images
+  // - track latest request so stale async responses cannot override current selection
+  // - serialize rapid arrow presses with a tiny queue to avoid race conditions
+  const imageObjectUrlCacheRef = useRef(new Map());
+  const imageSelectionRequestRef = useRef(0);
+  const imageNavigationBusyRef = useRef(false);
+  const queuedImageNavigationOffsetRef = useRef(0);
 
   const API_URL = import.meta.env.VITE_API_URL;
 
@@ -50,6 +62,88 @@ const CodeEditor = () => {
     if (lang === 'python') return '# Write your first line of code here!';
     else return '// Write your first line of code here!';
   }, []);
+
+  const isImageFileName = useCallback((name) => {
+    return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name || '');
+  }, []);
+
+  const compareFileNamesNaturally = useCallback((a, b) => {
+    // Natural sort keeps step-2 before step-10 when browsing captures.
+    const first = (a?.file_name || '').toString();
+    const second = (b?.file_name || '').toString();
+    return first.localeCompare(second, undefined, { numeric: true, sensitivity: 'base' });
+  }, []);
+
+  const loadImageBlobUrl = useCallback(async (fileId) => {
+    // Reuse object URLs for already-opened images to reduce navigation latency.
+    const cachedUrl = imageObjectUrlCacheRef.current.get(fileId);
+    if (cachedUrl) {
+      return cachedUrl;
+    }
+
+    const response = await fetch(`${API_URL}/user/files/${fileId}/binary`, {
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image blob (${response.status})`);
+    }
+
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    imageObjectUrlCacheRef.current.set(fileId, objectUrl);
+    return objectUrl;
+  }, [API_URL]);
+
+  const clearImagePreview = useCallback(() => {
+    setSelectedImageUrl(null);
+    setSelectedImageName('');
+    setImagePreviewIndex(-1);
+    setImagePreviewList([]);
+    // Increment request token so older async image loads are ignored.
+    imageSelectionRequestRef.current += 1;
+  }, []);
+
+  const loadImagePreviewListForFile = useCallback(async (activeFile) => {
+    if (!activeFile) {
+      return { index: -1, list: [] };
+    }
+
+    let allFiles = apiCache.current.userFilesData?.files;
+    if (!Array.isArray(allFiles) || allFiles.length === 0) {
+      try {
+        const filesResponse = await fetch(`${API_URL}/user/files`, {
+          credentials: 'include'
+        });
+        if (filesResponse.ok) {
+          const filesData = await filesResponse.json();
+          allFiles = filesData.files || [];
+          apiCache.current.userFilesData = {
+            ...(apiCache.current.userFilesData || {}),
+            files: allFiles,
+          };
+        }
+      } catch (error) {
+        console.error('Error loading files for image navigation:', error);
+      }
+    }
+
+    const activeFolderId = activeFile.folder_id ?? null;
+    const imageFiles = (Array.isArray(allFiles) ? allFiles : [])
+      .filter((file) => (file.folder_id ?? null) === activeFolderId)
+      .filter((file) => Boolean(file.has_binary) || isImageFileName(file.file_name))
+      .sort(compareFileNamesNaturally);
+
+    let imageIndex = imageFiles.findIndex((file) => file.file_id === activeFile.file_id);
+
+    if (imageIndex === -1 && (Boolean(activeFile.has_binary) || isImageFileName(activeFile.file_name))) {
+      const mergedFiles = [...imageFiles, activeFile].sort(compareFileNamesNaturally);
+      imageIndex = mergedFiles.findIndex((file) => file.file_id === activeFile.file_id);
+      return { index: imageIndex, list: mergedFiles };
+    }
+
+    return { index: imageIndex, list: imageFiles };
+  }, [API_URL, apiCache, isImageFileName, compareFileNamesNaturally]);
 
   // Auto-detect whether user file code reads from stdin
   const _codeNeedsInput = (src, lang) => {
@@ -86,6 +180,7 @@ const CodeEditor = () => {
     forceStopExecution();
     setSelectedUserFile(null);
     setIsBlankEditorMode(false);
+    clearImagePreview();
     const codeKey = `${currentLanguage}_${sampleKey}`;
 
     if (apiCache.current.code[codeKey]) {
@@ -116,14 +211,18 @@ const CodeEditor = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentLanguage, API_URL, forceStopExecution]);
+  }, [currentLanguage, API_URL, forceStopExecution, clearImagePreview]);
 
-  const handleUserFileSelect = useCallback((file) => {
+  const handleUserFileSelect = useCallback(async (file) => {
+    // Token for rejecting stale async loads if user navigates quickly.
+    const requestId = imageSelectionRequestRef.current + 1;
+    imageSelectionRequestRef.current = requestId;
     forceStopExecution();
 
     if (!file) {
       setSelectedUserFile(null);
       setIsBlankEditorMode(true);
+      clearImagePreview();
       setCode(getLanguageTemplate(currentLanguage));
       setOutput('');
       setAwaitConsoleInput(false);
@@ -138,11 +237,172 @@ const CodeEditor = () => {
       : 'Python';
 
     const fileContent = typeof file.content === 'string' ? file.content : '';
+    const imageMode = Boolean(file.has_binary) || isImageFileName(file.file_name);
+
+    if (imageMode) {
+      if (file.has_binary) {
+        try {
+          const objectUrl = await loadImageBlobUrl(file.file_id);
+          if (requestId !== imageSelectionRequestRef.current) {
+            return;
+          }
+          setSelectedImageUrl(objectUrl);
+        } catch (error) {
+          console.error('Failed to load image blob preview:', error);
+          if (requestId !== imageSelectionRequestRef.current) {
+            return;
+          }
+          setOutput('Failed to load image preview.');
+          setSelectedImageUrl(null);
+        }
+      } else {
+        setSelectedImageUrl(null);
+        setOutput('Image file detected but no binary blob is available. Please re-capture to regenerate this file.');
+      }
+      setSelectedImageName(file.file_name || 'snapshot.png');
+      setCode('');
+      if (file.has_binary) {
+        setOutput('Image preview mode');
+      }
+      setAwaitConsoleInput(false);
+      return;
+    }
+
+    clearImagePreview();
 
     setCode(fileContent.trim().length > 0 ? fileContent : getLanguageTemplate(langName));
     setOutput('');
     setCurrentLanguage(langName);
-  }, [forceStopExecution, languageData, getLanguageTemplate, currentLanguage]);
+  }, [forceStopExecution, languageData, getLanguageTemplate, currentLanguage, isImageFileName, clearImagePreview, loadImageBlobUrl]);
+
+  useEffect(() => {
+    const imageUrlCache = imageObjectUrlCacheRef.current;
+    return () => {
+      // Revoke all cached object URLs to avoid leaking browser memory.
+      imageUrlCache.forEach((url) => {
+        URL.revokeObjectURL(url);
+      });
+      imageUrlCache.clear();
+    };
+  }, []);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    if (!selectedUserFile || !selectedImageUrl) {
+      setImagePreviewIndex(-1);
+      setImagePreviewList([]);
+      return undefined;
+    }
+
+    const hydrateImageNavigation = async () => {
+      const { index, list } = await loadImagePreviewListForFile(selectedUserFile);
+      if (!isCancelled) {
+        setImagePreviewIndex(index);
+        setImagePreviewList(list);
+      }
+    };
+
+    hydrateImageNavigation();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedUserFile, selectedImageUrl, loadImagePreviewListForFile]);
+
+  useEffect(() => {
+    if (!selectedImageUrl || imagePreviewList.length === 0 || imagePreviewIndex < 0) {
+      return;
+    }
+
+    // Preload neighbors so next/prev arrow feels instant in common cases.
+    const neighborIndices = [imagePreviewIndex - 1, imagePreviewIndex + 1]
+      .filter((index) => index >= 0 && index < imagePreviewList.length);
+
+    neighborIndices.forEach((index) => {
+      const neighborFile = imagePreviewList[index];
+      if (neighborFile?.has_binary) {
+        loadImageBlobUrl(neighborFile.file_id).catch(() => {});
+      }
+    });
+  }, [selectedImageUrl, imagePreviewList, imagePreviewIndex, loadImageBlobUrl]);
+
+  const navigateImagePreview = useCallback(async (offset) => {
+    if (!selectedImageUrl || imagePreviewList.length === 0) {
+      return;
+    }
+
+    if (imageNavigationBusyRef.current) {
+      // Keep only the latest requested direction while current navigation is running.
+      queuedImageNavigationOffsetRef.current = offset;
+      return;
+    }
+
+    imageNavigationBusyRef.current = true;
+
+    try {
+      const currentIndexFromSelectedFile = selectedUserFile
+        ? imagePreviewList.findIndex((file) => file.file_id === selectedUserFile.file_id)
+        : -1;
+      const currentIndex = currentIndexFromSelectedFile >= 0 ? currentIndexFromSelectedFile : imagePreviewIndex;
+
+      if (currentIndex < 0) {
+        return;
+      }
+
+      const targetIndex = currentIndex + offset;
+      if (targetIndex < 0 || targetIndex >= imagePreviewList.length) {
+        return;
+      }
+
+      const targetFile = imagePreviewList[targetIndex];
+      if (!targetFile) {
+        return;
+      }
+
+      await handleUserFileSelect(targetFile);
+    } finally {
+      imageNavigationBusyRef.current = false;
+      const queuedOffset = queuedImageNavigationOffsetRef.current;
+      if (queuedOffset !== 0) {
+        queuedImageNavigationOffsetRef.current = 0;
+        // Process one queued navigation request after the current move settles.
+        navigateImagePreview(queuedOffset);
+      }
+    }
+  }, [selectedImageUrl, imagePreviewList, imagePreviewIndex, selectedUserFile, handleUserFileSelect]);
+
+  useEffect(() => {
+    if (!selectedImageUrl) {
+      return undefined;
+    }
+
+    const handleImageArrowKeys = (event) => {
+      const activeElement = document.activeElement;
+      const tagName = activeElement?.tagName;
+      const isTypingTarget = Boolean(
+        activeElement?.isContentEditable ||
+        tagName === 'INPUT' ||
+        tagName === 'TEXTAREA' ||
+        tagName === 'SELECT',
+      );
+
+      if (isTypingTarget) {
+        return;
+      }
+
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        navigateImagePreview(-1);
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        navigateImagePreview(1);
+      }
+    };
+
+    window.addEventListener('keydown', handleImageArrowKeys);
+    return () => window.removeEventListener('keydown', handleImageArrowKeys);
+  }, [selectedImageUrl, navigateImagePreview]);
 
   useEffect(() => {
     if (!isBlankEditorMode) return;
@@ -230,6 +490,9 @@ const CodeEditor = () => {
 
   // Editor change handler
   const handleEditorChange = (value) => {
+    if (selectedImageUrl) {
+      return;
+    }
     setCode(value || '');
     setAwaitConsoleInput(_codeNeedsInput(value || '', currentLanguage.toLowerCase()));
 
@@ -409,6 +672,14 @@ const CodeEditor = () => {
       // Playground-specific props
       handleUserFileSelect={handleUserFileSelect}
       selectedUserFile={selectedUserFile}
+      // Keep tree highlight in sync when image nav changes selected file.
+      selectedUserFileId={selectedUserFile?.file_id ?? null}
+      selectedImageUrl={selectedImageUrl}
+      selectedImageName={selectedImageName}
+      onImagePreviewPrev={() => navigateImagePreview(-1)}
+      onImagePreviewNext={() => navigateImagePreview(1)}
+      hasPrevImagePreview={imagePreviewIndex > 0}
+      hasNextImagePreview={imagePreviewIndex >= 0 && imagePreviewIndex < imagePreviewList.length - 1}
       autoSaving={autoSaving}
       initialSidebarTab={hasPendingIncomingFile || selectedUserFile ? 'myfiles' : 'samples'}
 

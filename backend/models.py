@@ -16,8 +16,7 @@ class User(db.Model):
     last_login = db.Column(db.DateTime, nullable=True)
     
     # Relationships
-    files = db.relationship('File', backref='user', lazy=True, cascade='all, delete-orphan')
-    closure_entries = db.relationship('ClosureTable', backref='user', lazy=True, cascade='all, delete-orphan')
+    files = db.relationship('File', backref='user', lazy=True, cascade='all, delete-orphan', foreign_keys='File.user_account_id')
     
     def set_password(self, password):
         """Hash and set password"""
@@ -65,23 +64,57 @@ class Language(db.Model):
             'run_cmd': self.run_cmd
         }
 
+class FileSystemItem(db.Model):
+    __tablename__ = 'filesystem_item'
 
-class Folder(db.Model):
-    __tablename__ = 'folder'
-    
-    folder_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    folder_name = db.Column(db.String(255), nullable=False)
+    item_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    item_name = db.Column(db.String(255), nullable=False)
     path = db.Column(db.String(1024), nullable=False)
-    folder_type = db.Column(db.Enum('user-defined', 'sample', name='object_type'), 
-                           default='user-defined', nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.now(), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('user_account.id'), nullable=False)
-    parent_folder_id = db.Column(db.Integer, db.ForeignKey('folder.folder_id', ondelete='CASCADE'), nullable=True)
-    
-    # Relationships
-    user = db.relationship('User', backref='folders')
-    files = db.relationship('File', backref='folder', lazy=True, cascade='all, delete-orphan')
-    
+    item_kind = db.Column(db.Enum('folder', 'file', name='filesystem_item_kind'), nullable=False)
+    item_type = db.Column(db.Enum('user-defined', 'sample', name='object_type'), default='user-defined', nullable=False)
+    user_account_id = db.Column(db.Integer, db.ForeignKey('user_account.id'), nullable=True)
+    parent_item_id = db.Column(db.Integer, db.ForeignKey('filesystem_item.item_id', ondelete='CASCADE'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
+    last_updated = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+
+    parent = db.relationship(
+        'FileSystemItem',
+        remote_side=[item_id],
+        backref=db.backref('children', lazy=True, cascade='all, delete-orphan')
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint('user_account_id', 'parent_item_id', 'item_name', name='uq_item_sibling_name'),
+    )
+
+    __mapper_args__ = {
+        'polymorphic_on': item_kind,
+        'polymorphic_identity': 'item',
+    }
+
+
+class Folder(FileSystemItem):
+    __tablename__ = 'folder'
+
+    folder_id = db.Column(db.Integer, db.ForeignKey('filesystem_item.item_id', ondelete='CASCADE'), primary_key=True)
+
+    # Compatibility aliases for existing route/helper naming.
+    folder_name = db.synonym('item_name')
+    folder_type = db.synonym('item_type')
+    user_id = db.synonym('user_account_id')
+    parent_folder_id = db.synonym('parent_item_id')
+
+    user = db.relationship('User', backref='folders', foreign_keys='Folder.user_account_id')
+    files = db.relationship(
+        'File',
+        primaryjoin='Folder.item_id == foreign(File.parent_item_id)',
+        foreign_keys='File.parent_item_id',
+        back_populates='folder',
+        overlaps='children,parent',
+        lazy=True,
+        cascade='all, delete-orphan'
+    )
+
     # Closure table relationships
     ancestors = db.relationship(
         'ClosureTable',
@@ -95,7 +128,11 @@ class Folder(db.Model):
         backref='ancestor_folder',
         cascade='all, delete-orphan'
     )
-    
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'folder',
+    }
+
     def to_dict(self, include_files=False):
         """Return folder as dictionary"""
         result = {
@@ -107,28 +144,40 @@ class Folder(db.Model):
             'user_id': self.user_id,
             'parent_folder_id': self.parent_folder_id
         }
-        
+
         if include_files:
             result['files'] = [f.to_dict() for f in self.files]
-        
+
         return result
 
 
-class File(db.Model):
+class File(FileSystemItem):
     __tablename__ = 'file'
-    
-    file_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    file_name = db.Column(db.String(255), nullable=False)
-    folder_id = db.Column(db.Integer, db.ForeignKey('folder.folder_id', ondelete='CASCADE'), nullable=True)  # NULL = root level
-    path = db.Column(db.String(1024), nullable=False)
-    file_type = db.Column(db.Enum('user-defined', 'sample', name='object_type'), 
-                         default='user-defined', nullable=False)
-    user_account_id = db.Column(db.Integer, db.ForeignKey('user_account.id'), nullable=True)  # NULL for samples
+
+    file_id = db.Column(db.Integer, db.ForeignKey('filesystem_item.item_id', ondelete='CASCADE'), primary_key=True)
     content = db.Column(db.Text, nullable=True)
+    content_blob = db.Column(db.LargeBinary, nullable=True)
+    content_mime = db.Column(db.String(100), nullable=True)
     lang_id = db.Column(db.Integer, db.ForeignKey('language.lang_id'), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.now(), nullable=False)    
-    last_updated = db.Column(db.DateTime, onupdate=datetime.now(), nullable=False)
-    
+
+    # Compatibility aliases for existing route/helper naming.
+    file_name = db.synonym('item_name')
+    file_type = db.synonym('item_type')
+    folder_id = db.synonym('parent_item_id')
+
+    folder = db.relationship(
+        'Folder',
+        primaryjoin='File.parent_item_id == remote(Folder.item_id)',
+        foreign_keys='File.parent_item_id',
+        back_populates='files',
+        uselist=False,
+        overlaps='children,parent'
+    )
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'file',
+    }
+
     def to_dict(self, include_content=True):
         """Return file as dictionary"""
         result = {
@@ -139,33 +188,33 @@ class File(db.Model):
             'file_type': self.file_type,
             'user_account_id': self.user_account_id,
             'lang_id': self.lang_id,
+            'has_binary': self.content_blob is not None,
+            'content_mime': self.content_mime,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'last_updated': self.last_updated.isoformat() if self.last_updated else None
         }
-        
+
         if include_content:
             result['content'] = self.content
-        
+
         return result
 
 
 class ClosureTable(db.Model):
     __tablename__ = 'closure_table'
     
-    ancestor = db.Column(db.Integer, db.ForeignKey('folder.folder_id', ondelete='CASCADE'), 
+    ancestor = db.Column(db.Integer, db.ForeignKey('filesystem_item.item_id', ondelete='CASCADE'), 
                         primary_key=True, nullable=False)
-    descendant = db.Column(db.Integer, db.ForeignKey('folder.folder_id', ondelete='CASCADE'), 
+    descendant = db.Column(db.Integer, db.ForeignKey('filesystem_item.item_id', ondelete='CASCADE'), 
                           primary_key=True, nullable=False)
     depth = db.Column(db.Integer, nullable=False)
-    user_account_id = db.Column(db.Integer, db.ForeignKey('user_account.id', ondelete='CASCADE'), nullable=True)
     
     def to_dict(self):
         """Return closure entry as dictionary"""
         return {
             'ancestor': self.ancestor,
             'descendant': self.descendant,
-            'depth': self.depth,
-            'user_account_id': self.user_account_id
+            'depth': self.depth
         }
 
 
@@ -175,7 +224,7 @@ class ResetTokens(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user_account.id', ondelete='CASCADE'), nullable=False)
     token = db.Column(db.String(255), unique=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.now(), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
     expires_at = db.Column(db.DateTime, nullable=False)
     
     user = db.relationship('User', backref='reset_tokens')

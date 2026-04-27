@@ -430,8 +430,6 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
           width={viewBox.width}
           height={viewBox.height} 
           fill="none" 
-          stroke="#ccc" 
-          strokeWidth="2"
           pointerEvents="none"
         />
         <g transform={`translate(${panOffset.x}, ${panOffset.y}) scale(${zoom})`}>
@@ -482,13 +480,6 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
       <div className="tree-visualization-wrapper">
         <div className='tree-visualization-container'>
           <div className="tree-visualization-left" style={{ position: 'relative' }}>
-            <button 
-              onClick={fitToScreen}
-              className='fit-to-screen-button'
-              title="Fit tree to screen"
-            >
-              <i className="fas fa-expand"></i>
-            </button>
             {renderTree()}
           </div>
           <div className="tree-visualization-right">

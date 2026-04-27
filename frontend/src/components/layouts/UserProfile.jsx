@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../../context/useAuth';
@@ -34,10 +34,14 @@ export default function UserProfile() {
   const [userFolders, setUserFolders] = useState([]);
   const [userFiles, setUserFiles] = useState([]);
   const [selectedFileId, setSelectedFileId] = useState(null);
+  // Batch delete mode for file directory in profile page.
+  const [isBatchDeleteMode, setIsBatchDeleteMode] = useState(false);
+  // Holds selected file IDs while batch mode is active.
+  const [selectedBatchFileIds, setSelectedBatchFileIds] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [contextMenu, setContextMenu] = useState(null);
   const [modal, setModal] = useState(null);
-  const [userFilesCache, setUserFilesCache] = useState({
+  const userFilesCacheRef = useRef({
     folders: null,
     files: null,
   });
@@ -99,9 +103,9 @@ export default function UserProfile() {
   };
 
   const loadUserFiles = useCallback(async (forceReload = false, silent = false) => {
-    if (!forceReload && userFilesCache.folders && userFilesCache.files) {
-      setUserFolders(userFilesCache.folders);
-      setUserFiles(userFilesCache.files);
+    if (!forceReload && userFilesCacheRef.current.folders && userFilesCacheRef.current.files) {
+      setUserFolders(userFilesCacheRef.current.folders);
+      setUserFiles(userFilesCacheRef.current.files);
       return;
     }
 
@@ -154,7 +158,7 @@ export default function UserProfile() {
       }
 
       setUserFiles(allFiles);
-      setUserFilesCache({ folders: allFolders, files: allFiles });
+      userFilesCacheRef.current = { folders: allFolders, files: allFiles };
     } catch (loadUserFilesError) {
       console.error('Error loading user files:', loadUserFilesError);
     } finally {
@@ -162,13 +166,19 @@ export default function UserProfile() {
         setFilesLoading(false);
       }
     }
-  }, [API_URL, userFilesCache]);
+  }, [API_URL]);
 
   useEffect(() => {
     if (user) {
       loadUserFiles();
     }
   }, [user, loadUserFiles]);
+
+  useEffect(() => {
+    if (!isBatchDeleteMode) {
+      setSelectedBatchFileIds([]);
+    }
+  }, [isBatchDeleteMode]);
 
   const filteredUserData = useMemo(() => {
     if (!searchQuery.trim()) {
@@ -331,9 +341,13 @@ export default function UserProfile() {
       if (response.ok) {
         loadUserFiles(true, true);
         setModal(null);
+      } else {
+        const data = await response.json();
+        alert(`Error: ${data.error || 'Failed to create file'}`);
       }
     } catch (createFileError) {
       console.error('Error creating file:', createFileError);
+      alert('Failed to create file. Please try again.');
     }
   };
 
@@ -342,7 +356,7 @@ export default function UserProfile() {
     userFiles,
     userFolders,
     onAfterMove: async () => {
-      setUserFilesCache({ folders: null, files: null });
+      userFilesCacheRef.current = { folders: null, files: null };
       await loadUserFiles(true, true);
     },
   });
@@ -379,6 +393,84 @@ export default function UserProfile() {
       }
     } catch (deleteError) {
       console.error('Error deleting:', deleteError);
+    }
+  };
+
+  const toggleBatchDeleteMode = () => {
+    // Toggle select mode and close any context menu to avoid conflicting actions.
+    setIsBatchDeleteMode((prev) => !prev);
+    setContextMenu(null);
+  };
+
+  const handleBatchFileToggle = (fileId) => {
+    // Add/remove one file id from current batch selection.
+    setSelectedBatchFileIds((prev) => (
+      prev.includes(fileId)
+        ? prev.filter((id) => id !== fileId)
+        : [...prev, fileId]
+    ));
+  };
+
+  const handleBatchDelete = async () => {
+    const fileCount = selectedBatchFileIds.length;
+    if (fileCount === 0) {
+      alert('No files selected. Select files first, then click Delete selected.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete ${fileCount} selected file${fileCount === 1 ? '' : 's'}? This cannot be undone.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      // Run deletes in parallel; partial failures are reported to the user.
+      const deleteResults = await Promise.allSettled(
+        selectedBatchFileIds.map((fileId) => (
+          fetch(`${API_URL}/user/files/${fileId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+          })
+        ))
+      );
+
+      const successfulDeletes = [];
+      let failedCount = 0;
+
+      deleteResults.forEach((result, index) => {
+        if (result.status === 'fulfilled' && result.value.ok) {
+          successfulDeletes.push(selectedBatchFileIds[index]);
+          return;
+        }
+        failedCount += 1;
+      });
+
+      if (successfulDeletes.length > 0) {
+        const deletedSet = new Set(successfulDeletes);
+        // Invalidate cached directory and reload latest server state.
+        userFilesCacheRef.current = { folders: null, files: null };
+        await loadUserFiles(true, true);
+
+        if (selectedFileId && deletedSet.has(selectedFileId)) {
+          setSelectedFileId(null);
+        }
+
+        // Remove deleted files from selection and return to normal browsing mode.
+        setSelectedBatchFileIds((prev) => prev.filter((fileId) => !deletedSet.has(fileId)));
+        setIsBatchDeleteMode(false);
+      }
+
+      if (failedCount > 0) {
+        alert(`Deleted ${successfulDeletes.length} file(s). ${failedCount} file(s) could not be deleted.`);
+      } else {
+        alert(`Deleted ${successfulDeletes.length} file(s).`);
+      }
+    } catch (error) {
+      console.error('Error during batch delete:', error);
+      alert('Batch delete failed. Please try again.');
     }
   };
 
@@ -700,6 +792,7 @@ export default function UserProfile() {
                 className="icon-button"
                 onClick={() => setModal({ type: 'create-folder', parentId: null })}
                 title="New Folder"
+                disabled={isBatchDeleteMode}
               >
                 📁 New folder
               </button>
@@ -707,10 +800,31 @@ export default function UserProfile() {
                 className="icon-button"
                 onClick={() => setModal({ type: 'create-file', folderId: null })}
                 title="New File"
+                disabled={isBatchDeleteMode}
               >
                 📄 New file
               </button>
+              <button
+                className={`icon-button ${isBatchDeleteMode ? 'active' : ''}`}
+                onClick={toggleBatchDeleteMode}
+                title="Select multiple files to delete"
+              >
+                {isBatchDeleteMode ? '✕ Cancel select' : '☑ Select files'}
+              </button>
+              <button
+                className="icon-button icon-button-danger"
+                onClick={handleBatchDelete}
+                title="Delete selected files"
+                disabled={!isBatchDeleteMode || selectedBatchFileIds.length === 0}
+              >
+                🗑 Delete selected ({selectedBatchFileIds.length})
+              </button>
             </div>
+            {isBatchDeleteMode && (
+              <div className="batch-selection-status">
+                Select files using checkboxes, then click Delete selected.
+              </div>
+            )}
             <hr style={{ borderColor: '#333', margin: '1rem 0' }} />
 
             {filesLoading ? (
@@ -727,6 +841,9 @@ export default function UserProfile() {
                     onMoveFile={handleMoveFile}
                     onMoveFolder={handleMoveFolder}
                     selectedFileId={selectedFileId}
+                    isBatchSelectMode={isBatchDeleteMode}
+                    selectedBatchFileIds={selectedBatchFileIds}
+                    onBatchFileToggle={handleBatchFileToggle}
                     languages={languages}
                     depth={0}
                   />

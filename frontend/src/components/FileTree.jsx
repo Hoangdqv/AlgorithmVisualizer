@@ -11,6 +11,9 @@ const FileTree = ({
   onMoveFile,
   onMoveFolder,
   selectedFileId,
+  isBatchSelectMode = false,
+  selectedBatchFileIds = [],
+  onBatchFileToggle,
   languages,
   depth = 0,
   parentFolderId = null,
@@ -31,6 +34,7 @@ const FileTree = ({
   const dragContext = dragContextProp || localDragContext;
   const setDragContext = setDragContextProp || setLocalDragContext;
   const { dragOverTarget, isDragging, dragSource } = dragContext;
+  const selectedBatchSet = new Set(selectedBatchFileIds);
   
   // Dynamic file extension mapper
 
@@ -52,6 +56,13 @@ const FileTree = ({
 
   const handleFileClick = (file, e) => {
     e.stopPropagation();
+    if (isBatchSelectMode) {
+      // In batch mode, clicking toggles checkbox-style selection instead of opening file.
+      if (onBatchFileToggle) {
+        onBatchFileToggle(file.file_id);
+      }
+      return;
+    }
     if (onFileClick) {
       onFileClick(file.file_id);
     }
@@ -60,12 +71,23 @@ const FileTree = ({
   const handleContextMenu = (e, item, type) => {
     e.preventDefault();
     e.stopPropagation();
+    // Disable file context actions in batch mode to avoid mixed interactions.
+    if (isBatchSelectMode && type === 'file') {
+      return;
+    }
     if (onContextMenu) {
       onContextMenu(e, item, type);
     }
   };
 
   const handleLanguages = (file) => {
+    const fileName = file.file_name;
+    // Get the extension
+    const extFormat_length = fileName.lastIndexOf('.');
+    if (extFormat_length > 0 && extFormat_length < fileName.length - 1) {
+      return fileName.slice(extFormat_length + 1).toLowerCase();
+    }
+
     if (!languages) return null;
     const lang = languages.find(lang => lang.lang_id === file.lang_id);
     return lang ? getFileExtension(lang.language) : 'txt';
@@ -102,6 +124,7 @@ const FileTree = ({
     }
     event.dataTransfer.setDragImage(dragImageRef.current, 0, 0);
 
+    //Current drag source, its info and dragging over what item
     setDragContext(prev => ({
       ...prev,
       isDragging: true,
@@ -110,6 +133,7 @@ const FileTree = ({
     }));
   };
 
+  // Clear drag source
   const handleDragEnd = () => {
     setDragContext(prev => ({
       ...prev,
@@ -170,6 +194,7 @@ const FileTree = ({
     event.preventDefault();
     event.stopPropagation();
 
+    //Get the drag data when dropped
     const payload = tryGetDragPayload(event);
     setDragContext(prev => ({
       ...prev,
@@ -180,7 +205,6 @@ const FileTree = ({
     if (!payload) {
       return;
     }
-
     if (payload.type === 'file' && payload.parentFolderId === (targetId ?? null)) {
       return;
     }
@@ -211,6 +235,7 @@ const FileTree = ({
       className={`file-tree ${!isDragSourceTarget('folder', parentFolderId) && dragOverTarget === (parentFolderId ? `folder:${parentFolderId}` : 'root:root') ? 'drop-target' : ''}`}
       onDragEnterCapture={handleTreeDragEnterCapture}
       onDragOverCapture={handleTreeDragOverCapture}
+      // Does parentID exist? if yes, it's a folder target, if no, it's the root target
       onDragOver={(e) => handleDragOverTarget(e, parentFolderId ? 'folder' : 'root', parentFolderId)}
       onDrop={(e) => handleDropOnTarget(e, parentFolderId ? 'folder' : 'root', parentFolderId)}
       onDragLeave={(e) => handleDragLeaveTarget(e, parentFolderId ? 'folder' : 'root', parentFolderId)}
@@ -228,6 +253,7 @@ const FileTree = ({
           onDragLeave={(e) => handleDragLeaveTarget(e, 'folder', folder.folder_id)}
         >
           <div
+          //If dragging and hovering, show drop hint
             className={`tree-item folder-item ${!isDragSourceTarget('folder', folder.folder_id) && dragOverTarget === `folder:${folder.folder_id}` ? 'drop-target' : ''}`}
             style={{ paddingLeft: `${indent}px` }}
             title={folder.folder_name}
@@ -266,6 +292,9 @@ const FileTree = ({
               onMoveFile={onMoveFile}
               onMoveFolder={onMoveFolder}
               selectedFileId={selectedFileId}
+              isBatchSelectMode={isBatchSelectMode}
+              selectedBatchFileIds={selectedBatchFileIds}
+              onBatchFileToggle={onBatchFileToggle}
               languages={languages}
               depth={depth + 1}
               parentFolderId={folder.folder_id}
@@ -280,15 +309,27 @@ const FileTree = ({
               {folder.files.map((file) => (
                 <div
                   key={`file-${file.file_id}`}
-                  className={`tree-item file-item ${selectedFileId === file.file_id ? 'selected' : ''}`}
+                  className={`tree-item file-item ${isBatchSelectMode ? (selectedBatchSet.has(file.file_id) ? 'selected batch-selected' : '') : (selectedFileId === file.file_id ? 'selected' : '')}`}
                   style={{ paddingLeft: `${fileIndent}px` }}
                   title={file.file_name}
                   onClick={(e) => handleFileClick(file, e)}
                   onContextMenu={(e) => handleContextMenu(e, file, 'file')}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, 'file', file)}
-                  onDragEnd={handleDragEnd}
+                  draggable={!isBatchSelectMode}
+                  onDragStart={(e) => !isBatchSelectMode && handleDragStart(e, 'file', file)}
+                  onDragEnd={() => !isBatchSelectMode && handleDragEnd()}
                 >
+                  {/* If batch select mode is enabled, show checkboxes */}
+                  {/* Drag states are not available in batch select mode */}
+                  {isBatchSelectMode && (
+                    <input
+                      type="checkbox"
+                      className="file-batch-checkbox"
+                      checked={selectedBatchSet.has(file.file_id)}
+                      onChange={() => onBatchFileToggle && onBatchFileToggle(file.file_id)}
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label={`Select ${file.file_name}`}
+                    />
+                  )}
                   <span className="file-icon">📄</span>
                   <span className="item-name" title={file.file_name}>{file.file_name}</span>
                   <span className="file-language">.{handleLanguages(file)}</span>
@@ -303,15 +344,25 @@ const FileTree = ({
       {depth === 0 && files.map((file) => (
         <div
           key={`file-${file.file_id}`}
-          className={`tree-item file-item ${selectedFileId === file.file_id ? 'selected' : ''}`}
+          className={`tree-item file-item ${isBatchSelectMode ? (selectedBatchSet.has(file.file_id) ? 'selected batch-selected' : '') : (selectedFileId === file.file_id ? 'selected' : '')}`}
           style={{ paddingLeft: `${indent}px` }}
           title={file.file_name}
           onClick={(e) => handleFileClick(file, e)}
           onContextMenu={(e) => handleContextMenu(e, file, 'file')}
-          draggable
-          onDragStart={(e) => handleDragStart(e, 'file', file)}
-          onDragEnd={handleDragEnd}
+          draggable={!isBatchSelectMode}
+          onDragStart={(e) => !isBatchSelectMode && handleDragStart(e, 'file', file)}
+          onDragEnd={() => !isBatchSelectMode && handleDragEnd()}
         >
+          {isBatchSelectMode && (
+            <input
+              type="checkbox"
+              className="file-batch-checkbox"
+              checked={selectedBatchSet.has(file.file_id)}
+              onChange={() => onBatchFileToggle && onBatchFileToggle(file.file_id)}
+              onClick={(e) => e.stopPropagation()}
+              aria-label={`Select ${file.file_name}`}
+            />
+          )}
           <span className="file-icon">📄</span>
           <span className="item-name" title={file.file_name}>{file.file_name}</span>
           <span className="file-language">.{handleLanguages(file)}</span>

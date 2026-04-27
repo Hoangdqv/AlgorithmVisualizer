@@ -18,7 +18,7 @@ import { PublicOnlyRoute, ProtectedRoute, AdminRoute } from './context/RouteGuar
 
 const AppRoutes = () => {
   return (
-    <div className="app-layout">
+    <div className="app-layout hidden-scrollbar">
       <NavBar />
       <div className='container'>
         <Routes>

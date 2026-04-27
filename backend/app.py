@@ -1480,8 +1480,7 @@ def get_folder_tree_route(folder_id):
 def create_folder():
     """Create a new folder"""
     from closure_table_helpers import create_folder_with_closure
-    from models import Folder
-    from models import ClosureTable
+    from models import Folder, FileSystemItem
 
     
     user_id = session.get('user_id')
@@ -1496,36 +1495,14 @@ def create_folder():
         return jsonify({'error': 'Folder name is required'}), 400
     
     try:
-        # Check for duplicate folder name in the same parent
-        if parent_folder_id:
-            # Check siblings in parent folder
-            existing = Folder.query.filter_by(
-                folder_name=folder_name,
-                user_id=user_id
-            ).join(
-                ClosureTable,
-                ClosureTable.descendant == Folder.folder_id
-            ).filter(
-                ClosureTable.ancestor == parent_folder_id,
-                ClosureTable.depth == 1
-            ).first()
-            
-            if existing:
-                return jsonify({'error': f'A folder named "{folder_name}" already exists in this location'}), 409
-        else:
-            # Check root level folders
-            existing = Folder.query.filter_by(
-                folder_name=folder_name,
-                user_id=user_id
-            ).outerjoin(
-                ClosureTable,
-                ClosureTable.descendant == Folder.folder_id
-            ).filter(
-                ClosureTable.ancestor == None
-            ).first()
-            
-            if existing:
-                return jsonify({'error': f'A folder named "{folder_name}" already exists at root level'}), 409
+        # Check duplicate item name (folder or file) in target parent.
+        existing = FileSystemItem.query.filter_by(
+            item_name=folder_name,
+            user_account_id=user_id,
+            parent_item_id=parent_folder_id
+        ).first()
+        if existing:
+            return jsonify({'error': f'An item named "{folder_name}" already exists in this location'}), 409
         
         # Build path
         if parent_folder_id:
@@ -1561,7 +1538,7 @@ def create_folder():
 @app.route('/api/user/folders/<int:folder_id>', methods=['PUT'])
 def update_folder(folder_id):
     """Rename a folder"""
-    from models import Folder
+    from models import Folder, FileSystemItem
     
     user_id = session.get('user_id')
     if not user_id:
@@ -1579,6 +1556,17 @@ def update_folder(folder_id):
         return jsonify({'error': 'Folder not found'}), 404
     
     try:
+        # Prevent duplicate item names in the same parent folder.
+        duplicate = FileSystemItem.query.filter(
+            FileSystemItem.user_account_id == user_id,
+            FileSystemItem.parent_item_id == folder.parent_folder_id,
+            FileSystemItem.item_name == new_name,
+            FileSystemItem.item_id != folder.folder_id
+        ).first()
+
+        if duplicate:
+            return jsonify({'error': f'An item named "{new_name}" already exists in this location'}), 409
+
         # Update folder name and path
         old_path = folder.path
         folder.folder_name = new_name
@@ -1706,7 +1694,7 @@ def get_file(file_id):
 @app.route('/api/user/files', methods=['POST'])
 def create_file():
     """Create a new file"""
-    from models import File, Language, Folder
+    from models import File, Language, Folder, FileSystemItem
     from datetime import datetime
     
     user_id = session.get('user_id')
@@ -1721,24 +1709,24 @@ def create_file():
     
     if not file_name:
         return jsonify({'error': 'File name is required'}), 400
+    if language_id is None:
+        return jsonify({'error': 'language_id is required'}), 400
     
     try:
-        # Check for duplicate file name in the same folder
-        if folder_id:
-            existing = File.query.filter_by(
-                file_name=file_name,
-                folder_id=folder_id,
-                user_account_id=user_id
-            ).first()
-        else:
-            existing = File.query.filter_by(
-                file_name=file_name,
-                folder_id=None,
-                user_account_id=user_id
-            ).first()
-        
+        # Validate language exists before insert.
+        language = Language.query.get(language_id)
+        if not language:
+            return jsonify({'error': 'Invalid language_id'}), 400
+
+        # Check duplicate item name (folder or file) in target parent.
+        existing = FileSystemItem.query.filter_by(
+            item_name=file_name,
+            user_account_id=user_id,
+            parent_item_id=folder_id
+        ).first()
+
         if existing:
-            return jsonify({'error': f'A file named "{file_name}" already exists in this location'}), 409
+            return jsonify({'error': f'An item named "{file_name}" already exists in this location'}), 409
         
         
         # Build path
@@ -1760,6 +1748,8 @@ def create_file():
             file_type='user-defined',
             user_account_id=user_id,
             content=content,
+            content_blob=None,
+            content_mime=None,
             lang_id=language_id,
             created_at=datetime.now(),
             last_updated=datetime.now()
@@ -1780,7 +1770,7 @@ def create_file():
 @app.route('/api/user/files/<int:file_id>', methods=['PUT'])
 def update_file(file_id):
     """Update file content, rename file, or move file"""
-    from models import File, Folder
+    from models import File, Folder, FileSystemItem
     from datetime import datetime
     
     user_id = session.get('user_id')
@@ -1812,20 +1802,22 @@ def update_file(file_id):
 
         new_name = data.get('file_name', file.file_name)
 
-        # Prevent duplicate file names in the destination folder (or root).
-        duplicate = File.query.filter(
-            File.user_account_id == user_id,
-            File.folder_id.is_(None) if target_folder_id is None else File.folder_id == target_folder_id,
-            File.file_name == new_name,
-            File.file_id != file.file_id
+        # Prevent duplicate item names in the destination folder (or root).
+        duplicate = FileSystemItem.query.filter(
+            FileSystemItem.user_account_id == user_id,
+            FileSystemItem.parent_item_id == target_folder_id,
+            FileSystemItem.item_name == new_name,
+            FileSystemItem.item_id != file.file_id
         ).first()
 
         if duplicate:
-            return jsonify({'error': f'A file named "{new_name}" already exists in this location'}), 409
+            return jsonify({'error': f'An item named "{new_name}" already exists in this location'}), 409
 
         # Update content if provided
         if 'content' in data:
             file.content = data['content']
+            file.content_blob = None
+            file.content_mime = None
         
         # Update name/folder/path as a single operation to keep path consistent.
         file.file_name = new_name
@@ -1846,6 +1838,117 @@ def update_file(file_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/user/files/upload-image', methods=['POST'])
+def upload_user_image_file():
+    """Upload an image file directly as binary blob"""
+    from models import File, Language, Folder, FileSystemItem
+    from datetime import datetime
+
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    upload = request.files.get('file')
+    file_name = request.form.get('file_name')
+    folder_id_raw = request.form.get('folder_id')
+    language_id_raw = request.form.get('language_id')
+
+    folder_id = int(folder_id_raw) if folder_id_raw not in (None, '', 'null') else None
+    language_id = int(language_id_raw) if language_id_raw not in (None, '') else None
+
+    if not upload:
+        return jsonify({'error': 'Image file is required'}), 400
+    if not file_name:
+        return jsonify({'error': 'File name is required'}), 400
+    if language_id is None:
+        return jsonify({'error': 'language_id is required'}), 400
+
+    mime_type = upload.mimetype or 'application/octet-stream'
+    if not mime_type.startswith('image/'):
+        return jsonify({'error': 'Only image uploads are supported for this route'}), 400
+
+    # Return of read() is a bytes object and store into content_blob in DB
+    blob_content = upload.read()
+    if not blob_content:
+        return jsonify({'error': 'Uploaded image is empty'}), 400
+
+    try:
+        language = Language.query.get(language_id)
+        if not language:
+            return jsonify({'error': 'Invalid language_id'}), 400
+
+        existing = FileSystemItem.query.filter_by(
+            item_name=file_name,
+            user_account_id=user_id,
+            parent_item_id=folder_id
+        ).first()
+        if existing:
+            return jsonify({'error': f'An item named "{file_name}" already exists in this location'}), 409
+
+        if folder_id:
+            folder = Folder.query.get(folder_id)
+            if not folder:
+                return jsonify({'error': 'Folder not found'}), 404
+            if folder.user_id != user_id:
+                return jsonify({'error': 'Access denied'}), 403
+            path = f"{folder.path}/{file_name}"
+        else:
+            path = f"/{file_name}"
+
+        new_file = File(
+            file_name=file_name,
+            folder_id=folder_id,
+            path=path,
+            file_type='user-defined',
+            user_account_id=user_id,
+            content=None,
+            content_blob=blob_content,
+            content_mime=mime_type,
+            lang_id=language_id,
+            created_at=datetime.now(),
+            last_updated=datetime.now(),
+        )
+
+        db.session.add(new_file)
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Image file uploaded successfully',
+            'file': new_file.to_dict(include_content=False)
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/user/files/<int:file_id>/binary', methods=['GET'])
+def get_file_binary(file_id):
+    """Get binary file content for user-owned files"""
+    from models import File
+
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    file = File.query.filter_by(
+        file_id=file_id,
+        user_account_id=user_id
+    ).first()
+
+    if not file:
+        return jsonify({'error': 'File not found'}), 404
+    if not file.content_blob:
+        return jsonify({'error': 'No binary content available for this file'}), 404
+
+    return Response(
+        file.content_blob,
+        mimetype=file.content_mime or 'application/octet-stream',
+        headers={
+            'Content-Disposition': f'inline; filename="{file.file_name}"'
+        }
+    )
 
 
 @app.route('/api/user/files/<int:file_id>', methods=['DELETE'])

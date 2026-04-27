@@ -10,10 +10,10 @@ export default function NavBar() {
 
   return (
     <div className='navbar'>
-      <header>
+      <header className='navbar-header'>
         <h1>My Application</h1>
       </header>
-      <ul>
+      <ul className='navbar-links'>
         <Link to='/home'><li>Home</li></Link>
         <Link to='/algorithms'><li>Algorithms</li></Link>
         <Link to='/playground'><li>Code Editor</li></Link>
@@ -25,15 +25,15 @@ export default function NavBar() {
       
         <>
           {user ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem'}}>
+            <div className='navbar-auth navbar-auth-user'>
               <div>
-                <span style={{ borderRadius: '5px', boxSizing: 'border-box'}}>Welcome, {user.username}!</span>
+                <span className='navbar-welcome'>Welcome, {user.username}!</span>
               </div>
               <Link to='/profile' className='sign-in-btn'>Profile</Link>
               <a className="logout-btn" href='javascript:void(0)' onClick={handleLogout}>Logout</a>
             </div>
           ) : (
-            <div style={{ display: 'flex', gap: '2rem' }}>
+            <div className='navbar-auth navbar-auth-guest'>
               <Link to='/login' className='sign-in-btn'>Login</Link>
               <Link to='/signup' className='sign-up-btn'>Sign Up</Link>
             </div>

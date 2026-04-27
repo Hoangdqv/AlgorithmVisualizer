@@ -18,11 +18,11 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
-  const [graphState, resetGraphState] = useState(false);
-  const [autoFit, setAutoFit] = useState(false);
+  const [autoFitPending, setAutoFitPending] = useState(false);
   const svgRef = useRef(null);
   const isDraggingRef = useRef(false);
   const isPanningRef = useRef(false);
+  const lastLayoutOperationRef = useRef(0);
 
   const radius = 150;
   const centerX = 200; // Center of 400x400 viewBox
@@ -35,8 +35,8 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
     height: 400
   }), []);
 
-  // Function to calculate initial positions in a circle layout
-  const calculateInitialPositions = useCallback((nodeCount) => {
+  // Default layout strategy.
+  const calculateCirclePositions = useCallback((nodeCount) => {
     if (nodeCount === 0) return {};
 
     const positions = {};
@@ -49,24 +49,62 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
     return positions;
   }, []);
 
+  // Random layout with minimum spacing.
+  const calculateRandomPositions = useCallback((nodeCount) => {
+    if (nodeCount === 0) return {};
+
+    const positions = {};
+    // Minimum distance between nodes to avoid overlap
+    const minDistance = 95;
+    // Min x/y coordinate
+    const minBound = viewBox.minX + 30;
+    // Max x/y coordinate
+    const maxBound = viewBox.minX + viewBox.width - minBound;
+
+    for (let i = 0; i < nodeCount; i++) {
+      let chosen = null;
+
+      for (let attempt = 0; attempt < 50; attempt += 1) {
+        const candidate = {
+          x: minBound + Math.random() * (maxBound - minBound),
+          y: minBound + Math.random() * (maxBound - minBound),
+        };
+        const farEnough = Object.values(positions).every((pos) => (
+          Math.hypot(pos.x - candidate.x, pos.y - candidate.y) >= minDistance
+        ));
+        if (farEnough) {
+          chosen = candidate;
+          break;
+        }
+      }
+
+      // Fallback to radial spread if random attempts overlap too much.
+      if (!chosen) {
+        const angle = (i * 2 * Math.PI) / Math.max(nodeCount, 1);
+        chosen = {
+          x: centerX + (radius - 25) * Math.cos(angle),
+          y: centerY + (radius - 25) * Math.sin(angle),
+        };
+      }
+
+      positions[i] = chosen;
+    }
+    return positions;
+  }, [centerX, centerY, radius]);
+
   // Initialize/update node positions
   useEffect(() => {
     const nodeCount = graphData.length;
     updateNodePositions((prev) => {
-      if (graphState) {
-        resetGraphState(false);
-        return calculateInitialPositions(nodeCount);
-      }
-
       const prevNodeIds = new Set(Object.keys(prev).map((id) => parseInt(id)));
       const newNodeIds = new Set(Array.from({ length: nodeCount }, (_, i) => i));
       const hasNewNodes = Array.from(newNodeIds).some((id) => !prevNodeIds.has(id));
 
       if (hasNewNodes || Object.keys(prev).length === 0) {
         if (hasNewNodes) {
-          setAutoFit(true);
+          setAutoFitPending(true);
         }
-        return calculateInitialPositions(nodeCount);
+        return calculateCirclePositions(nodeCount);
       }
 
       const cleaned = { ...prev };
@@ -77,7 +115,33 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
       });
       return cleaned;
     });
-  }, [graphData.length, calculateInitialPositions, graphState]);
+  }, [graphData, calculateCirclePositions]);
+
+  const randomizeLayout = useCallback(() => {
+    const now = Date.now();
+    if (now - lastLayoutOperationRef.current < 120) {
+      return;
+    }
+    lastLayoutOperationRef.current = now;
+
+    const nodeCount = graphData.length;
+    if (nodeCount === 0) return;
+    updateNodePositions(() => {
+      return calculateRandomPositions(nodeCount);
+    });
+  }, [graphData, calculateRandomPositions]);
+
+  const resetToDefaultCircularLayout = useCallback(() => {
+    const now = Date.now();
+    if (now - lastLayoutOperationRef.current < 120) {
+      return;
+    }
+    lastLayoutOperationRef.current = now;
+
+    const nodeCount = graphData.length;
+    updateNodePositions(() => calculateCirclePositions(nodeCount));
+    setAutoFitPending(true);
+  }, [graphData.length, calculateCirclePositions]);
 
   const getSVGCoordinates = (e) => {
     if (!svgRef.current) return { x: 0, y: 0 };
@@ -263,20 +327,21 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
   // Expose resetPositions to parent component
   useImperativeHandle(ref, () => ({
     resetPositions: () => {
-      resetGraphState(true);
-      setPanOffset({ x: 0, y: 0 });
-      setZoom(1);
+      resetToDefaultCircularLayout();
     },
     fit: () => {
       fitToScreen();
+    },
+    random: () => {
+      randomizeLayout();
     }
-  }), [fitToScreen]);
+  }), [fitToScreen, randomizeLayout, resetToDefaultCircularLayout]);
 
   useEffect(() => {
-    if (!autoFit) return;
+    if (!autoFitPending) return;
     fitToScreen();
-    setAutoFit(false);
-  }, [nodePositions, autoFit, fitToScreen]);
+    setAutoFitPending(false);
+  }, [nodePositions, autoFitPending, fitToScreen]);
 
   const getNodeClass = (nodeId) => {
     let classes = 'graph-node';
@@ -315,8 +380,6 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
           width={viewBox.width}
           height={viewBox.height} 
           fill="none" 
-          stroke="#ccc" 
-          strokeWidth="2"
           pointerEvents="none"
         />
         <g transform={`translate(${panOffset.x}, ${panOffset.y}) scale(${zoom})`}>
@@ -324,16 +387,17 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
           // graphData is an adjacency matrix, check for edges between nodes
             row.map((connected, j) => {
               // For undirected graphs, only render edge once (i < j)
-              if (connected === 1 && i < j && nodePositions[i] && nodePositions[j]) {
+              if (connected > 0 && i < j && nodePositions[i] && nodePositions[j]) {
                 return (
-                  <line
-                    key={`edge-${i}-${j}`}
-                    x1={nodePositions[i].x}
-                    y1={nodePositions[i].y}
-                    x2={nodePositions[j].x}
-                    y2={nodePositions[j].y}
-                    className="graph-edge"
-                  />
+                  <g key={`edge-${i}-${j}`}>
+                    <line
+                      x1={nodePositions[i].x}
+                      y1={nodePositions[i].y}
+                      x2={nodePositions[j].x}
+                      y2={nodePositions[j].y}
+                      className="graph-edge"
+                    />
+                  </g>
                 );
               }
               return null;
@@ -377,13 +441,6 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
       <div className="graph-visualization-wrapper">
         <div className='graph-visualization-container'>
           <div className="graph-visualization-left" style={{ position: 'relative' }}>
-            <button 
-              onClick={fitToScreen}
-              className='fit-to-screen-button'
-              title="Fit graph to screen"
-            >
-              <i className="fas fa-expand"></i>
-            </button>
             {renderGraph()}
           </div>
           <div className="graph-visualization-right">
@@ -413,6 +470,7 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
                   {discoveredNode !== null && discoveredNode !== undefined ? `Node ${discoveredNode}` : '-'}
                 </div>
               </div>
+
             </div>
           </div>
         </div>
