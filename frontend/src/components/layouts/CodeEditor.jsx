@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import EditorComponent from '../EditorComponent';
+import { consoleErrorHandling } from '../../script_utils/consoleErrorHandling';
 
 const CodeEditor = () => {
   const location = useLocation();
@@ -49,7 +50,6 @@ const CodeEditor = () => {
   // Image preview performance/state refs:
   // - cache blob URLs so arrow navigation does not refetch previous images
   // - track latest request so stale async responses cannot override current selection
-  // - serialize rapid arrow presses with a tiny queue to avoid race conditions
   const imageObjectUrlCacheRef = useRef(new Map());
   const imageSelectionRequestRef = useRef(0);
   const imageNavigationBusyRef = useRef(false);
@@ -151,6 +151,11 @@ const CodeEditor = () => {
     return /readline|process\.stdin|prompt\s*\(/.test(src);
   };
 
+  const getDefaultExeFileName = useCallback(() => {
+    const ext = currentLanguage.toLowerCase() === 'python' ? 'py' : 'js';
+    return `playground.${ext}`;
+  }, [currentLanguage]);
+
   // SSE Cleanup check
   const closeStream = useCallback(() => {
     if (eventSourceRef.current) {
@@ -207,7 +212,7 @@ const CodeEditor = () => {
         setCode(`// Error loading sample: ${data.error}`);
       }
     } catch (error) {
-      setCode(`// Failed to load sample: ${error.message}`);
+      setCode(`// Failed to load sample: ${consoleErrorHandling(error)}`);
     } finally {
       setLoading(false);
     }
@@ -252,12 +257,12 @@ const CodeEditor = () => {
           if (requestId !== imageSelectionRequestRef.current) {
             return;
           }
-          setOutput('Failed to load image preview.');
+          setOutput(consoleErrorHandling(error));
           setSelectedImageUrl(null);
         }
       } else {
         setSelectedImageUrl(null);
-        setOutput('Image file detected but no binary blob is available. Please re-capture to regenerate this file.');
+        setOutput(consoleErrorHandling(new Error('Image file detected but no binary blob is available. Please re-capture to regenerate this file.')));
       }
       setSelectedImageName(file.file_name || 'snapshot.png');
       setCode('');
@@ -508,6 +513,7 @@ const CodeEditor = () => {
     setOutput('');
     setStdinValue('');
     setContainerReady(false);
+    const executionFileName = getDefaultExeFileName();
 
     if (awaitConsoleInput) {
       // Interactive mode — use SSE streaming so stdin can be sent
@@ -516,14 +522,18 @@ const CodeEditor = () => {
         const res = await fetch(`${API_URL}/execute/run`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ language: currentLanguage.toLowerCase(), code }),
+          body: JSON.stringify({
+            language: currentLanguage.toLowerCase(),
+            code,
+            file_name: executionFileName,
+          }),
         });
         const body = await res.json();
 
         if (!res.ok) {
           activeRunRef.current = false;
           setIsRunning(false);
-          setOutput(`Error: ${body.error || 'Unknown error'}`);
+          setOutput(consoleErrorHandling(body.error || body.stderr));
           return;
         }
 
@@ -565,7 +575,7 @@ const CodeEditor = () => {
       } catch (err) {
         activeRunRef.current = false;
         setIsRunning(false);
-        setOutput(`Error: ${err.message}`);
+        setOutput(consoleErrorHandling(err.message));
       }
     } else {
       // Non-interactive mode — simple POST
@@ -573,20 +583,25 @@ const CodeEditor = () => {
         const res = await fetch(`${API_URL}/execute`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ language: currentLanguage.toLowerCase(), code }),
+          body: JSON.stringify({
+            language: currentLanguage.toLowerCase(),
+            code,
+            file_name: selectedUserFile?.file_name ?? executionFileName,
+          }),
         });
         const body = await res.json();
         setIsRunning(false);
 
-        if (!res.ok || !body.success) {
-          setOutput(body.error || body.stderr || 'Execution failed');
+        console.log('Execution response:', body);
+        if (!body.success) {
+          setOutput(consoleErrorHandling(body.error || body.stderr));
           return;
         }
 
-        setOutput(body.output || '(no output)');
+        setOutput(body.output);
       } catch (err) {
         setIsRunning(false);
-        setOutput(`Error: ${err.message}`);
+        setOutput(consoleErrorHandling(err.message));
       }
     }
   };
@@ -629,6 +644,7 @@ const CodeEditor = () => {
       });
       if (response.ok) console.log('File auto-saved');
     } catch (error) {
+      setOutput(consoleErrorHandling('Error auto-saving file'));
       console.error('Error auto-saving file:', error);
     } finally {
       setTimeout(() => setAutoSaving(false), 1500);
@@ -645,12 +661,15 @@ const CodeEditor = () => {
     setIsOpen(false);
   };
 
+  const languageSelectionKey = currentLanguage;
+
   return (
     <EditorComponent
       // Core editor props
       code={code}
       handleEditorChange={handleEditorChange}
       currentLanguage={currentLanguage}
+      languageSelectionKey={languageSelectionKey}
       languages={languages}
       handleLanguageSelect={handleLanguageSelect}
       output={output}

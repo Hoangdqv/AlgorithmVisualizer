@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/useAuth';
-import { validateEmail, isUsernameEmpty,validatePassword, validatePasswordMatch } from '../../utils/credentialsValidation';
+import { validateEmail, isUsernameEmpty,validatePassword, validatePasswordMatch } from '../../script_utils/credentialsValidation';
 import SignUpForm from '../SignUpForm';
 
 export default function SignUp() {

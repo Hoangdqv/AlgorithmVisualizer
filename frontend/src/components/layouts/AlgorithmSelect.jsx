@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import EditorComponent from '../EditorComponent';
 import { buildParamsBlock } from '../../data/algorithmParams';
 import { getTracerGuideWithDetection } from '../../data/tracerGuideTemplates';
+import { consoleErrorHandling } from '../../script_utils/consoleErrorHandling';
 
 const AlgorithmSelect = () => {
   // Router hooks
@@ -53,6 +54,7 @@ const AlgorithmSelect = () => {
       }
       return algorithmKey;
     });
+    // codeKey example format: "sorting_python_quicksort" or "graphs_javascript_dfs"
     const codeKey = `${category}_${currentLanguage}_${algorithmKey}`;
     
     if (apiCache.current.code[codeKey]) {
@@ -140,6 +142,7 @@ const AlgorithmSelect = () => {
   }, [currentLanguage]); // Run once on mount or if currentLanguage changes
 
   useEffect(() => {
+    // example cacheKey format is "sorting_python" or "graphs_javascript"
     const cacheKey = `${category}_${currentLanguage}`;
 
     setSelectedAlgorithmName('Loading...');
@@ -178,7 +181,7 @@ const AlgorithmSelect = () => {
         }
       } catch (error) {
         console.error('Failed to fetch algorithms:', error);
-        setCode(`// Failed to load algorithms: ${error.message}`);
+        setCode(`// Failed to load algorithms: ${consoleErrorHandling(error.message)}`);
       } finally {
         setLoading(false);
       }
@@ -248,7 +251,7 @@ const AlgorithmSelect = () => {
       const data = await response.json();
 
       if (data.success) {
-        setOutput(data.output || 'No output');
+        setOutput(data.output);
         
         // Store tracer data for visualization
         if (data.states) {
@@ -269,10 +272,11 @@ const AlgorithmSelect = () => {
           setTreeSession(null);
         }
       } else {
-        setOutput(`Error: ${data.error}`);
+        console.log('Execution error:', data.stderr);
+        setOutput(consoleErrorHandling(data.stderr));
       }
     } catch (error) {
-      setOutput(`Failed to run code: ${error.message}`);
+      setOutput(consoleErrorHandling(error.message));
     } finally {
       setIsRunning(false);
     }
@@ -317,7 +321,7 @@ const AlgorithmSelect = () => {
       const data = await response.json();
 
       if (data.success) {
-        setOutput(data.output || 'No output');
+        setOutput(data.output);
 
         if (data.states) {
           const previousStates = tracerData?.states || [];
@@ -349,10 +353,10 @@ const AlgorithmSelect = () => {
           }
         }
       } else {
-        setOutput(`Error: ${data.error}`);
+        setOutput(consoleErrorHandling(data.stderr));
       }
     } catch (error) {
-      setOutput(`Failed to run code: ${error.message}`);
+      setOutput(consoleErrorHandling(error.message));
     } finally {
       setIsRunning(false);
       setIsLiveAppendingRun(false);
@@ -381,11 +385,11 @@ const AlgorithmSelect = () => {
     setShowSidebar(!showSidebar);
   };
 
-  const downloadCapture = useCallback((blob, fileName) => {
+  const downloadCapture = useCallback((blob, filename) => {
     const objectUrl = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = objectUrl;
-    anchor.download = fileName;
+    anchor.download = filename;
     document.body.appendChild(anchor);
     anchor.click();
     document.body.removeChild(anchor);
@@ -409,22 +413,22 @@ const AlgorithmSelect = () => {
     // Zero-pad step index so file listings and image navigation keep numeric order.
     const totalSteps = Math.max(capture.totalSteps || stepNumber, stepNumber);
     const paddedStep = String(stepNumber).padStart(String(totalSteps).length, '0');
-    const fileName = `${sanitizedAlgoName}-step-${paddedStep}-${stamp}.png`;
+    const filename = `${sanitizedAlgoName}-step-${paddedStep}-${stamp}.png`;
 
     const languageMatch = languageData.find((lang) => lang.language?.toLowerCase() === currentLanguage.toLowerCase());
     const fallbackLanguageId = languageData[0]?.lang_id;
     const languageId = languageMatch?.lang_id || fallbackLanguageId;
 
     if (!languageId) {
-      downloadCapture(capture.blob, fileName);
+      downloadCapture(capture.blob, filename);
       setOutput('Could not resolve a language id for file storage, snapshot downloaded locally instead.');
       return false;
     }
 
     try {
       const formData = new FormData();
-      formData.append('file', capture.blob, fileName);
-      formData.append('file_name', fileName);
+      formData.append('file', capture.blob, filename);
+      formData.append('file_name', filename);
       formData.append('language_id', String(languageId));
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/user/files/upload-image`, {
@@ -434,24 +438,24 @@ const AlgorithmSelect = () => {
       });
 
       if (response.ok) {
-        setOutput(`Saved snapshot to My Files: ${fileName}`);
+        setOutput(`Saved snapshot to My Files: ${filename}`);
         return true;
       }
 
       if (response.status === 401) {
-        downloadCapture(capture.blob, fileName);
+        downloadCapture(capture.blob, filename);
         setOutput('You are not logged in, so the snapshot was downloaded locally.');
         return false;
       }
 
       const errorData = await response.json().catch(() => ({}));
       setOutput(`Failed to save snapshot to My Files (${errorData.error || response.statusText}). Downloaded locally instead.`);
-      downloadCapture(capture.blob, fileName);
+      downloadCapture(capture.blob, filename);
       return false;
     } catch (error) {
       console.error('Failed to persist visualization capture:', error);
       setOutput(`Failed to save snapshot online (${error.message}). Downloaded locally instead.`);
-      downloadCapture(capture.blob, fileName);
+      downloadCapture(capture.blob, filename);
       return false;
     }
   }, [currentLanguage, languageData, downloadCapture, selectedAlgorithmName]);
@@ -461,12 +465,15 @@ const AlgorithmSelect = () => {
     navigate('/algorithms');
   };
 
+  const languageSelectionKey = `${category}_${currentLanguage}`;
+
   return (
     <EditorComponent
       // Core editor props
       code={code}
       handleEditorChange={handleEditorChange}
       currentLanguage={currentLanguage}
+      languageSelectionKey={languageSelectionKey}
       languages={languages}
       handleLanguageSelect={handleLanguageSelect}
       output={output}

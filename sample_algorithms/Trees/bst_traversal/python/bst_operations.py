@@ -4,7 +4,7 @@ Provides a unified interface for various BST operations including
 traversals (inorder, preorder, postorder) and modifications (search, insert, delete).
 """
 
-from tracers.tracer import Tracer
+from runtime.tracer import Tracer
 from helpers import (
     inorder_traversal,
     preorder_traversal,

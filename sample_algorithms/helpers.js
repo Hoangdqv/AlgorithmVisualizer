@@ -36,7 +36,7 @@ export function runTargets(target, fn, mutate = false) {
 
 export function buildTreeOnly(treeNodes, tracer) {
     const snapshot = JSON.parse(JSON.stringify(treeNodes));
-    tracer.addState([], {
+    tracer.add_state([], {
         tree: snapshot,
         visited: [],
         current: null,
@@ -78,7 +78,7 @@ export function inorderTraversal(treeNodes, rootId, tracer) {
         // Left subtree
         if (children.length > 0 && children[0] !== null && children[0] !== undefined) {
             const leftChild = children[0];
-            tracer.addState([], {
+            tracer.add_state([], {
                 tree: JSON.parse(JSON.stringify(treeNodes)), visited: [...visited], current: leftChild,
                 depth: depth + 1
             });
@@ -87,7 +87,7 @@ export function inorderTraversal(treeNodes, rootId, tracer) {
         
         // Visit current node
         visited.push(nodeId);
-        tracer.addState([], {
+        tracer.add_state([], {
             tree: JSON.parse(JSON.stringify(treeNodes)), visited: [...visited], current: nodeId,
             depth
         });
@@ -95,7 +95,7 @@ export function inorderTraversal(treeNodes, rootId, tracer) {
         // Right subtree
         if (children.length > 1 && children[1] !== null && children[1] !== undefined) {
             const rightChild = children[1];
-            tracer.addState([], {
+            tracer.add_state([], {
                 tree: JSON.parse(JSON.stringify(treeNodes)), visited: [...visited], current: rightChild,
                 depth: depth + 1
             });
@@ -104,7 +104,7 @@ export function inorderTraversal(treeNodes, rootId, tracer) {
     }
     
     // Initial state
-    tracer.addState([], {
+    tracer.add_state([], {
         tree: JSON.parse(JSON.stringify(treeNodes)), visited: [], current: rootId,
         depth: 0
     });
@@ -112,7 +112,7 @@ export function inorderTraversal(treeNodes, rootId, tracer) {
     traverse(rootId, 0);
     
     // Final state
-    tracer.addState([], {
+    tracer.add_state([], {
         tree: JSON.parse(JSON.stringify(treeNodes)), visited: visited, current: null,
         depth: 0
     });
@@ -150,7 +150,7 @@ export function preorderTraversal(treeNodes, rootId, tracer) {
         
         // Visit current node first
         visited.push(nodeId);
-        tracer.addState([], {
+        tracer.add_state([], {
             tree: JSON.parse(JSON.stringify(treeNodes)), visited: [...visited], current: nodeId,
             depth
         });
@@ -158,7 +158,7 @@ export function preorderTraversal(treeNodes, rootId, tracer) {
         // Left subtree
         if (children.length > 0 && children[0] !== null && children[0] !== undefined) {
             const leftChild = children[0];
-            tracer.addState([], {
+            tracer.add_state([], {
                 tree: JSON.parse(JSON.stringify(treeNodes)), visited: [...visited], current: leftChild,
                 depth: depth + 1
             });
@@ -168,7 +168,7 @@ export function preorderTraversal(treeNodes, rootId, tracer) {
         // Right subtree
         if (children.length > 1 && children[1] !== null && children[1] !== undefined) {
             const rightChild = children[1];
-            tracer.addState([], {
+            tracer.add_state([], {
                 tree: JSON.parse(JSON.stringify(treeNodes)), visited: [...visited], current: rightChild,
                 depth: depth + 1
             });
@@ -177,7 +177,7 @@ export function preorderTraversal(treeNodes, rootId, tracer) {
     }
     
     // Initial state
-    tracer.addState([], {
+    tracer.add_state([], {
         tree: JSON.parse(JSON.stringify(treeNodes)), visited: [], current: rootId,
         depth: 0
     });
@@ -185,7 +185,7 @@ export function preorderTraversal(treeNodes, rootId, tracer) {
     traverse(rootId, 0);
     
     // Final state
-    tracer.addState([], {
+    tracer.add_state([], {
         tree: JSON.parse(JSON.stringify(treeNodes)), visited: visited, current: null,
         depth: 0
     });
@@ -224,7 +224,7 @@ export function postorderTraversal(treeNodes, rootId, tracer) {
         // Left subtree
         if (children.length > 0 && children[0] !== null && children[0] !== undefined) {
             const leftChild = children[0];
-            tracer.addState([], {
+            tracer.add_state([], {
                 tree: JSON.parse(JSON.stringify(treeNodes)), visited: [...visited], current: leftChild,
                 depth: depth + 1
             });
@@ -234,7 +234,7 @@ export function postorderTraversal(treeNodes, rootId, tracer) {
         // Right subtree
         if (children.length > 1 && children[1] !== null && children[1] !== undefined) {
             const rightChild = children[1];
-            tracer.addState([], {
+            tracer.add_state([], {
                 tree: JSON.parse(JSON.stringify(treeNodes)), visited: [...visited], current: rightChild,
                 depth: depth + 1
             });
@@ -243,14 +243,14 @@ export function postorderTraversal(treeNodes, rootId, tracer) {
         
         // Visit current node last
         visited.push(nodeId);
-        tracer.addState([], {
+        tracer.add_state([], {
             tree: JSON.parse(JSON.stringify(treeNodes)), visited: [...visited], current: nodeId,
             depth
         });
     }
     
     // Initial state
-    tracer.addState([], {
+    tracer.add_state([], {
         tree: JSON.parse(JSON.stringify(treeNodes)), visited: [], current: rootId,
         depth: 0
     });
@@ -258,7 +258,7 @@ export function postorderTraversal(treeNodes, rootId, tracer) {
     traverse(rootId, 0);
     
     // Final state
-    tracer.addState([], {
+    tracer.add_state([], {
         tree: JSON.parse(JSON.stringify(treeNodes)), visited: visited, current: null,
         depth: 0
     });
@@ -296,7 +296,7 @@ export function bstSearch(treeNodes, rootId, target, tracer) {
         visited.push(nodeId);
         
         // Show current node being examined
-        tracer.addState([], {
+        tracer.add_state([], {
             tree: JSON.parse(JSON.stringify(treeNodes)), visited: [...visited], current: nodeId,
             depth
         });
@@ -325,7 +325,7 @@ export function bstSearch(treeNodes, rootId, target, tracer) {
     search(rootId, 0);
     
     // Final state
-    tracer.addState([], {
+    tracer.add_state([], {
         tree: JSON.parse(JSON.stringify(treeNodes)), visited: visited, current: null,
         depth: 0
     });
@@ -370,7 +370,7 @@ export function bstInsert(treeNodes, rootId, value, tracer, visited = null) {
         visited.push(nodeId);
         
         // Show current node being examined
-        tracer.addState([], {
+        tracer.add_state([], {
             tree: JSON.parse(JSON.stringify(treeNodes)), visited: [...visited], current: nodeId,
             depth
         });
@@ -434,7 +434,7 @@ export function bstInsert(treeNodes, rootId, value, tracer, visited = null) {
         // Show the tree with the new node inserted
         const parentValue = parent.value;
         const positionText = insertPosition === 'left' ? 'left' : 'right';
-        tracer.addState([], {
+        tracer.add_state([], {
             tree: JSON.parse(JSON.stringify(treeNodes)), visited: [...visited], current: newNodeId,
             depth: 0,
             message: `Inserted ${value} as ${positionText} child of ${parentValue}`
@@ -442,7 +442,7 @@ export function bstInsert(treeNodes, rootId, value, tracer, visited = null) {
     }
     
     // Final state
-    tracer.addState([], {
+    tracer.add_state([], {
         tree: JSON.parse(JSON.stringify(treeNodes)), visited: [], current: null,
         depth: 0
     });
@@ -492,7 +492,7 @@ export function bstDelete(treeNodes, rootId, target, tracer, mutateInPlace = fal
         visited.push(nodeId);
         
         // Show current node being examined
-        tracer.addState([], {
+        tracer.add_state([], {
             tree: JSON.parse(JSON.stringify(treeNodes)), visited: [...visited], current: nodeId,
             depth
         });
@@ -530,7 +530,7 @@ export function bstDelete(treeNodes, rootId, target, tracer, mutateInPlace = fal
         // Case 1: Leaf node (no children)
         if (children.length === 0 || children.every(c => c === null || c === undefined)) {
             // Show state before deletion
-            tracer.addState([], {
+            tracer.add_state([], {
                 tree: JSON.parse(JSON.stringify(treeNodes)), visited: [...visited], current: foundNode,
                 depth: nodeDepth,
                 message: `Deleting leaf node ${nodeToDelete.value}`
@@ -550,7 +550,7 @@ export function bstDelete(treeNodes, rootId, target, tracer, mutateInPlace = fal
             const childId = (children.length === 1 || children[0] !== null) ? children[0] : children[1];
             
             // Show state before deletion
-            tracer.addState([], {
+            tracer.add_state([], {
                 tree: JSON.parse(JSON.stringify(treeNodes)), visited: [...visited], current: foundNode,
                 depth: nodeDepth,
                 message: `Replacing node ${nodeToDelete.value} with its child`
@@ -571,7 +571,7 @@ export function bstDelete(treeNodes, rootId, target, tracer, mutateInPlace = fal
         // Case 3: Two children - find inorder successor (leftmost node in right subtree)
         else if (children.length === 2 && children[0] !== null && children[1] !== null) {
             // Show initial state
-            tracer.addState([], {
+            tracer.add_state([], {
                 tree: JSON.parse(JSON.stringify(treeNodes)), visited: [...visited], current: foundNode,
                 depth: nodeDepth,
                 message: `Node ${nodeToDelete.value} has two children, finding successor...`
@@ -583,7 +583,7 @@ export function bstDelete(treeNodes, rootId, target, tracer, mutateInPlace = fal
             let successorDepthCount = 1;
             
             // Show traversal to find successor
-            tracer.addState([], {
+            tracer.add_state([], {
                 tree: JSON.parse(JSON.stringify(treeNodes)), visited: [...visited], current: successorId,
                 depth: nodeDepth + 1,
                 message: "Looking for successor (minimum in right subtree)"
@@ -599,7 +599,7 @@ export function bstDelete(treeNodes, rootId, target, tracer, mutateInPlace = fal
                     
                     // Show each step in finding successor
                     const successorDepth = nodeDepth + successorDepthCount;
-                    tracer.addState([], {
+                    tracer.add_state([], {
                         tree: JSON.parse(JSON.stringify(treeNodes)), visited: [...visited], current: successorId,
                         depth: successorDepth,
                         message: "Going left to find minimum"
@@ -612,7 +612,7 @@ export function bstDelete(treeNodes, rootId, target, tracer, mutateInPlace = fal
             // Highlight the successor found
             const successorValue = nodeMap[successorId].value;
             const successorDepth = nodeDepth + successorDepthCount;
-            tracer.addState([], {
+            tracer.add_state([], {
                 tree: JSON.parse(JSON.stringify(treeNodes)), visited: [...visited, successorId], current: successorId,
                 depth: successorDepth,
                 message: `Found successor: ${successorValue}`
@@ -620,7 +620,7 @@ export function bstDelete(treeNodes, rootId, target, tracer, mutateInPlace = fal
             
             // Show the swap about to happen
             const originalValue = nodeToDelete.value;
-            tracer.addState([], {
+            tracer.add_state([], {
                 tree: JSON.parse(JSON.stringify(treeNodes)), visited: [...visited, successorId, foundNode], current: foundNode,
                 depth: nodeDepth,
                 message: `Swapping value ${originalValue} with successor value ${successorValue}`
@@ -644,7 +644,7 @@ export function bstDelete(treeNodes, rootId, target, tracer, mutateInPlace = fal
             treeNodes = treeNodes.filter(n => n.id !== successorId);
             
             // Show state after value replacement and successor removal
-            tracer.addState([], {
+            tracer.add_state([], {
                 tree: JSON.parse(JSON.stringify(treeNodes)), visited: [...visited, successorId, foundNode], current: foundNode,
                 depth: nodeDepth,
                 message: `Replaced with successor value ${successorValue} and removed old successor node`
@@ -653,7 +653,7 @@ export function bstDelete(treeNodes, rootId, target, tracer, mutateInPlace = fal
     }
     
     // Final state
-    tracer.addState([], {
+    tracer.add_state([], {
         tree: JSON.parse(JSON.stringify(treeNodes)), visited: visited, current: null,
         depth: 0
     });

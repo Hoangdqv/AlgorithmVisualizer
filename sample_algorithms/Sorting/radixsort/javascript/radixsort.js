@@ -1,11 +1,11 @@
-import Tracer from './tracers/tracer.js';
+import Tracer from './runtime/tracer.js';
 
 // [ALGORITHM]
 function sortByDigit(arr, exp, tracer) {
     const n = arr.length;
     const buckets = Array.from({ length: 10 }, () => []);  // one bucket per digit 0-9
 
-    tracer.addState([...arr], {
+    tracer.add_state([...arr], {
         indexVars: [],
         buckets: buckets.map(b => [...b])
     });
@@ -16,7 +16,7 @@ function sortByDigit(arr, exp, tracer) {
         buckets[digit].push(val);
         // Pad with null to keep visual array at original size
         const display = [...arr, ...new Array(n - arr.length).fill(null)];
-        tracer.addState(display, {
+        tracer.add_state(display, {
             comparing: [arr.length],
             buckets: buckets.map(b => [...b]),
             indexVars: [],
@@ -31,7 +31,7 @@ function sortByDigit(arr, exp, tracer) {
             arr.push(val);
             // Pad with null for remaining slots
             const display = [...arr, ...new Array(n - arr.length).fill(null)];
-            tracer.addState(display, {
+            tracer.add_state(display, {
                 selected: [arr.length - 1],
                 buckets: buckets.map(b => [...b]),
                 indexVars: [],
@@ -45,7 +45,7 @@ function radixSort(arr, tracer) {
     if (arr.length === 0) return [arr, tracer];
 
     const maxVal = Math.max(...arr);
-    tracer.addState([...arr], { indexVars: [], variables: { max: maxVal, status: 'start' } });
+    tracer.add_state([...arr], { indexVars: [], variables: { max: maxVal, status: 'start' } });
 
     let exp = 1;
     while (Math.floor(maxVal / exp) > 0) {
@@ -53,7 +53,7 @@ function radixSort(arr, tracer) {
         exp *= 10;
     }
 
-    tracer.addState([...arr], { indexVars: [], variables: { status: 'sorted' } });
+    tracer.add_state([...arr], { indexVars: [], variables: { status: 'sorted' } });
     return [arr, tracer];
 }
 

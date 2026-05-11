@@ -1,22 +1,26 @@
 import { useState, useEffect, useRef } from 'react';
-import html2canvas from 'html2canvas';
 import SortingVisualization from './visualizations/SortingVisualization';
 import GraphVisualization from './visualizations/GraphVisualization';
 import TreeVisualization from './visualizations/TreeVisualization';
+import {
+  captureVisualizationFrame,
+  saveVisualizationCapture,
+  waitForCaptureStability,
+} from '../script_utils/visualCapture';
 
 const VisualModule = ({ tracerData, isRunning, currentLanguage, suppressRunningOverlay = false, onSaveVisualizationCapture }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speedMultiplier, setSpeedMultiplier] = useState(1); // 0.5x to 2x
   const [isCapturing, setIsCapturing] = useState(false);
-  const [batchCaptureCount, setBatchCaptureCount] = useState(5);
+  const [batchCaptureCount, setBatchCaptureCount] = useState("1");
   const [isCaptureMenuOpen, setIsCaptureMenuOpen] = useState(false);
   const graphVisualizationRef = useRef(null);
-  const captureSurfaceRef = useRef(null);
+  const visualModuleContainerRef = useRef(null);
   const captureMenuRef = useRef(null);
 
   const [displayData, setDisplayData] = useState(tracerData);
-  console.log('Current displayData:', displayData);
+  // console.log('Current displayData:', displayData);
   const displayStates = displayData?.states || [];
   const displayTotalSteps = displayStates.length;
   const currentState = displayStates[currentStep];
@@ -108,6 +112,7 @@ const VisualModule = ({ tracerData, isRunning, currentLanguage, suppressRunningO
   const handleNextManual = () => {
     if (currentStep < displayTotalSteps - 1) {
       setCurrentStep(currentStep + 1);
+      handleFitToScreen();
       setIsPlaying(false);
     }
   };
@@ -115,6 +120,7 @@ const VisualModule = ({ tracerData, isRunning, currentLanguage, suppressRunningO
   const handlePrevManual = () => {
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
+      handleFitToScreen();
       setIsPlaying(false);
     }
   };
@@ -149,210 +155,45 @@ const VisualModule = ({ tracerData, isRunning, currentLanguage, suppressRunningO
 
   const handleStepJump = (stepIndex) => {
     setCurrentStep(stepIndex);
+    handleFitToScreen();
     setIsPlaying(false);
   };
 
-  const wrapTextByWidth = (context, text, maxWidth) => {
-    if (!text) return [''];
-
-    const words = text.split(/\s+/);
-    const lines = [];
-    let currentLine = words[0] || '';
-
-    for (let i = 1; i < words.length; i += 1) {
-      const candidate = `${currentLine} ${words[i]}`;
-      if (context.measureText(candidate).width <= maxWidth) {
-        currentLine = candidate;
-      } else {
-        lines.push(currentLine);
-        currentLine = words[i];
-      }
-    }
-
-    lines.push(currentLine);
-    return lines;
-  };
-
-  const triggerDownload = (blob, fileName) => {
-    const objectUrl = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = objectUrl;
-    anchor.download = fileName;
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-    URL.revokeObjectURL(objectUrl);
-  };
-
-  const waitForNextPaint = () => new Promise((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(resolve));
-  });
-
-  const waitForDelay = (delayMs) => new Promise((resolve) => {
-    window.setTimeout(resolve, delayMs);
-  });
-
-  // Give state highlight transitions enough time to settle before rasterizing.
-  const CAPTURE_SETTLE_MS = 340;
-
-  // Convert the canvas section to blob object
-  const canvasToBlob = (canvas) => new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        reject(new Error('Unable to encode snapshot image'));
-        return;
-      }
-      resolve(blob);
-    }, 'image/png');
-  });
-
-  const captureSingleStep = async (stepIndex, stepState) => {
-    if (!captureSurfaceRef.current) {
-      throw new Error('Capture surface is not available');
-    }
-
-    // Let the current visualization frame settle before rasterizing.
-    await waitForNextPaint();
-    // Delay accounts for highlight transitions so captures reflect final visual state.
-    await waitForDelay(CAPTURE_SETTLE_MS);
-    await waitForNextPaint();
-    if (document.fonts?.ready) {
-      await document.fonts.ready;
-    }
-
-    // Read current visible capture-surface bounds in CSS pixels.
-    const targetRect = captureSurfaceRef.current.getBoundingClientRect();
-    // Device pixel ratio of the current display.
-    const dpr = window.devicePixelRatio || 1;
-    // Use integer scaling for consistent edge rasterization.
-    const captureScale = dpr >= 2 ? 2 : 1;
-
-    // Canvas snapshot of the live visualization surface.
-    const renderedCanvas = await html2canvas(captureSurfaceRef.current, {
-      // Force a consistent background so transparent areas don't export as black.
-      backgroundColor: '#1e1e1e',
-      // Use an integer scale (1x/2x) to avoid subpixel border artifacts.
-      scale: captureScale,
-      // Allow external assets (icons/fonts/images) to be included when CORS permits.
-      useCORS: true,
-      // Disable verbose html2canvas logging in production.
-      logging: false,
-      // Remove the temporary cloned container after capture to avoid DOM buildup.
-      removeContainer: true,
-      onclone: (clonedDoc) => {
-        // Target the cloned capture area so we can lock layout deterministically.
-        const clonedSurface = clonedDoc.querySelector('.visual-module-capture-surface');
-        if (clonedSurface) {
-          // Freeze transitions/animations in the clone for deterministic screenshots.
-          clonedSurface.classList.add('visual-capture-freeze');
-          // Lock clone dimensions to the live element dimensions to prevent relayout shifts.
-          clonedSurface.style.width = `${Math.round(targetRect.width)}px`;
-          clonedSurface.style.height = `${Math.round(targetRect.height)}px`;
-          // Clip overflowing children so export bounds match the visible panel.
-          clonedSurface.style.overflow = 'hidden';
-          // Ensure width/height include padding/border exactly like the live layout.
-          clonedSurface.style.boxSizing = 'border-box';
-        }
-      },
+  const captureSingleStep = async (stepIndex, stepCurrentState) => {
+    return captureVisualizationFrame({
+      moduleElement: visualModuleContainerRef.current,
+      stepIndex,
+      totalSteps: displayTotalSteps,
+      statusMessage: stepCurrentState.message || '',
     });
-
-    // Step message shown in the footer.
-    const message = (stepState?.message || '').toString();
-    // Human-readable progress label.
-    const stepSummary = `Step ${stepIndex + 1} of ${displayTotalSteps}`;
-    // 2D context used to measure wrapped text width.
-    const ctxForMeasure = renderedCanvas.getContext('2d');
-
-    // Wrapped lines for the message block in the capture footer.
-    let wrappedLines = [message];
-    if (ctxForMeasure) {
-      ctxForMeasure.font = `${Math.max(20, Math.floor(renderedCanvas.width * 0.015))}px sans-serif`;
-      wrappedLines = wrapTextByWidth(ctxForMeasure, message, renderedCanvas.width - 80);
-    }
-
-    // Text line height used for footer layout.
-    const lineHeight = Math.max(12, Math.floor(renderedCanvas.width * 0.015));
-    // Vertical padding above and below footer text.
-    const footerPadding = 18;
-    // Total footer height based on line count and padding.
-    const footerHeight = footerPadding * 2 + lineHeight * (wrappedLines.length + 1);
-
-    // Output canvas that includes visualization + footer annotation.
-    const exportCanvas = document.createElement('canvas');
-    exportCanvas.width = renderedCanvas.width;
-    exportCanvas.height = renderedCanvas.height + footerHeight;
-
-    // 2D drawing context for final export composition.
-    const exportCtx = exportCanvas.getContext('2d');
-    if (!exportCtx) {
-      throw new Error('Unable to build snapshot image context');
-    }
-
-    exportCtx.drawImage(renderedCanvas, 0, 0);
-    exportCtx.fillStyle = '#141414';
-    exportCtx.fillRect(0, renderedCanvas.height, exportCanvas.width, footerHeight);
-
-    // Center all footer text vertically so the step label is not pinned at the top edge.
-    const totalFooterLines = wrappedLines.length + 1;
-    const textBlockHeight = lineHeight * totalFooterLines;
-    const firstLineCenterY = renderedCanvas.height + (footerHeight - textBlockHeight) / 2 + lineHeight / 2;
-
-    exportCtx.textBaseline = 'middle';
-    exportCtx.fillStyle = '#f8d775';
-    exportCtx.font = `600 ${Math.max(20, Math.floor(renderedCanvas.width * 0.017))}px sans-serif`;
-    exportCtx.fillText(stepSummary, 24, firstLineCenterY);
-
-    exportCtx.fillStyle = '#d9d9d9';
-    exportCtx.font = `${Math.max(18, Math.floor(renderedCanvas.width * 0.014))}px sans-serif`;
-    wrappedLines.forEach((line, index) => {
-      exportCtx.fillText(line, 24, firstLineCenterY + lineHeight * (index + 1));
-    });
-
-    const blob = await canvasToBlob(exportCanvas);
-    return { blob, message };
   };
 
   const saveCaptureBlob = async ({ blob, stepIndex, message }) => {
-    // Timestamp token
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    // Default filename
-    const fallbackName = `visual-step-${stepIndex + 1}-${stamp}.png`;
-
-    if (onSaveVisualizationCapture) {
-      const saved = await onSaveVisualizationCapture({
-        // Image binary payload
-        blob,
-        step: stepIndex + 1,
-        totalSteps: displayTotalSteps,
-        message,
-        category,
-        fileName: fallbackName,
-      });
-
-      if (!saved) {
-        triggerDownload(blob, fallbackName);
-      }
-      return;
-    }
-
-    triggerDownload(blob, fallbackName);
+    await saveVisualizationCapture({
+      blob,
+      stepIndex,
+      totalSteps: displayTotalSteps,
+      message,
+      category,
+      onSaveVisualizationCapture,
+    });
   };
 
-  const runCaptureForSteps = async (stepIndices) => {
-    if (!captureSurfaceRef.current || isCapturing || displayTotalSteps === 0 || stepIndices.length === 0) {
+  const captureSelectedSteps = async (stepIndices) => {
+    if (!visualModuleContainerRef.current || isCapturing || displayTotalSteps === 0 || stepIndices.length === 0) {
       return;
     }
 
-    const normalizedStepIndices = Array.from(
+    const validStepIndices = Array.from(
       new Set(stepIndices.filter((stepIndex) => stepIndex >= 0 && stepIndex < displayTotalSteps)),
     );
 
-    if (normalizedStepIndices.length === 0) {
+    if (validStepIndices.length === 0) {
       return;
     }
 
-    const wasPlaying = isPlaying;
-    const previousStep = currentStep;
+    const shouldResumePlayback = isPlaying;
+    const previousStepIndex = currentStep;
 
     setIsCapturing(true);
     setIsPlaying(false);
@@ -360,20 +201,20 @@ const VisualModule = ({ tracerData, isRunning, currentLanguage, suppressRunningO
     setIsCaptureMenuOpen(false);
 
     try {
-      for (const stepIndex of normalizedStepIndices) {
+      for (const stepIndex of validStepIndices) {
         setCurrentStep(stepIndex);
-        const stepState = displayStates[stepIndex];
-        const { blob, message } = await captureSingleStep(stepIndex, stepState);
+        const stepCurrentState = displayStates[stepIndex];
+        const { blob, message } = await captureSingleStep(stepIndex, stepCurrentState);
         await saveCaptureBlob({ blob, stepIndex, message });
       }
     } catch (error) {
       console.error('Failed to capture visualization:', error);
       alert('Failed to capture visualization snapshot.');
     } finally {
-      setCurrentStep(previousStep);
-      await waitForNextPaint();
+      setCurrentStep(previousStepIndex);
+      await waitForCaptureStability();
       setIsCapturing(false);
-      if (wasPlaying) {
+      if (shouldResumePlayback) {
         setIsPlaying(true);
       }
     }
@@ -381,17 +222,32 @@ const VisualModule = ({ tracerData, isRunning, currentLanguage, suppressRunningO
 
   const handleCaptureAll = async () => {
     const allStepIndices = Array.from({ length: displayTotalSteps }, (_, stepIndex) => stepIndex);
-    await runCaptureForSteps(allStepIndices);
+    await captureSelectedSteps(allStepIndices);
   };
 
   const handleCaptureCount = async () => {
-    const parsedCount = Number(batchCaptureCount);
-    const clampedCount = Number.isFinite(parsedCount)
-      ? Math.min(Math.max(Math.floor(parsedCount), 1), displayTotalSteps)
-      : 1;
-    const lastExclusive = Math.min(currentStep + clampedCount, displayTotalSteps);
-    const stepIndices = Array.from({ length: lastExclusive - currentStep }, (_, offset) => currentStep + offset);
-    await runCaptureForSteps(stepIndices);
+    // Handle range input selection
+    if (batchCaptureCount.includes('-')) {
+      const [startRange, endRange] = batchCaptureCount.split('-').map(str => str.trim());
+      const startIdx = parseInt(startRange, 10);
+      const endIdx = parseInt(endRange, 10);
+      if (startIdx >= 1 && endIdx >= startIdx) {
+        const stepIndices = Array.from({ length: endIdx - startIdx + 1 }, (_, i) => startIdx - 1 + i).filter(
+          index => index < displayTotalSteps
+        );
+        await captureSelectedSteps(stepIndices);
+        return;
+      }
+
+    // If not range, handle single step input
+    } else {
+      const selectedStepToCapture = parseInt(batchCaptureCount, 10);
+      if (Number.isInteger(selectedStepToCapture) && selectedStepToCapture >= 1 && selectedStepToCapture <= displayTotalSteps) {
+        await captureSelectedSteps([selectedStepToCapture - 1]);
+        return;
+      }
+    }
+    alert('Please enter a valid number of steps to capture (e.g. "1" or "2-5").');
   };
 
   const toggleCaptureMenu = () => {
@@ -425,7 +281,10 @@ const VisualModule = ({ tracerData, isRunning, currentLanguage, suppressRunningO
   };
 
   return (
-    <div className="visual-module-container">
+    <div
+      ref={visualModuleContainerRef}
+      className={`visual-module-container ${isCapturing ? 'is-capturing' : ''}`}
+    >
       <div className="visual-module-header">
         <div className="visual-module-header-top">
           <div className="visual-module-title-section">
@@ -486,7 +345,7 @@ const VisualModule = ({ tracerData, isRunning, currentLanguage, suppressRunningO
                     className="visual-module-button visual-module-button-capture"
                     title="Capture options"
                   >
-                    {isCapturing ? 'Capturing...' : '📸 Capture'}
+                    📸 Capture
                   </button>
 
                   {isCaptureMenuOpen && !isCapturing && (
@@ -505,9 +364,7 @@ const VisualModule = ({ tracerData, isRunning, currentLanguage, suppressRunningO
                         </label>
                         <input
                           id="capture-step-count"
-                          type="number"
-                          min="1"
-                          max={Math.max(displayTotalSteps, 1)}
+                          type="text"
                           value={batchCaptureCount}
                           onChange={(event) => setBatchCaptureCount(event.target.value)}
                           className="visual-module-capture-count-input"
@@ -523,7 +380,7 @@ const VisualModule = ({ tracerData, isRunning, currentLanguage, suppressRunningO
                         </button>
                       </div>
                       <div className="visual-module-capture-context-hint">
-                        Use N = 1 to capture only the current step.
+                        N can be a single number (e.g. "1") or a range (e.g. "1-10") to capture a relative range of steps.
                       </div>
                     </div>
                   )}
@@ -573,12 +430,7 @@ const VisualModule = ({ tracerData, isRunning, currentLanguage, suppressRunningO
       </div>
 
       {/* Visualization on Category */}
-      <div
-        ref={captureSurfaceRef}
-        className={`visual-module-capture-surface ${isCapturing ? 'is-capturing' : ''}`}
-      >
-        {renderVisualization()}
-      </div>
+      {renderVisualization()}
     </div>
   );
 };

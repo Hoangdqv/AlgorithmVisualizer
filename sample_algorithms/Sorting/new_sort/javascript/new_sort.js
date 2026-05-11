@@ -1,6 +1,6 @@
 // New Sort
 
-import Tracer from './tracers/tracer.js';
+import Tracer from './runtime/tracer.js';
 
 //[ALGORITHM]
     // Add algorithm implementation here

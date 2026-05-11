@@ -1,4 +1,4 @@
-import Tracer from './tracers/tracer.js';
+import Tracer from './runtime/tracer.js';
 import { swap } from './helpers.js';
 
 // [ALGORITHM]
@@ -16,7 +16,7 @@ function quickSortHoare(arr, tracer, low = 0, high = arr.length - 1) {
   
   // Track state after partitioning
   if (low === 0 && high === arr.length - 1) {
-    tracer.addState([...arr]); // Complete state
+    tracer.add_state([...arr]); // Complete state
   }
   
   return [arr, tracer];
@@ -26,7 +26,7 @@ function partitionHoare(arr, tracer, low, high) {
   const pivot = arr[low];
   
   // Show pivot selection
-  tracer.addState([...arr], { 
+  tracer.add_state([...arr], { 
     pivot: low, 
     range: [low, high],
     indexVars: ['low', 'high', 'pivotIdx'],
@@ -42,7 +42,7 @@ function partitionHoare(arr, tracer, low, high) {
       i++;
       // Show left scan
       if (i <= j) {
-        tracer.addState([...arr], { 
+        tracer.add_state([...arr], { 
           comparing: [i, low], 
           pivot: low, 
           range: [low, high],
@@ -57,7 +57,7 @@ function partitionHoare(arr, tracer, low, high) {
       j--;
       // Show right scan
       if (i <= j) {
-        tracer.addState([...arr], { 
+        tracer.add_state([...arr], { 
           comparing: [j, low], 
           pivot: low, 
           range: [low, high],
@@ -70,7 +70,7 @@ function partitionHoare(arr, tracer, low, high) {
     // If pointers haven't crossed, swap
     if (i < j) {
       // Show which elements will be swapped
-      tracer.addState([...arr], { 
+      tracer.add_state([...arr], { 
         comparing: [i, j], 
         pivot: low, 
         range: [low, high],
@@ -79,7 +79,7 @@ function partitionHoare(arr, tracer, low, high) {
       });
       swap(arr, i, j);
       // Show swap result
-      tracer.addState([...arr], { 
+      tracer.add_state([...arr], { 
         swapped: [i, j], 
         pivot: low, 
         range: [low, high],

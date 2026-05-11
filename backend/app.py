@@ -9,6 +9,8 @@ import threading
 import queue
 import json
 from functools import wraps
+from services.infrastructure.dockerExecutionService import dockerExecutionService
+from services.application.executionService import executionService
 from config import LANGUAGE_MAP, ALGORITHM_MAP, SAMPLE_CODE_DIR, SAMPLE_ALGORITHMS_DIR
 from config import add_algorithm_config
 from config import remove_algorithm_config
@@ -66,12 +68,14 @@ CORS(
     origins=[origin.strip() for origin in cors_origins.split(',') if origin.strip()]
 )
 
-container_handler = ContainerHandler()
+# container_handler = ContainerHandler()
+docker_service = dockerExecutionService()
+execution_service = executionService(docker_service)
 
 # Server Startup cleanup: Remove leftover containers if any
 def _startup_cleanup():
     try:
-        client = container_handler._get_client()
+        client = docker_service._get_client()
         orphans = client.containers.list(
             all=True,
             filters={'ancestor': 'python:3.13-alpine', 'status': 'exited'}
@@ -313,10 +317,24 @@ def get_algorithm_code(category, language, algorithm_key):
 
 @app.route('/api/execute', methods=['POST'])
 def execute_code():
+    from models import Language
     try:
         data = request.get_json()
+
         language = data.get('language', '').lower()
         code = data.get('code', '')
+        file_name = data.get('file_name')
+        language_row = Language.query.filter_by(language=language).first()
+        cmd = language_row.get_run_cmd() if language_row else None
+        docker_image = language_row.get_docker_image() if language_row else None
+
+        execution_data = {
+            'language': language,
+            'code': code,
+            'cmd': cmd,
+            'docker_image': docker_image,
+            'file_name': file_name
+        }
 
         if not code:
             return jsonify({'error': 'No code provided'}), 400
@@ -324,11 +342,15 @@ def execute_code():
         if language not in ('python', 'javascript'):
             return jsonify({'error': f'Language {language} not supported'}), 400
 
-        result = container_handler.execute_code(language, code)
+        result = execution_service.execute_code(**execution_data)
 
         if not result.get('success'):
-            return jsonify(result), 500
-
+            return jsonify({
+                'success': False,
+                'stderr': result.get('stderr', ''),
+                'error_file': result.get('error_file')
+            }), 500
+        
         return jsonify({
             'success': True,
             'output': result.get('output', ''),
@@ -356,11 +378,23 @@ def inject_params_block(code, language, params_block):
 
 @app.route('/api/execute/algorithm', methods=['POST'])
 def execute_algorithm():
+    from models import Language
     try:
         data = request.get_json()
+        params_block = data.get('params_block', None)
+
         language = data.get('language', '').lower()
         code = data.get('code', '')
-        params_block = data.get('params_block', None)
+        language_row = Language.query.filter_by(language=language).first()
+        cmd = language_row.get_run_cmd() if language_row else None
+        docker_image = language_row.get_docker_image() if language_row else None
+
+        execution_data = {
+            'language': language,
+            'code': code,
+            'cmd': cmd,
+            'docker_image': docker_image
+        }
 
         if params_block is not None:
             code = inject_params_block(code, language, params_block)
@@ -372,8 +406,8 @@ def execute_algorithm():
         if not code:
             return jsonify({'error': 'No code provided'}), 400
         
-        # Use containerHandler to execute
-        result = container_handler.execute_algorithm(language, code)
+
+        result = execution_service.execute_algorithm(**execution_data)
         
         print(f"\n[API] Result: {'SUCCESS' if result.get('success') else 'FAILED'}")
         if result.get('success'):
@@ -385,7 +419,10 @@ def execute_algorithm():
         print(f"{'='*60}\n")
         
         if not result.get('success'):
-            return jsonify(result), 500
+            return jsonify({
+                'success': False,
+                'stderr': result.get('stderr', ''),
+            }), 500
             
         return jsonify(result)
             
@@ -467,7 +504,6 @@ def register():
 def login():
     """Login user with email or username"""
     from models import User
-    from datetime import datetime
     
     data = request.get_json()
     identifier = data.get('username')  # Can be email or username
@@ -485,7 +521,7 @@ def login():
         return jsonify({'error': 'Invalid email/username or password'}), 401
     
     # Update last login
-    user.last_login = datetime.now()
+    user.record_login()
     db.session.commit()
     
     # Set session
@@ -545,8 +581,7 @@ def google_login():
             
             if user:
                 # Link existing account to Google
-                user.oauth_provider = 'google'
-                user.oauth_id = google_id
+                user.link_oauth('google', google_id)
             else:
                 # Create new user
                 base_username = email.split('@')[0]
@@ -566,7 +601,7 @@ def google_login():
                 )
                 db.session.add(user)
         
-        user.last_login = datetime.now()
+        user.record_login()
         db.session.commit()
         
         session['user_id'] = user.id
@@ -635,8 +670,7 @@ def link_google_account():
         if existing_google_user and existing_google_user.id != user.id:
             return jsonify({'error': 'This Google account is already linked to another user'}), 409
 
-        user.oauth_provider = 'google'
-        user.oauth_id = google_id
+        user.link_oauth('google', google_id)
         db.session.commit()
 
         return jsonify({'message': 'Google account linked successfully', 'user': user.to_dict()}), 200
@@ -819,9 +853,8 @@ def confirm_reset():
         return jsonify({'error': 'Invalid or expired token'}), 400
     
     # Check if token is expired
-    token_expires_at = _to_aware_datetime(reset_token.expires_at)
-    if not token_expires_at or _utcnow() > token_expires_at:
-        db.session.delete(reset_token)
+    if reset_token.is_expired(_utcnow()):
+        reset_token.consume()
         db.session.commit()
         return jsonify({'error': 'Token has expired'}), 400
     
@@ -838,7 +871,7 @@ def confirm_reset():
     session[f'reset_{reset_session_id}'] = reset_session
     
     # Delete the token immediately after verification (single use)
-    db.session.delete(reset_token)
+    reset_token.consume()
     db.session.commit()
     
     # Return confirmation
@@ -1332,7 +1365,7 @@ def create_algorithm():
         
         javascript_file = os.path.join(algorithm_path, 'javascript', f'{algorithm_name}.js')
         with open(javascript_file, 'w', encoding='utf-8') as f:
-            f.write(f"// {algorithm_name.replace("_", " ").title()}\n\nimport Tracer from './tracers/tracer.js';\n\n//[ALGORITHM]\n    // Add algorithm implementation here\n//[PARAMS]\n    // Add parameters here\n//[PARAMS] \n\ntracer.finalize();\n")
+            f.write(f"// {algorithm_name.replace("_", " ").title()}\n\nimport Tracer from './runtime/tracer.js';\n\n//[ALGORITHM]\n    // Add algorithm implementation here\n//[PARAMS]\n    // Add parameters here\n//[PARAMS] \n\ntracer.finalize();\n")
 
         # Add algorithm to config
         display_name = f'{algorithm_name.replace("_", " ").title()}'
@@ -1409,7 +1442,7 @@ def get_languages():
                 'lang_id': lang.lang_id,
                 'language': lang.language,
                 'docker_img': lang.docker_image,
-                'run_cmd': lang.run_cmd
+                'cmd': lang.run_cmd
             } for lang in languages]
         }), 200
     except Exception as e:
@@ -1479,8 +1512,7 @@ def get_folder_tree_route(folder_id):
 @app.route('/api/user/folders', methods=['POST'])
 def create_folder():
     """Create a new folder"""
-    from closure_table_helpers import create_folder_with_closure
-    from models import Folder, FileSystemItem
+    from models import Folder
 
     
     user_id = session.get('user_id')
@@ -1495,36 +1527,16 @@ def create_folder():
         return jsonify({'error': 'Folder name is required'}), 400
     
     try:
-        # Check duplicate item name (folder or file) in target parent.
-        existing = FileSystemItem.query.filter_by(
-            item_name=folder_name,
-            user_account_id=user_id,
-            parent_item_id=parent_folder_id
-        ).first()
-        if existing:
-            return jsonify({'error': f'An item named "{folder_name}" already exists in this location'}), 409
-        
-        # Build path
-        if parent_folder_id:
-            from models import Folder
-            parent = Folder.query.get(parent_folder_id)
-            if not parent:
-                return jsonify({'error': 'Parent folder not found'}), 404
-            if parent.user_id != user_id:
-                return jsonify({'error': 'Access denied'}), 403
-            path = f"{parent.path}/{folder_name}"
-        else:
-            path = f"/{folder_name}"
-        
-        # Create folder with closure table
-        new_folder = create_folder_with_closure(
+        new_folder, error = Folder.create_for_user(
+            user_id=user_id,
             folder_name=folder_name,
-            path=path,
+            parent_folder_id=parent_folder_id,
             folder_type='user-defined',
             created_at=datetime.now(),
-            user_id=user_id,
-            parent_folder_id=parent_folder_id,
         )
+
+        if error:
+            return jsonify({'error': error['message']}), error['status']
         
         return jsonify({
             'message': 'Folder created successfully',
@@ -1538,7 +1550,7 @@ def create_folder():
 @app.route('/api/user/folders/<int:folder_id>', methods=['PUT'])
 def update_folder(folder_id):
     """Rename a folder"""
-    from models import Folder, FileSystemItem
+    from models import Folder
     
     user_id = session.get('user_id')
     if not user_id:
@@ -1551,34 +1563,11 @@ def update_folder(folder_id):
     if not new_name:
         return jsonify({'error': 'Folder name is required'}), 400
     
-    folder = Folder.query.get(folder_id)
-    if not folder:
-        return jsonify({'error': 'Folder not found'}), 404
-    
     try:
-        # Prevent duplicate item names in the same parent folder.
-        duplicate = FileSystemItem.query.filter(
-            FileSystemItem.user_account_id == user_id,
-            FileSystemItem.parent_item_id == folder.parent_folder_id,
-            FileSystemItem.item_name == new_name,
-            FileSystemItem.item_id != folder.folder_id
-        ).first()
+        folder, error = Folder.rename_for_user(folder_id, user_id, new_name)
 
-        if duplicate:
-            return jsonify({'error': f'An item named "{new_name}" already exists in this location'}), 409
-
-        # Update folder name and path
-        old_path = folder.path
-        folder.folder_name = new_name
-        
-        # Update path
-        path_parts = old_path.rsplit('/', 1)
-        if len(path_parts) > 1:
-            folder.path = f"{path_parts[0]}/{new_name}"
-        else:
-            folder.path = f"/{new_name}"
-        
-        db.session.commit()
+        if error:
+            return jsonify({'error': error['message']}), error['status']
         
         return jsonify({
             'message': 'Folder renamed successfully',
@@ -1611,7 +1600,7 @@ def delete_folder(folder_id):
 @app.route('/api/user/folders/<int:folder_id>/move', methods=['POST'])
 def move_folder(folder_id):
     """Move folder to a new parent"""
-    from closure_table_helpers import move_folder as move_folder_helper
+    from models import Folder
     
     user_id = session.get('user_id')
     if not user_id:
@@ -1621,14 +1610,15 @@ def move_folder(folder_id):
     new_parent_id = data.get('new_parent_id')  # None for root
     
     try:
-        success = move_folder_helper(folder_id, new_parent_id, user_id)
-        
+        success, error = Folder.move_for_user(folder_id, new_parent_id, user_id)
+
+        if error:
+            return jsonify({'error': error['message']}), error['status']
+
         if success:
             return jsonify({'message': 'Folder moved successfully'}), 200
         else:
             return jsonify({'error': 'Failed to move folder'}), 500
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -1694,8 +1684,7 @@ def get_file(file_id):
 @app.route('/api/user/files', methods=['POST'])
 def create_file():
     """Create a new file"""
-    from models import File, Language, Folder, FileSystemItem
-    from datetime import datetime
+    from models import File
     
     user_id = session.get('user_id')
     if not user_id:
@@ -1713,50 +1702,16 @@ def create_file():
         return jsonify({'error': 'language_id is required'}), 400
     
     try:
-        # Validate language exists before insert.
-        language = Language.query.get(language_id)
-        if not language:
-            return jsonify({'error': 'Invalid language_id'}), 400
-
-        # Check duplicate item name (folder or file) in target parent.
-        existing = FileSystemItem.query.filter_by(
-            item_name=file_name,
-            user_account_id=user_id,
-            parent_item_id=folder_id
-        ).first()
-
-        if existing:
-            return jsonify({'error': f'An item named "{file_name}" already exists in this location'}), 409
-        
-        
-        # Build path
-        if folder_id:
-            folder = Folder.query.get(folder_id)
-            if not folder:
-                return jsonify({'error': 'Folder not found'}), 404
-            if folder.user_id != user_id:
-                return jsonify({'error': 'Access denied'}), 403
-            path = f"{folder.path}/{file_name}"
-        else:
-            path = f"/{file_name}"
-        
-        # Create file
-        new_file = File(
+        new_file, error = File.create_for_user(
+            user_id=user_id,
             file_name=file_name,
             folder_id=folder_id,
-            path=path,
-            file_type='user-defined',
-            user_account_id=user_id,
-            content=content,
-            content_blob=None,
-            content_mime=None,
-            lang_id=language_id,
-            created_at=datetime.now(),
-            last_updated=datetime.now()
-        )   
-        
-        db.session.add(new_file)
-        db.session.commit()
+            language_id=language_id,
+            content=content
+        )
+
+        if error:
+            return jsonify({'error': error['message']}), error['status']
         
         return jsonify({
             'message': 'File created successfully',
@@ -1770,8 +1725,7 @@ def create_file():
 @app.route('/api/user/files/<int:file_id>', methods=['PUT'])
 def update_file(file_id):
     """Update file content, rename file, or move file"""
-    from models import File, Folder, FileSystemItem
-    from datetime import datetime
+    from models import File
     
     user_id = session.get('user_id')
     if not user_id:
@@ -1779,57 +1733,11 @@ def update_file(file_id):
     
     data = request.get_json()
     
-    file = File.query.filter_by(
-        file_id=file_id,
-        user_account_id=user_id
-    ).first()
-    
-    if not file:
-        return jsonify({'error': 'File not found'}), 404
-    
     try:
-        target_folder_id = file.folder_id
-        if 'folder_id' in data:
-            target_folder_id = data.get('folder_id')
+        file, error = File.update_for_user(file_id, user_id, data)
 
-            # Validate destination folder ownership when moving into a folder.
-            if target_folder_id is not None:
-                target_folder = Folder.query.get(target_folder_id)
-                if not target_folder:
-                    return jsonify({'error': 'Destination folder not found'}), 404
-                if target_folder.user_id != user_id:
-                    return jsonify({'error': 'Access denied'}), 403
-
-        new_name = data.get('file_name', file.file_name)
-
-        # Prevent duplicate item names in the destination folder (or root).
-        duplicate = FileSystemItem.query.filter(
-            FileSystemItem.user_account_id == user_id,
-            FileSystemItem.parent_item_id == target_folder_id,
-            FileSystemItem.item_name == new_name,
-            FileSystemItem.item_id != file.file_id
-        ).first()
-
-        if duplicate:
-            return jsonify({'error': f'An item named "{new_name}" already exists in this location'}), 409
-
-        # Update content if provided
-        if 'content' in data:
-            file.content = data['content']
-            file.content_blob = None
-            file.content_mime = None
-        
-        # Update name/folder/path as a single operation to keep path consistent.
-        file.file_name = new_name
-        file.folder_id = target_folder_id
-        if target_folder_id is not None:
-            target_folder = Folder.query.get(target_folder_id)
-            file.path = f"{target_folder.path}/{new_name}"
-        else:
-            file.path = f"/{new_name}"
-        
-        file.last_updated = datetime.now()
-        db.session.commit()
+        if error:
+            return jsonify({'error': error['message']}), error['status']
         
         return jsonify({
             'message': 'File updated successfully',
@@ -1843,8 +1751,7 @@ def update_file(file_id):
 @app.route('/api/user/files/upload-image', methods=['POST'])
 def upload_user_image_file():
     """Upload an image file directly as binary blob"""
-    from models import File, Language, Folder, FileSystemItem
-    from datetime import datetime
+    from models import File
 
     user_id = session.get('user_id')
     if not user_id:
@@ -1875,44 +1782,17 @@ def upload_user_image_file():
         return jsonify({'error': 'Uploaded image is empty'}), 400
 
     try:
-        language = Language.query.get(language_id)
-        if not language:
-            return jsonify({'error': 'Invalid language_id'}), 400
-
-        existing = FileSystemItem.query.filter_by(
-            item_name=file_name,
-            user_account_id=user_id,
-            parent_item_id=folder_id
-        ).first()
-        if existing:
-            return jsonify({'error': f'An item named "{file_name}" already exists in this location'}), 409
-
-        if folder_id:
-            folder = Folder.query.get(folder_id)
-            if not folder:
-                return jsonify({'error': 'Folder not found'}), 404
-            if folder.user_id != user_id:
-                return jsonify({'error': 'Access denied'}), 403
-            path = f"{folder.path}/{file_name}"
-        else:
-            path = f"/{file_name}"
-
-        new_file = File(
+        new_file, error = File.create_image_for_user(
+            user_id=user_id,
             file_name=file_name,
             folder_id=folder_id,
-            path=path,
-            file_type='user-defined',
-            user_account_id=user_id,
-            content=None,
-            content_blob=blob_content,
-            content_mime=mime_type,
-            lang_id=language_id,
-            created_at=datetime.now(),
-            last_updated=datetime.now(),
+            language_id=language_id,
+            blob_content=blob_content,
+            mime_type=mime_type
         )
 
-        db.session.add(new_file)
-        db.session.commit()
+        if error:
+            return jsonify({'error': error['message']}), error['status']
 
         return jsonify({
             'message': 'Image file uploaded successfully',
@@ -2042,7 +1922,7 @@ def _cleanup_run(run_id):
     # Kill/remove the container
     container = run_data.get('container')
     if container:
-        container_handler.cleanup_container(container)
+        docker_service.cleanup_container(container)
     # Remove temp file
     temp_file = run_data.get('temp_file')
     if temp_file:
@@ -2112,10 +1992,23 @@ def start_execution():
     POST { language: str, code: str }
     Returns { run_id: str }
     """
+    from models import Language
     data = request.get_json(silent=True) or {}
+
     language = data.get('language', '').lower()
     code = data.get('code', '')
+    language_row = Language.query.filter_by(language=language).first()
+    cmd = language_row.get_run_cmd() if language_row else None
+    docker_image = language_row.get_docker_image() if language_row else None
+    file_name = data.get('file_name')
 
+    execution_data = {
+        'language': language,
+        'code': code,
+        'file_name': file_name,
+        'cmd': cmd,
+        'docker_image': docker_image
+    }
     if not code:
         return jsonify({'error': 'No code provided'}), 400
     if language not in LANGUAGE_MAP:
@@ -2124,10 +2017,10 @@ def start_execution():
     run_id = secrets.token_hex(8)
 
     try:
-        container, temp_file = container_handler.create_interactive_container(language, code)
+        container, temp_file = docker_service.build_interactive_container(**execution_data)
         container.start()
 
-        sock = container_handler._get_api_client().attach_socket(
+        sock = docker_service._get_api_client().attach_socket(
             container.id,
             params={'stdin': 1, 'stdout': 1, 'stderr': 1, 'stream': 1}
         )

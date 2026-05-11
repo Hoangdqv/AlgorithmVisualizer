@@ -81,11 +81,11 @@ const FileTree = ({
   };
 
   const handleLanguages = (file) => {
-    const fileName = file.file_name;
+    const filename = file.file_name;
     // Get the extension
-    const extFormat_length = fileName.lastIndexOf('.');
-    if (extFormat_length > 0 && extFormat_length < fileName.length - 1) {
-      return fileName.slice(extFormat_length + 1).toLowerCase();
+    const extFormat_length = filename.lastIndexOf('.');
+    if (extFormat_length > 0 && extFormat_length < filename.length - 1) {
+      return filename.slice(extFormat_length + 1).toLowerCase();
     }
 
     if (!languages) return null;

@@ -135,6 +135,8 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
       if (graphState) {
         resetGraphState(false);
         previousStructureSignatureRef.current = treeStructureSignature;
+        setAutoFit(true);
+
         return calculateTreePositions(treeStructure);
       }
 
@@ -153,6 +155,7 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
           setAutoFit(true);
         }
         // Structure changed/new nodes/first render - recalculate positions
+        setAutoFit(true);
         return calculateTreePositions(treeStructure);
       } else {
         // Keep existing positions, just remove deleted nodes
@@ -343,8 +346,6 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
   useImperativeHandle(ref, () => ({
     resetPositions: () => {
       resetGraphState(true);
-      setPanOffset({ x: 0, y: 0 });
-      setZoom(1);
     },
     fit: () => {
       fitToScreen();
@@ -484,7 +485,7 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
           </div>
           <div className="tree-visualization-right">
             <div className="tree-info-section">
-              <h3 className="tree-info-title">Algorithm State</h3>
+              {/* <h3 className="tree-info-title">Algorithm State</h3> */}
               {/* <div className="tree-info-item">
                 <div className="tree-info-label">Tree Type:</div>
                 <div className="tree-info-value">{dataStructureLabel}</div>
@@ -499,16 +500,14 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
                   {current !== null && current !== undefined ? getNodeValueById(current) : '-'}
                 </div>
               </div>
-              {message && (
               <div className="tree-info-item">
                   <>
                     <div className="tree-info-label">Status:</div>
-                    <div className="tree-info-value" style={{ fontStyle: 'italic', color: '#ffa500' }}>
+                    <div className="tree-info-value message" style={{ fontStyle: 'italic', color: '#ffa500' }}>
                       {message || '-'}
                     </div>
                   </>
               </div>
-              )}
               {depth !== null && depth !== undefined && (
                 <div className="tree-info-item">
                   <div className="tree-info-label">Depth:</div>

@@ -1,4 +1,4 @@
-import Tracer from './tracers/tracer.js';
+import Tracer from './runtime/tracer.js';
 import { swap } from './helpers.js';
 
 // [ALGORITHM]
@@ -15,7 +15,7 @@ function quickSort(arr, tracer, low = 0, high = arr.length - 1) {
   }
   
   if (low === 0 && high === arr.length - 1) {
-    tracer.addState([...arr]); // Complete state
+    tracer.add_state([...arr]); // Complete state
   }
   
   return [arr, tracer];
@@ -25,14 +25,14 @@ function partition(arr, tracer, low, high) {
   const pivot = arr[high];
   let i = low - 1;
   
-  tracer.addState(
+  tracer.add_state(
     [...arr], 
     { pivot: high, range: [low, high], indexVars: ['low', 'high', 'pivotIdx'], variables: { pivotIdx: high, low, high } }
   );
   
   for (let j = low; j < high; j++) {
     // Show current element being examined
-    tracer.addState([...arr], { 
+    tracer.add_state([...arr], { 
       selected: [j], 
       pivot: high, 
       range: [low, high],
@@ -44,7 +44,7 @@ function partition(arr, tracer, low, high) {
       i++;
       if (i !== j) {
         // Show comparison before swap
-        tracer.addState([...arr], { 
+        tracer.add_state([...arr], { 
           comparing: [i, j],
           pivot: high, 
           range: [low, high],
@@ -54,7 +54,7 @@ function partition(arr, tracer, low, high) {
         // Swap elements
         swap(arr, i, j);
         // Show swap result
-        tracer.addState([...arr], { 
+        tracer.add_state([...arr], { 
           swapped: [i, j],
           pivot: high, 
           range: [low, high],
@@ -67,7 +67,7 @@ function partition(arr, tracer, low, high) {
   
   // Place pivot in its final position
   if (i + 1 !== high) {
-    tracer.addState([...arr], { 
+    tracer.add_state([...arr], { 
       comparing: [i + 1, high], 
       pivot: high, 
       range: [low, high], 
@@ -75,7 +75,7 @@ function partition(arr, tracer, low, high) {
       variables: { i, pivotIdx: i + 1, low, high } 
     });
     swap(arr, i + 1, high);
-    tracer.addState([...arr], { 
+    tracer.add_state([...arr], { 
       swapped: [i + 1, high], 
       pivot: i + 1, 
       range: [low, high], 
@@ -83,7 +83,7 @@ function partition(arr, tracer, low, high) {
       variables: { i, pivotIdx: i + 1, low, high } 
     });
   } else {
-    tracer.addState([...arr], { 
+    tracer.add_state([...arr], { 
       pivot: i + 1, 
       range: [low, high], 
       indexVars: ['i', 'low', 'high', 'pivotIdx'], 

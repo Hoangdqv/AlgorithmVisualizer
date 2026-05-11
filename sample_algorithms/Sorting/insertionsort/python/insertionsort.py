@@ -1,5 +1,5 @@
 # Simple Insertion Sort in Python
-from tracers.tracer import Tracer
+from runtime.tracer import Tracer
 
 # [ALGORITHM]
 def insertion_sort(arr, tracer):

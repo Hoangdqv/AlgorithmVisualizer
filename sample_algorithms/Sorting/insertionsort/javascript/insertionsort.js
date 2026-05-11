@@ -1,5 +1,5 @@
 // Simple Insertion Sort in JavaScript
-import Tracer from './tracers/tracer.js';
+import Tracer from './runtime/tracer.js';
 
 // [ALGORITHM]
 function insertionSort(arr, tracer) {
@@ -9,7 +9,7 @@ function insertionSort(arr, tracer) {
         const key = arr[i];
         let j = i - 1;
         
-        tracer.addState([...arr], {   
+        tracer.add_state([...arr], {   
             selected: [i],
             indexVars: ['i'],
             variables: { i: i } 
@@ -19,7 +19,7 @@ function insertionSort(arr, tracer) {
         // Shift elements greater than key one position to the right
         while (j >= 0 && arr[j] > key) {
             // Comparing (yellow)
-            tracer.addState([...arr], {
+            tracer.add_state([...arr], {
                 comparing: [j, j + 1],
                 indexVars: ['i', 'j'],
                 variables: { i: i, j: j } 
@@ -28,7 +28,7 @@ function insertionSort(arr, tracer) {
             arr[j] = null;
             
             // Shifted (green)
-            tracer.addState([...arr], { 
+            tracer.add_state([...arr], { 
                 swapped: [j, j + 1],
                 indexVars: ['i', 'j'],
                 variables: { i: i, j: j } 
@@ -39,7 +39,7 @@ function insertionSort(arr, tracer) {
         arr[j + 1] = key;
     }
     
-    tracer.addState([...arr]);
+    tracer.add_state([...arr]);
     return { arr, tracer };
 }
 

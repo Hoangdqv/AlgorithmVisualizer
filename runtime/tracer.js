@@ -1,13 +1,13 @@
 class Tracer {
-    constructor(category = null, dataStructure = null, dataStructureLabel = null) {
+    constructor(category = null, data_structure = null, data_structure_label = null) {
         this.states = [];
         this.step = 0;
         this.category = category;
-        this.dataStructure = dataStructure;
-        this.dataStructureLabel = dataStructureLabel || (dataStructure ? dataStructure.charAt(0).toUpperCase() + dataStructure.slice(1) : null);
+        this.data_structure = data_structure;
+        this.data_structure_label = data_structure_label || (data_structure ? data_structure.charAt(0).toUpperCase() + data_structure.slice(1) : null);
     }
 
-    addState(data, metadata = {}) {
+    add_state(data, metadata = {}) {
         this.step += 1;
         const state = { step: this.step, data: data, ...metadata };
         if (this.category) {
@@ -16,12 +16,12 @@ class Tracer {
         this.states.push(state);
     }
 
-    getStates() {
+    get_states() {
         const result = { states: this.states };
-        if (this.dataStructure) {
+        if (this.data_structure) {
             result.metadata = {
-                dataStructure: this.dataStructure,
-                dataStructureLabel: this.dataStructureLabel
+                dataStructure: this.data_structure,
+                dataStructureLabel: this.data_structure_label
             };
         }
         return result;
@@ -29,7 +29,7 @@ class Tracer {
 
     finalize() {
         console.log('\n--- TRACER_JSON_START ---');
-        console.log(JSON.stringify(this.getStates()));
+        console.log(JSON.stringify(this.get_states()));
         console.log('--- TRACER_JSON_END ---');
     }
 }

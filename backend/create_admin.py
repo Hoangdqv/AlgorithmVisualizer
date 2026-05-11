@@ -1,6 +1,6 @@
 # Generate a test admin account
 from database import db
-from app import app
+from backend.app import app
 from models import User
 import bcrypt
 

@@ -6,7 +6,7 @@ from models import Folder, ClosureTable, Language, File, FileSystemItem
 
 
 def _owned_closure_query(user_id):
-    """Scope closure rows to descendants owned by the given user."""
+    """Scope closure rows to descendants owned by the given user through a join between ClosureTable and FileSystemItem on user_id."""
     return ClosureTable.query.join(
         FileSystemItem,
         ClosureTable.descendant == FileSystemItem.item_id

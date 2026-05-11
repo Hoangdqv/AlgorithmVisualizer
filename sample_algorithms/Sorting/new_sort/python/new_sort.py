@@ -1,6 +1,6 @@
 # New Sort
 
-from tracers.tracer import Tracer
+from runtime.tracer import Tracer
 
 #[ALGORITHM]
     # Add algorithm implementation here

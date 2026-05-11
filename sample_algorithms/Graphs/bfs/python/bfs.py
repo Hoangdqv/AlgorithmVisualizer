@@ -1,4 +1,4 @@
-from tracers.tracer import Tracer
+from runtime.tracer import Tracer
 from collections import deque
 
 # [ALGORITHM]

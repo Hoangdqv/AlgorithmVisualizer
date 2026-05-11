@@ -4,7 +4,7 @@
  * traversals (inorder, preorder, postorder) and modifications (search, insert, delete).
  */
 
-import Tracer from './tracers/tracer.js';
+import Tracer from './runtime/tracer.js';
 import {
     inorderTraversal,
     preorderTraversal,

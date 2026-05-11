@@ -1,5 +1,5 @@
 # Quick Sort (Hoare Partition) in Python
-from tracers.tracer import Tracer
+from runtime.tracer import Tracer
 from helpers import swap
 
 # [ALGORITHM]

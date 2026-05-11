@@ -1,5 +1,5 @@
 # Quick Sort in Python
-from tracers.tracer import Tracer
+from runtime.tracer import Tracer
 from helpers import swap
 # [ALGORITHM]
 def quick_sort(arr, tracer, low=0, high=None):

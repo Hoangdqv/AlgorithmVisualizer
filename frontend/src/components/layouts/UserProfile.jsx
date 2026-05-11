@@ -685,12 +685,12 @@ export default function UserProfile() {
                           {new Date(user.created_at).toLocaleDateString()}
                         </span>
                       </div>
-                      {isOAuthUser && (
+                      {/* {isOAuthUser && (
                         <div className="info-row">
                           <span className="info-label">Login Method:</span>
                           <span className="info-value">{user.oauth_provider}</span>
                         </div>
-                      )}
+                      )} */}
                       
                       <button 
                         className="profile-button primary"
@@ -773,7 +773,16 @@ export default function UserProfile() {
                     </button>
                   </div>
                 )}
-          </div>
+                {isOAuthUser && user.oauth_provider && (
+                  <div className="profile-section">
+                    <h3>Linked Account:</h3>
+                    <div className="info-row">
+                      <span>Provider:</span>
+                      <span>{user.oauth_provider}</span>
+                    </div>
+                  </div>
+                )}
+          </div>word
         </div>
         <div className="profile-file-storage-management">
           <div className="profile-file-storage-card">

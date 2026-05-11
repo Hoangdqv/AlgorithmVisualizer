@@ -1,4 +1,4 @@
-import Tracer from './tracers/tracer.js';
+import Tracer from './runtime/tracer.js';
 import { swap } from './helpers.js';
 // New edit from admin panel
 // [ALGORITHM]
@@ -8,14 +8,14 @@ function bubbleSort(arr, tracer) {
     for (let i = 0; i < n; i++) {
         let swapped = false;  
         for (let j = 0; j < n - i - 1; j++) {
-            tracer.addState([...arr], { 
+            tracer.add_state([...arr], { 
                 comparing: [j, j + 1],
                 indexVars: ['i', 'j'],
                 variables: { i, j } 
             });
             if (arr[j] > arr[j + 1]) {
                 swap(arr, j, j + 1);
-                tracer.addState([...arr], { 
+                tracer.add_state([...arr], { 
                     swapped: [j, j + 1],
                     indexVars: ['i', 'j'],
                     variables: { i, j } 
@@ -28,7 +28,7 @@ function bubbleSort(arr, tracer) {
             break;
         }
     }
-    tracer.addState([...arr]); // Complete state
+    tracer.add_state([...arr]); // Complete state
     return [arr, tracer];
 }
 

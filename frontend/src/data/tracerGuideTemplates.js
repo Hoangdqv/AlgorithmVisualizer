@@ -37,7 +37,7 @@ const GUIDE_CONFIG = {
         python: `tracer.add_state(
     arr.copy()
 )`,
-        javascript: `tracer.addState(
+        javascript: `tracer.add_state(
   [...arr]
 );`
       },
@@ -51,7 +51,7 @@ const GUIDE_CONFIG = {
     indexVars=['i', 'j'],
     variables={'i': i, 'j': j}
 )`,
-        javascript: `tracer.addState(
+        javascript: `tracer.add_state(
   [...arr],
   {
     comparing: [i, j],
@@ -70,7 +70,7 @@ const GUIDE_CONFIG = {
     indexVars=['i', 'j'],
     variables={'i': i, 'j': j}
 )`,
-        javascript: `tracer.addState(
+        javascript: `tracer.add_state(
   [...arr],
   {
     swapped: [i, j],
@@ -89,7 +89,7 @@ const GUIDE_CONFIG = {
     pivot=pivot_idx,
     variables={'i': i, 'pivot_idx': pivot_idx}
 )`,
-        javascript: `tracer.addState(
+        javascript: `tracer.add_state(
   [...arr],
   {
     selected: [i],
@@ -105,7 +105,7 @@ const GUIDE_CONFIG = {
         python: `tracer.add_state(
     arr.copy()
 )`,
-        javascript: `tracer.addState(
+        javascript: `tracer.add_state(
   [...arr],
 );`
       }
@@ -156,7 +156,7 @@ const GUIDE_CONFIG = {
     queue=list(queue),
     visited=visited.copy()
 )`,
-        javascript: `tracer.addState(
+        javascript: `tracer.add_state(
   [],
   {
     graph,
@@ -176,7 +176,7 @@ const GUIDE_CONFIG = {
     visited=visited.copy(),
     processing=current_node
 )`,
-        javascript: `tracer.addState(
+        javascript: `tracer.add_state(
   [],
   {
     graph,
@@ -197,7 +197,7 @@ const GUIDE_CONFIG = {
     visited=visited.copy(),
     discovered=neighbor
 )`,
-        javascript: `tracer.addState(
+        javascript: `tracer.add_state(
   [],
   {
     graph,
@@ -217,7 +217,7 @@ const GUIDE_CONFIG = {
     queue=list(queue),
     visited=visited.copy()
 )`,
-        javascript: `tracer.addState(
+        javascript: `tracer.add_state(
   [],
   {
     graph,
@@ -271,7 +271,7 @@ const GUIDE_CONFIG = {
     current=None,
     depth=0
 )`,
-        javascript: `tracer.addState(
+        javascript: `tracer.add_state(
   [],
   {
     tree,
@@ -290,7 +290,7 @@ const GUIDE_CONFIG = {
     current=node_id,
     depth=depth
 )`,
-        javascript: `tracer.addState(
+        javascript: `tracer.add_state(
   [],
   {
     tree,
@@ -309,7 +309,7 @@ const GUIDE_CONFIG = {
     current=node_id,
     depth=depth
 )`,
-        javascript: `tracer.addState(
+        javascript: `tracer.add_state(
   [],
   {
     tree,
@@ -327,7 +327,7 @@ const GUIDE_CONFIG = {
     tree=tree,
     current=None
 )`,
-        javascript: `tracer.addState(
+        javascript: `tracer.add_state(
   [],
   {
     tree,
@@ -369,7 +369,7 @@ const fallbackConfig = {
       python: `tracer.add_state(
     state_data
 )`,
-      javascript: `tracer.addState(
+      javascript: `tracer.add_state(
   stateData
 );`
     },
@@ -381,7 +381,7 @@ const fallbackConfig = {
     state_data,
     variables={'event': 'update'}
 )`,
-      javascript: `tracer.addState(
+      javascript: `tracer.add_state(
   stateData,
   { variables: { event: 'update' } }
 );`
@@ -393,7 +393,7 @@ const fallbackConfig = {
       python: `tracer.add_state(
     state_data
 )`,
-      javascript: `tracer.addState(
+      javascript: `tracer.add_state(
   stateData
 );`
     }
@@ -415,7 +415,7 @@ export const getTracerGuideConfig = (category, language) => {
     category: normalizedCategory,
     language: normalizedLanguage,
     languageLabel: toDisplayLanguage(normalizedLanguage),
-    tracerMethod: normalizedLanguage === 'javascript' ? 'addState' : 'add_state'
+    tracerMethod: normalizedLanguage === 'javascript' ? 'add_state' : 'add_state'
   };
 };
 
@@ -425,7 +425,7 @@ const detectTracerLines = (tracerLines, code) => {
   return tracerLines.filter(line => {
     // IF always shows, return true
     if (line.always) return true;
-    // If no detect patterns, skip this line (return false)
+    // If no patterns detected
     if (!line.detect || line.detect.length === 0) return false;
     // Check if every pattern in detect matches the code snippet
     return line.detect.every(pattern => pattern.test(normalizedCode));

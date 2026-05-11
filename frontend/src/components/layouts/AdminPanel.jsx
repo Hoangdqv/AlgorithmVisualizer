@@ -24,7 +24,7 @@ export default function AdminPanel() {
   // Editing states
   const [creatingNew, setCreatingNew] = useState(false);
   const [editingExplanation, setEditingExplanation] = useState(false);
-  const [editingCode, setEditingCode] = useState(null); // {language, filename, content}
+  const [editingCode, setEditingCode] = useState(null); // {language, file_name, content}
   
   // Form states
   const [explanationText, setExplanationText] = useState('');
@@ -167,19 +167,19 @@ export default function AdminPanel() {
     }
   };
 
-  const handleEditCode = async (language, filename) => {
+  const handleEditCode = async (language, file_name) => {
     if (!selectedAlgorithm) return;
     
     // Fetch the code file content
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/admin/algorithms/${selectedAlgorithm.category}/${selectedAlgorithm.name}/code/${language}/${filename}`,
+        `${import.meta.env.VITE_API_URL}/admin/algorithms/${selectedAlgorithm.category}/${selectedAlgorithm.name}/code/${language}/${file_name}`,
         { credentials: 'include' }
       );
       
       if (response.ok) {
         const data = await response.json();
-        setEditingCode({ language, filename, content: data.code });
+        setEditingCode({ language, file_name, content: data.code });
       } else {
         setError('Failed to load code file');
       }
@@ -197,7 +197,7 @@ export default function AdminPanel() {
     
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/admin/algorithms/${selectedAlgorithm.category}/${selectedAlgorithm.name}/code/${editingCode.language}/${editingCode.filename}`,
+        `${import.meta.env.VITE_API_URL}/admin/algorithms/${selectedAlgorithm.category}/${selectedAlgorithm.name}/code/${editingCode.language}/${editingCode.file_name}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -257,7 +257,7 @@ export default function AdminPanel() {
     }
   };
 
-  const handleCodeFileUpload = async (event, language, filename) => {
+  const handleCodeFileUpload = async (event, language, file_name) => {
     const file = event.target.files?.[0];
     event.target.value = '';
 
@@ -273,7 +273,7 @@ export default function AdminPanel() {
       const text = await readUploadedText(file);
       setError('');
       setMessage(`Loaded ${file.name} into editor. Click Save to persist.`);
-      setEditingCode({ language, filename, content: text });
+      setEditingCode({ language, file_name, content: text });
     } catch {
       setError('Failed to read uploaded code file');
     }
@@ -461,17 +461,8 @@ export default function AdminPanel() {
                         />
                       </div>
                     )}
-                  </div>
-                  
-                  {editingExplanation ? (
-                    <>
-                      <textarea
-                        className="admin-textarea"
-                        value={explanationText}
-                        onChange={(e) => setExplanationText(e.target.value)}
-                        rows={15}
-                      />
-                      <div className="section-actions">
+                    {editingExplanation && (
+                      <div className="code-edit-actions">
                         <button
                           className="modal-button primary"
                           onClick={handleUpdateExplanation}
@@ -490,6 +481,17 @@ export default function AdminPanel() {
                           Cancel
                         </button>
                       </div>
+                    )}
+                  </div>
+                  
+                  {editingExplanation ? (
+                    <>
+                      <textarea
+                        className="admin-textarea"
+                        value={explanationText}
+                        onChange={(e) => setExplanationText(e.target.value)}
+                        rows={25}
+                      />
                     </>
                   ) : (
                     <pre className="explanation-preview">{selectedAlgorithm.explanation}</pre>
@@ -504,11 +506,11 @@ export default function AdminPanel() {
                     <div key={language} className="language-section">
                       <h5>{language.charAt(0).toUpperCase() + language.slice(1)}</h5>
                       {files.map((file) => (
-                        <div key={file.filename} className="code-file">
+                        <div key={file.file_name} className="code-file">
                           <div className="file-header">
-                            <span className="filename">{file.filename}</span>
+                            <span className="file_name">{file.file_name}</span>
                             {(() => {
-                              const refKey = `${language}/${file.filename}`;
+                              const refKey = `${language}/${file.file_name}`;
                               return (
                                 <input
                                   ref={(element) => {
@@ -519,11 +521,11 @@ export default function AdminPanel() {
                                   type="file"
                                   accept={language === 'python' ? '.py,text/x-python' : '.js,text/javascript,application/javascript'}
                                   style={{ display: 'none' }}
-                                  onChange={(event) => handleCodeFileUpload(event, language, file.filename)}
+                                  onChange={(event) => handleCodeFileUpload(event, language, file.file_name)}
                                 />
                               );
                             })()}
-                            {editingCode && editingCode.language === language && editingCode.filename === file.filename ? (
+                            {editingCode && editingCode.language === language && editingCode.file_name === file.file_name ? (
                               <div className="code-edit-actions">
                                 <button
                                   className="modal-button primary"
@@ -541,7 +543,7 @@ export default function AdminPanel() {
                                 </button>
                                 <button
                                   className="modal-button secondary"
-                                  onClick={() => codeUploadInputRefs.current[`${language}/${file.filename}`]?.click()}
+                                  onClick={() => codeUploadInputRefs.current[`${language}/${file.file_name}`]?.click()}
                                   disabled={loading}
                                 >
                                   Upload a file
@@ -551,20 +553,20 @@ export default function AdminPanel() {
                               <div className="code-edit-actions">
                                 <button
                                   className="modal-button primary"
-                                  onClick={() => handleEditCode(language, file.filename)}
+                                  onClick={() => handleEditCode(language, file.file_name)}
                                 >
                                   Edit Code
                                 </button>
                                 <button
                                   className="modal-button secondary"
-                                  onClick={() => codeUploadInputRefs.current[`${language}/${file.filename}`]?.click()}
+                                  onClick={() => codeUploadInputRefs.current[`${language}/${file.file_name}`]?.click()}
                                 >
                                   Upload a file
                                 </button>
                               </div>
                             )}
                           </div>
-                          {editingCode && editingCode.language === language && editingCode.filename === file.filename ? (
+                          {editingCode && editingCode.language === language && editingCode.file_name === file.file_name ? (
                             <div className="code-editor-container">
                               <Editor
                                 height="400px"

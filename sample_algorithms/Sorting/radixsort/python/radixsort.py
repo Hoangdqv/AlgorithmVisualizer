@@ -1,4 +1,4 @@
-from tracers.tracer import Tracer
+from runtime.tracer import Tracer
 
 # [ALGORITHM]
 def sort_by_digit(arr, exp, tracer):

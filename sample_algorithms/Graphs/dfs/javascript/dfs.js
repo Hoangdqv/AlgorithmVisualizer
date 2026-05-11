@@ -1,4 +1,4 @@
-import Tracer from './tracers/tracer.js';
+import Tracer from './runtime/tracer.js';
 //this is updated from the admin panel
 // [ALGORITHM]
 function dfs(graph, startNode, tracer) {
@@ -16,7 +16,7 @@ function dfs(graph, startNode, tracer) {
     const visitedOrder = [];
     
     // Initial state - show graph with start node in stack
-    tracer.addState([], {
+    tracer.add_state([], {
         graph: graph,
         visited: [...visited],
         stack: [...stack]
@@ -33,7 +33,7 @@ function dfs(graph, startNode, tracer) {
         visitedOrder.push(current);
         
         // Show current node being processed
-        tracer.addState([], {
+        tracer.add_state([], {
             graph: graph,
             visited: [...visited],
             stack: [...stack],
@@ -46,7 +46,7 @@ function dfs(graph, startNode, tracer) {
                 stack.push(neighbor);
                 
                 // Show neighbor being discovered
-                tracer.addState([], {
+                tracer.add_state([], {
                     graph: graph,
                     visited: [...visited],
                     stack: [...stack],
@@ -58,7 +58,7 @@ function dfs(graph, startNode, tracer) {
     }
     
     // Final state
-    tracer.addState([], {
+    tracer.add_state([], {
         graph: graph,
         visited: [...visited],
         stack: [],

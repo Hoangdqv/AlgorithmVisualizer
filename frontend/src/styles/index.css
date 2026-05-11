@@ -41,6 +41,10 @@ body {
   flex-direction: column;
   min-height: 100vh;
   margin: 0;
+  -webkit-user-select: none;
+  -moz-user-select: -moz-none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 .app-layout {
@@ -77,13 +81,6 @@ a {
 }
 a:hover {
   color: #535bf2;
-}
-
-body{
-  -webkit-user-select:none;
-  -moz-user-select:-moz-none;
-  -ms-user-select:none;
-  user-select:none;
 }
 
 .hidden-scrollbar::-webkit-scrollbar {
@@ -473,9 +470,12 @@ button {
   border-radius: 5px;
   padding: 0.2rem 0.5rem;
   cursor: pointer;
+
 }
 .tracer-guide-close-btn:hover {
   background-color: #3a3a3a;
+  border: 1px solid red;
+  color: red;
 }
 .tracer-guide-section {
   margin-top: 0.55rem;
@@ -529,8 +529,8 @@ button {
   border-radius: 6px;
   padding: 4px 4px;
   cursor: pointer;
-  /* min-width: 58px;
-  height: 28px; */
+  /* min-width: 58px; */
+  height: stretch;
   font-size: 12px;
   line-height: 1;
   flex-shrink: 0;
@@ -890,7 +890,10 @@ button {
 }
 
 .error-alert {
-  color: #ff5c5c;
+  padding: 0.75rem 1rem;
+  background-color: #5c1e1e;
+  border-left: 4px solid #f44336;
+  color: #ef9a9a;
   border-radius: 4px;
   margin-bottom: 1rem;
   text-align: left;
@@ -1038,12 +1041,12 @@ button {
 
 /* FILE TREE STYLES */
 .file-tree {
-  user-select: none;
   background-color: #252526;
   border-radius: 4px;
   height: 100%;
   width: 100%;
   overflow-x: hidden;
+  overflow-y: auto;
   position: relative;
 }
 
@@ -1582,7 +1585,8 @@ footer {
 }
 
 .visual-module-capture-surface {
-  flex: 1;
+  /* Keep wrapper out of normal layout so SortingVisualization's sibling blocks stay direct flex items. */
+  display: contents;
   min-height: 0;
   width: 100%;
   box-sizing: border-box;
@@ -1595,6 +1599,11 @@ footer {
 .visual-capture-freeze *::after {
   animation: none !important;
   transition: none !important;
+}
+
+.visual-module-capture-surface.is-capturing {
+  /* html2canvas needs a real box target while snapshotting. */
+  display: block;
 }
 
 .visual-module-bar-value {
@@ -2298,6 +2307,8 @@ footer {
 /* Tree Visualization Styles */
 .tree-visualization-wrapper {
   display: grid;
+  /* avoid text box wrapping issues when message is too long */
+  width: 100%;
   padding: 1rem;
   gap: 1rem;
   overflow-y: auto;
@@ -2306,7 +2317,7 @@ footer {
 
 .tree-visualization-container {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: center;
   gap: 2rem;
 }
@@ -2326,7 +2337,9 @@ footer {
 
 .tree-svg {
   width: 100%;
-  max-width: 600px;
+  max-width: 300px;
+  min-width: 0;
+  min-height: 0;
   height: auto;
   background-color: #1e1e1e;
   border: none;
@@ -2423,10 +2436,11 @@ footer {
 }
 
 .tree-info-section {
+  border: 1px solid #444;
   background-color: #2a2a2a;
   border-radius: 0.5rem;
   width: 100%;
-  padding: 1rem;
+  padding: 0.75rem;
   height: fit-content;
   min-height: 0;
   overflow-y: auto;
@@ -2442,11 +2456,12 @@ footer {
 }
 
 .tree-info-item {
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.4rem;
   padding: 0.5rem;
   background-color: #1e1e1e;
   border-radius: 0.25rem;
   border-left: 3px solid #555;
+  overflow: auto;
 }
 
 .tree-info-label {
@@ -2461,6 +2476,10 @@ footer {
   color: white;
   font-family: 'Courier New', monospace;
   padding: 0.15rem;
+}
+
+.tree-info-value.message {
+  height: 2.5rem;
 }
 
 .tree-info-current {
@@ -2923,15 +2942,6 @@ footer {
   border-radius: 4px;
 }
 
-.error-alert {
-  padding: 0.75rem 1rem;
-  background-color: #5c1e1e;
-  border-left: 4px solid #f44336;
-  color: #ef9a9a;
-  border-radius: 4px;
-  margin-bottom: 1rem;
-}
-
 /* ─── ADMIN PANEL STYLES ─────────────────────────────────────────────────────── */
 .admin-container {
   width: 100%;
@@ -3160,6 +3170,7 @@ footer {
 
 .explanation-preview {
   background: #1e1e1e;
+  border: 1px solid #444;
   padding: 1rem;
   border-radius: 4px;
   color: #ccc;
@@ -3218,6 +3229,7 @@ footer {
   padding: 0.5rem 0.75rem;
   background: #2d2d2d;
   border-radius: 4px 4px 0 0;
+  border: 1px solid #444;
 }
 
 .code-edit-actions {
@@ -3241,6 +3253,7 @@ footer {
   background: #1e1e1e;
   padding: 1rem;
   border-radius: 0 0 4px 4px;
+  border: 1px solid #444;
   color: #ccc;
   white-space: pre-wrap;
   font-family: 'Courier New', monospace;

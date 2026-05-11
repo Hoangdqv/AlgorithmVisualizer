@@ -1,109 +1,41 @@
 import docker
-import json
 import tempfile
 import os
-import socket as _socket
-import re
+import json
+from backend_utils.find_root import get_project_root
 
-class ContainerHandler:
-    def __init__(self):
-        self.client = None
-        self.api_client = None
-        self.docker_images = {
-            'python': 'python:3.13-alpine',
-            'javascript': 'node:22-alpine'
-        }
-        # Security limits
-        self.max_code_size = 100 * 1024  # 100KB max code size
-        self.execution_timeout = 30  # 30 seconds
-        self.simple_timeout = 10    # 10 seconds for plain code runs
-        self.memory_limit = '128m'  # 128MB RAM limit
-        self.cpu_quota = 50000  # 50% CPU (50000 out of 100000)
-        self.max_output_bytes = 10 * 1024  # 10KB output cap for simple runs
+class executionService:
+    def __init__(self, docker_service):
+        self.docker_service = docker_service
 
-    def _get_client(self):
-        """Lazy initialization of high-level Docker client."""
-        if self.client is None:
-            self.client = docker.from_env()
-        return self.client
-
-    def _get_api_client(self):
-        """Lazy initialization of low-level Docker API client (needed for attach_socket)."""
-        if self.api_client is None:
-            self.api_client = docker.APIClient()
-        return self.api_client
-    
-    def _validate_code(self, code):
-        """Validate code for security concerns."""
-        if len(code) > self.max_code_size:
-            return False, 'Code exceeds maximum size limit'
-        
-        dangerous_patterns = [
-            'import os',
-            'import subprocess',
-            '__import__',
-            'eval(',
-            'exec(',
-            'compile(',
-            'open(',
-            '__builtins__',
-            'require("child_process")',
-            'require("fs")',
-            'require("net")',
-            'require("http")',
-        ]
-        
-        code_lower = code.lower()
-        for pattern in dangerous_patterns:
-            if pattern.lower() in code_lower:
-                return False, f'Dangerous operation blocked: {pattern}'
-        
-        return True, None
-
-    def _build_container_filename(self, language, file_name=None):
-        ext = 'py' if language == 'python' else 'js'
-        safe_name = (file_name or '').strip()
-
-        if safe_name:
-            safe_name = os.path.basename(safe_name)
-            safe_name = re.sub(r'[^A-Za-z0-9._-]+', '_', safe_name)
-            root, current_ext = os.path.splitext(safe_name)
-            if root and current_ext.lower() != f'.{ext}':
-                safe_name = f'{root}.{ext}'
-
-        if not safe_name:
-            safe_name = f'main.{ext}'
-
-        return safe_name
-
-    def execute_code(self, language, code, file_name=None):
-        if len(code) > self.max_code_size:
+    def execute_code(self, language, code, cmd, docker_image, file_name=None):
+        if len(code) > self.docker_service.max_code_size:
             return {'success': False, 'error': 'Code exceeds maximum size limit'}
 
-        docker_image = self.docker_images.get(language)
         if not docker_image:
             return {'success': False, 'error': f'Language {language} not supported'}
 
         ext = 'py' if language == 'python' else 'js'
-        container_filename = self._build_container_filename(language, file_name)
+        container_filename = self.docker_service._build_container_filename(language, file_name)
         container_path = f'/app/{container_filename}'
 
+        cmd = f' {cmd} {container_path}' # python main.py or node main.js
+        
         with tempfile.NamedTemporaryFile(mode='w', suffix=f'.{ext}', delete=False, encoding='utf-8') as f:
             temp_file = f.name
             f.write(code)
         # -u flag on Python disables output buffering
-        cmd = ['python', '-u', container_path] if language == 'python' else ['node', container_path]
 
         try:
-            container = self._get_client().containers.run(
+            container = self.docker_service._get_client().containers.run(
                 docker_image,
                 command=cmd,
                 volumes={os.path.abspath(temp_file): {'bind': container_path, 'mode': 'ro'}},
                 detach=True,
                 remove=False,
                 network_mode='none',
-                mem_limit=self.memory_limit,
-                cpu_quota=self.cpu_quota,
+                mem_limit=self.docker_service.memory_limit,
+                cpu_quota=self.docker_service.cpu_quota,
                 cpu_period=100000,
                 read_only=True,
                 tmpfs={'/tmp': 'size=10M,noexec,nosuid'},
@@ -117,14 +49,14 @@ class ContainerHandler:
                 ],
             )
 
-            result = container.wait(timeout=self.simple_timeout)
+            result = container.wait(timeout=self.docker_service.execution_timeout)
 
             output = container.logs(stdout=True, stderr=False).decode('utf-8', errors='replace')
             errors = container.logs(stdout=False, stderr=True).decode('utf-8', errors='replace')
 
             # Cap output to prevent flooding
-            if len(output) > self.max_output_bytes:
-                output = output[:self.max_output_bytes] + '\n[Output truncated at 10 KB]'
+            if len(output) > self.docker_service.max_output_bytes:
+                output = output[:self.docker_service.max_output_bytes] + '\n[Output truncated at 10 KB]'
 
             try:
                 container.remove()
@@ -156,81 +88,18 @@ class ContainerHandler:
                 os.unlink(temp_file)
             except Exception:
                 pass
-
-    def create_interactive_container(self, language, code, file_name=None):
-        """
-        Create (but do not start) a Docker container for interactive stdin/stdout
-        execution.  The caller is responsible for starting the container and
-        attaching to it via attach_socket().
-
-        Returns (container, temp_file_path) so the caller can clean up the
-        temp file when the session ends.
-        """
-        if len(code) > self.max_code_size:
-            raise ValueError('Code exceeds maximum size limit')
-
-        docker_image = self.docker_images.get(language)
-        if not docker_image:
-            raise ValueError(f'Language {language} not supported')
-
-        ext = 'py' if language == 'python' else 'js'
-        container_filename = self._build_container_filename(language, file_name)
-        container_path = f'/app/{container_filename}'
-
-        with tempfile.NamedTemporaryFile(mode='w', suffix=f'.{ext}', delete=False, encoding='utf-8') as f:
-            temp_file = f.name
-            f.write(code)
-
-        cmd = ['python', '-u', container_path] if language == 'python' else ['node', container_path]
-        container = self._get_client().containers.create(
-            docker_image,
-            command=cmd,
-            volumes={os.path.abspath(temp_file): {'bind': container_path, 'mode': 'ro'}},
-            stdin_open=True,   # keep stdin pipe open
-            tty=True,          # allocate a PTY → raw byte stream (no 8-byte mux headers)
-            detach=True,
-            network_mode='none',
-            mem_limit=self.memory_limit,
-            cpu_quota=self.cpu_quota,
-            cpu_period=100000,
-            read_only=True,
-            tmpfs={'/tmp': 'size=10M,noexec,nosuid'},
-            cap_drop=['ALL'],
-            security_opt=['no-new-privileges'],
-            pids_limit=50,
-            user='nobody',
-            ulimits=[
-                docker.types.Ulimit(name='nofile', soft=64, hard=64),
-                docker.types.Ulimit(name='fsize', soft=10485760, hard=10485760),
-            ],
-        )
-
-        return container, temp_file
-
-    def cleanup_container(self, container):
-        """Kill and remove a container, ignoring errors."""
-        try:
-            container.kill()
-        except Exception:
-            pass
-        try:
-            container.remove()
-        except Exception:
-            pass
-    
-    def execute_algorithm(self, language, code):
+    def execute_algorithm(self, language, code, cmd, docker_image):
         print(f"\n[CONTAINER] Starting execution for {language}")
         print(f"[CONTAINER] Code length: {len(code)} bytes")
         
         # Validation
-        is_valid, error_msg = self._validate_code(code)
+        is_valid, error_msg = self.docker_service._validate_code(code)
         if not is_valid:
             print(f"[CONTAINER] Validation failed: {error_msg}")
             return {'success': False, 'error': error_msg}
         
         print(f"[CONTAINER] Code validation passed")
         
-        docker_image = self.docker_images.get(language)
         if not docker_image:
             return {
                 'success': False,
@@ -244,9 +113,11 @@ class ContainerHandler:
         print(f"[CONTAINER] Created temp file: {temp_file}")
         
         # Get tracers directory path
-        backend_dir = os.path.dirname(os.path.abspath(__file__))
-        tracers_dir = os.path.join(os.path.dirname(backend_dir), 'tracers')
-        helpers_dir = os.path.join(os.path.dirname(backend_dir), 'sample_algorithms')
+        RUNTIME_DIR_NAME = 'runtime' # CHANGE THIS IF RUNTIME DIR NAME CHANGES
+        HELPERS_DIR_NAME = 'sample_algorithms' # CHANGE THIS IF HELPERS DIR NAME CHANGES
+        root_dir = get_project_root()
+        tracers_dir = os.path.join(root_dir, RUNTIME_DIR_NAME)
+        helpers_dir = os.path.join(root_dir, HELPERS_DIR_NAME)
         
         print(f"[CONTAINER] Tracers directory: {tracers_dir}")
         print(f"[CONTAINER] Helpers directory: {helpers_dir}")
@@ -255,17 +126,15 @@ class ContainerHandler:
             # Determine file extension and command
             if language == 'python':
                 container_path = '/app/algorithm.py'
-                cmd = ['python', container_path]
             else:  # javascript
                 container_path = '/app/algorithm.js'
-                cmd = ['node', container_path]
-            
+
+            cmd = f' {cmd} {container_path}' # python algorithm.py or node algorithm.js
             print(f"[CONTAINER] Using image: {docker_image}")
-            print(f"[CONTAINER] Command: {' '.join(cmd)}")
             print(f"[CONTAINER] Starting container...")
             
             # Run container with code mounted (don't auto-remove yet)
-            container = self._get_client().containers.run(
+            container = self.docker_service._get_client().containers.run(
                 docker_image,
                 command=cmd,
                 volumes={
@@ -273,10 +142,12 @@ class ContainerHandler:
                         'bind': container_path,
                         'mode': 'ro'  # Read-only
                     },
+                    # BIND ENTIRE TRACER DIRECTORY AS READ-ONLY
                     os.path.abspath(tracers_dir): {
-                        'bind': '/app/tracers',
+                        'bind': f'/app/{RUNTIME_DIR_NAME}',
                         'mode': 'ro'  # Read-only
                     },
+                    # BIND FILES ONLY, NOT FOLDERS
                     os.path.abspath(os.path.join(helpers_dir, 'helpers.py')): {
                         'bind': '/app/helpers.py',
                         'mode': 'ro'
@@ -289,8 +160,8 @@ class ContainerHandler:
                 detach=True,
                 remove=False,
                 network_mode='none',
-                mem_limit=self.memory_limit,
-                cpu_quota=self.cpu_quota,
+                mem_limit=self.docker_service.memory_limit,
+                cpu_quota=self.docker_service.cpu_quota,
                 cpu_period=100000,
                 read_only=True,  # Read-only root filesystem
                 tmpfs={'/tmp': 'size=10M,noexec,nosuid'},
@@ -305,10 +176,10 @@ class ContainerHandler:
             )
             
             # Wait for container to finish
-            print(f"[CONTAINER] Waiting for execution (timeout: {self.execution_timeout}s)...")
-            result = container.wait(timeout=self.execution_timeout)
+            print(f"[CONTAINER] Waiting for execution (timeout: {self.docker_service.execution_timeout}s)...")
+            result = container.wait(timeout=self.docker_service.execution_timeout)
             print(f"[CONTAINER] Execution completed with exit code: {result['StatusCode']}")
-            
+                
             logs = container.logs(stdout=True, stderr=False).decode('utf-8')
             errors = container.logs(stdout=False, stderr=True).decode('utf-8')
 
@@ -326,6 +197,11 @@ class ContainerHandler:
                 print(f"[CONTAINER] ===== STDERR =====")
                 print(errors)
                 print(f"[CONTAINER] ===== END STDERR =====")
+                return {
+                    'success': False,
+                    'stderr': errors,
+                    'exit_code': result['StatusCode']
+                }
             
             start_marker = '--- TRACER_JSON_START ---'
             end_marker = '--- TRACER_JSON_END ---'

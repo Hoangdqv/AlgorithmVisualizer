@@ -1,11 +1,4 @@
 Next implementations:
-- Figure out how to deploy the Docker services to a cloud platform to avoid the
-  need for users to set up Docker locally (high-prio) [WIP]
-- Implement real-time collaborative coding features using WebSockets or similar (low-prio)
-- Enhance the code execution environment with more languages and better resource management.
-- Setup a proper admin/user dashboard/profile
-- Add more sample algorithms and coding challenges/categories for users to practice on.
-
 - Thinking about migrating samples and algorithms to database instead of local device.
 
 
@@ -13,3 +6,7 @@ Next implementations:
 == Errors ==
 - COOP (Cross Origin Opener Policy) error known for GoogleOauth, working as intended despite error in console, maybe need to change in dev server instead of local device
 - Added time delay for Google token verification because local device have time desyncs
+
+
+==Notes==
+- Error in algorithms section is currently at the wrong segments due to import [?]

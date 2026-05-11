@@ -1,4 +1,4 @@
-import Tracer from './tracers/tracer.js';
+import Tracer from './runtime/tracer.js';
 
 // [ALGORITHM]
 function bfs(graph, startNode, tracer) {
@@ -17,7 +17,7 @@ function bfs(graph, startNode, tracer) {
     const visitedOrder = [];
     
     // Initial state - show graph with start node
-    tracer.addState([], {
+    tracer.add_state([], {
         graph: graph,
         visited: [...visited],
         queue: [...queue]
@@ -28,7 +28,7 @@ function bfs(graph, startNode, tracer) {
         visitedOrder.push(current);
         
         // Show current node being processed
-        tracer.addState([], {
+        tracer.add_state([], {
             graph: graph,
             visited: [...visited],
             queue: [...queue],
@@ -42,7 +42,7 @@ function bfs(graph, startNode, tracer) {
                 queue.push(neighbor);
                 
                 // Show neighbor being discovered
-                tracer.addState([], {
+                tracer.add_state([], {
                     graph: graph,
                     visited: [...visited],
                     queue: [...queue],
@@ -54,7 +54,7 @@ function bfs(graph, startNode, tracer) {
     }
     
     // Final state
-    tracer.addState([], {
+    tracer.add_state([], {
         graph: graph,
         visited: [...visited],
         queue: [],

@@ -3,7 +3,7 @@ Delete user by username or email
 Usage: python delete_user.py <username_or_email>
 """
 import sys
-from app import app
+from backend.app import app
 from database import db
 from models import User, File, Folder, ClosureTable
 

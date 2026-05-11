@@ -16,6 +16,7 @@ const EditorComponent = ({
   code,
   handleEditorChange,
   currentLanguage,
+  languageSelectionKey,
   languages,
   handleLanguageSelect,
   output,
@@ -72,10 +73,13 @@ const EditorComponent = ({
   toggleTracerGuide,
   onBack,
 }) => {
-  const sidebarLanguageKey = category ? `${category}_${currentLanguage}` : currentLanguage;
+  const resolvedLanguageKey =
+    languageSelectionKey || (category ? `${category}_${currentLanguage}` : currentLanguage);
   const TRACER_GUIDE_ANIMATION_MS = 350;
   const [isTracerGuideRendered, setIsTracerGuideRendered] = useState(showTracerGuide);
   const [isTracerGuideClosing, setIsTracerGuideClosing] = useState(false);
+  const [metadataTooltip, setMetadataTooltip] = useState(null);
+  const [metadataTooltipPos, setMetadataTooltipPos] = useState({ x: 0, y: 0 });
   const editorInstanceRef = useRef(null);
 
 
@@ -137,6 +141,14 @@ const EditorComponent = ({
 
   const getCurrentEditorRef = (editor) => {
     editorInstanceRef.current = editor;
+  };
+
+  const handleMetadataMouseMove = (event) => {
+    setMetadataTooltipPos({ x: event.clientX, y: event.clientY });
+  };
+
+  const handleMetadataMouseLeave = () => {
+    setMetadataTooltip(null);
   };
 
   return (
@@ -228,7 +240,7 @@ const EditorComponent = ({
               <Sidebar
                 onFileSelect={handleFileSelect}
                 onUserFileSelect={handleUserFileSelect}
-                selectedLanguage={sidebarLanguageKey || currentLanguage}
+                selectedLanguage={resolvedLanguageKey}
                 initialTab={initialSidebarTab}
                 // Propagates selection state so tree highlight follows image arrow navigation.
                 selectedUserFileId={selectedUserFileId}
@@ -428,7 +440,7 @@ const EditorComponent = ({
           <div className='tracer-guide-section'>
             <div className='tracer-guide-label'>Detected tracer lines for this code:</div>
             <ol className='tracer-guide-line-list'>
-              {tracerGuide.detectedLines?.map((line) => (
+              {tracerGuide.detectedLines.map((line) => (
                 <li key={line.id} className='tracer-guide-line-item'>
                   {(() => {
                     return (
@@ -453,7 +465,7 @@ const EditorComponent = ({
                       className='tracer-guide-line-copy-btn'
                       onClick={() => handleCopySnippet(line.snippet)}
                     >
-                      Copy
+                      📋
                     </button>
                   </div>
                       </>
@@ -466,23 +478,29 @@ const EditorComponent = ({
 
           <div className='tracer-guide-section'>
             <div className='tracer-guide-label'>Common tracer metadata:</div>
-            <pre className='tracer-guide-inline'>{tracerGuide.metadata.join(', ')}</pre>
-            {tracerGuide.metadataHints && (
-              <div style={{ marginTop: '0.45rem' }}>
-                <div className='tracer-guide-label' style={{ marginBottom: '0.2rem' }}>Possible values:</div>
-                <ul className='tracer-guide-list'>
-                  {tracerGuide.metadata.map((metaKey) => {
-                    const hint = tracerGuide.metadataHints[metaKey];
-                    if (!hint) return null;
-                    return (
-                      <li key={metaKey}>
-                        <strong>{metaKey}</strong>: {hint}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
+            <div className='tracer-guide-metadata-list'>
+              {tracerGuide.metadata.map((metaKey) => {
+                const hint = tracerGuide.metadataHints?.[metaKey];
+                const tooltipText = hint ? `${metaKey}: ${hint}` : metaKey;
+                return (
+                  <span
+                    key={metaKey}
+                    className='tracer-guide-metadata-chip'
+                    onMouseEnter={(event) => {
+                      setMetadataTooltip(tooltipText);
+                      setMetadataTooltipPos({ x: event.clientX, y: event.clientY });
+                    }}
+                    onMouseMove={handleMetadataMouseMove}
+                    onMouseLeave={handleMetadataMouseLeave}
+                  >
+                    {metaKey}
+                  </span>
+                );
+              })}
+            </div>
+            <div className='tracer-guide-label' style={{ marginTop: '0.35rem', fontSize: '0.8rem' }}>
+              Hover a metadata key to see possible values.
+            </div>
           </div>
 
           <div className='tracer-guide-section'>
@@ -493,6 +511,14 @@ const EditorComponent = ({
           </div>
 
         </aside>
+        {metadataTooltip && (
+          <div
+            className='tracer-guide-floating-tooltip'
+            style={{ left: `${metadataTooltipPos.x}px`, top: `${metadataTooltipPos.y}px` }}
+          >
+            {metadataTooltip}
+          </div>
+        )}
       </>
     )}
   </div>

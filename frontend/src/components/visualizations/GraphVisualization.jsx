@@ -35,6 +35,45 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
     height: 400
   }), []);
 
+  const fitToScreen = useCallback(() => {
+    const nodeIds = Object.keys(nodePositions);
+    if (nodeIds.length === 0) return;
+    
+    // Bounding box of all nodes
+    const padding = 50;
+    const nodeRadius = 20;
+    
+    const xs = nodeIds.map(id => nodePositions[id].x);
+    const ys = nodeIds.map(id => nodePositions[id].y);
+    
+    const minX = Math.min(...xs) - nodeRadius - padding;
+    const maxX = Math.max(...xs) + nodeRadius + padding;
+    const minY = Math.min(...ys) - nodeRadius - padding;
+    const maxY = Math.max(...ys) + nodeRadius + padding;
+    
+    const contentWidth = maxX - minX;
+    const contentHeight = maxY - minY;
+    
+    // Calculate zoom to fit
+    const scaleX = viewBox.width / contentWidth;
+    const scaleY = viewBox.height / contentHeight;
+    const newZoom = Math.min(scaleX, scaleY, 3); 
+    
+    // Center of content
+    const contentCenterX = (minX + maxX) / 2;
+    const contentCenterY = (minY + maxY) / 2;
+    
+    // Pan to center the content
+    const viewBoxCenterX = viewBox.width / 2;
+    const viewBoxCenterY = viewBox.height / 2;
+    
+    const newPanX = viewBoxCenterX - contentCenterX * newZoom;
+    const newPanY = viewBoxCenterY - contentCenterY * newZoom;
+    
+    setZoom(newZoom);
+    setPanOffset({ x: newPanX, y: newPanY });
+  }, [nodePositions, viewBox.height, viewBox.width]);
+
   // Default layout strategy.
   const calculateCirclePositions = useCallback((nodeCount) => {
     if (nodeCount === 0) return {};
@@ -90,7 +129,7 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
       positions[i] = chosen;
     }
     return positions;
-  }, [centerX, centerY, radius]);
+  }, [centerX, centerY, radius, viewBox.width, viewBox.minX]);
 
   // Initialize/update node positions
   useEffect(() => {
@@ -141,6 +180,7 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
     const nodeCount = graphData.length;
     updateNodePositions(() => calculateCirclePositions(nodeCount));
     setAutoFitPending(true);
+
   }, [graphData.length, calculateCirclePositions]);
 
   const getSVGCoordinates = (e) => {
@@ -285,44 +325,6 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
     }
   }, [handleWheel]);
 
-  const fitToScreen = useCallback(() => {
-    const nodeIds = Object.keys(nodePositions);
-    if (nodeIds.length === 0) return;
-    
-    // Bounding box of all nodes
-    const padding = 50;
-    const nodeRadius = 20;
-    
-    const xs = nodeIds.map(id => nodePositions[id].x);
-    const ys = nodeIds.map(id => nodePositions[id].y);
-    
-    const minX = Math.min(...xs) - nodeRadius - padding;
-    const maxX = Math.max(...xs) + nodeRadius + padding;
-    const minY = Math.min(...ys) - nodeRadius - padding;
-    const maxY = Math.max(...ys) + nodeRadius + padding;
-    
-    const contentWidth = maxX - minX;
-    const contentHeight = maxY - minY;
-    
-    // Calculate zoom to fit
-    const scaleX = viewBox.width / contentWidth;
-    const scaleY = viewBox.height / contentHeight;
-    const newZoom = Math.min(scaleX, scaleY, 3); 
-    
-    // Center of content
-    const contentCenterX = (minX + maxX) / 2;
-    const contentCenterY = (minY + maxY) / 2;
-    
-    // Pan to center the content
-    const viewBoxCenterX = viewBox.width / 2;
-    const viewBoxCenterY = viewBox.height / 2;
-    
-    const newPanX = viewBoxCenterX - contentCenterX * newZoom;
-    const newPanY = viewBoxCenterY - contentCenterY * newZoom;
-    
-    setZoom(newZoom);
-    setPanOffset({ x: newPanX, y: newPanY });
-  }, [nodePositions, viewBox.height, viewBox.width]);
 
   // Expose resetPositions to parent component
   useImperativeHandle(ref, () => ({
@@ -335,7 +337,7 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
     random: () => {
       randomizeLayout();
     }
-  }), [fitToScreen, randomizeLayout, resetToDefaultCircularLayout]);
+  }), [fitToScreen,randomizeLayout, resetToDefaultCircularLayout]);
 
   useEffect(() => {
     if (!autoFitPending) return;
@@ -382,6 +384,7 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
           fill="none" 
           pointerEvents="none"
         />
+        
         <g transform={`translate(${panOffset.x}, ${panOffset.y}) scale(${zoom})`}>
           {graphData.map((row, i) =>
           // graphData is an adjacency matrix, check for edges between nodes
@@ -403,7 +406,6 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
               return null;
             })
           )}
-          
           {nodeIds.map((nodeId) => {
             const pos = nodePositions[nodeId];
             return (
