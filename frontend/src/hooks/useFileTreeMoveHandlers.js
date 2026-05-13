@@ -40,7 +40,7 @@ export default function useFileTreeMoveHandlers({
 
   const handleMoveFile = useCallback(async (fileId, targetFolderId = null) => {
     const file = userFiles.find(f => f.file_id === fileId);
-    if (!file || file.folder_id === targetFolderId) {
+    if (!file || file.parent_item_id === targetFolderId) {
       return;
     }
 
@@ -49,7 +49,7 @@ export default function useFileTreeMoveHandlers({
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ folder_id: targetFolderId })
+        body: JSON.stringify({ parent_item_id: targetFolderId })
       });
 
       if (response.ok) {
@@ -68,7 +68,7 @@ export default function useFileTreeMoveHandlers({
 
   const handleMoveFolder = useCallback(async (folderId, targetParentId = null) => {
     const folder = findFolderById(userFolders, folderId);
-    if (!folder || folder.parent_folder_id === targetParentId) {
+    if (!folder || folder.parent_item_id === targetParentId) {
       return;
     }
 

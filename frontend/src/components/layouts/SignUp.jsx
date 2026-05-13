@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/useAuth';
 import { validateEmail, isUsernameEmpty,validatePassword, validatePasswordMatch } from '../../script_utils/credentialsValidation';
@@ -10,6 +10,7 @@ export default function SignUp() {
     const [password, setPassword] = useState('');
     const [passwordRetype, setPasswordRetype] = useState('');
     const [error, setError] = useState('');
+    const [showError, setShowError] = useState(false);
     const { register } = useAuth();
     const navigate = useNavigate();
 
@@ -17,7 +18,18 @@ export default function SignUp() {
     const usernameIsEmpty = isUsernameEmpty(username);
     const passwordIsValid = validatePassword(password);
     const passwordMatch = validatePasswordMatch(password, passwordRetype);
+    useEffect(() => {
+        if (error) {
+        setShowError(true);
 
+        const timer = setTimeout(() => {
+            setShowError(false);
+        }, 3000);
+
+        return () => clearTimeout(timer);
+        }
+    }, [error]);
+    
     const handleUserSignUp = async (e) => {
         e.preventDefault();
         setError('');
@@ -52,7 +64,7 @@ export default function SignUp() {
   return (
     <div className='auth-container'>
         <h2>Sign Up</h2>
-        {error && <div className="error-alert">{error}</div>}
+        {showError && <div className="error-alert">{error}</div>}
         <SignUpForm
             username={username}
             email={email}

@@ -23,6 +23,11 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
   const [modal, setModal] = useState(null);
   const [languages, setLanguages] = useState([]);
 
+  const [dragContext, setDragContext] = useState({
+    dragOverTarget: null,
+    isDragging: false,
+    dragSource: null,
+  });
   const API_URL = import.meta.env.VITE_API_URL;
 
   // Load available languages
@@ -138,8 +143,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
 
         allFolders = trees.filter(t => t !== null);
       }
-      
-      setUserFolders(allFolders);
+    
 
       // Load all files
       const filesResponse = await fetch(`${API_URL}/user/files`, {
@@ -150,14 +154,16 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
       if (filesResponse.ok) {
         const filesData = await filesResponse.json();
         allFiles = filesData.files || [];
-        setUserFiles(allFiles);
+
       }
 
-      // Update shared cache
+      setUserFolders(allFolders);
+      setUserFiles(allFiles);
       apiCache.current.userFilesData = {
         folders: allFolders,
         files: allFiles,
       };
+
     } catch (error) {
       console.error('Error loading user files:', error);
     } finally {
@@ -166,6 +172,19 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
       }
     }
   }, [apiCache, API_URL]);
+
+    const isDragSourceTarget = useCallback(
+    (targetType, targetId) => (
+      dragContext.dragSource
+      && dragContext.dragSource.type === targetType
+      && dragContext.dragSource.id === targetId
+    ),
+    [dragContext.dragSource]
+  );
+
+  const isRootDropTarget = dragContext.dragOverTarget === 'root:root'
+    && !isDragSourceTarget('folder', null);
+
 
     // Load samples when on samples tab
   useEffect(() => {
@@ -208,15 +227,15 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
       };
     });
 
-    // Build parent-child relationships using parent_folder_id
+    // Build parent-child relationships using parent_item_id
     const roots = [];
     treeNodes.forEach(node => {
       if (node.depth === 0) {
         // Root folder
         roots.push(nodeMap[node.folder_id]);
       } else {
-        // Find the parent using parent_folder_id
-        const parentId = node.parent_folder_id;
+        // Find the parent using parent_item_id
+        const parentId = node.parent_item_id;
         
         if (parentId && nodeMap[parentId]) {
           // Add this node as a child of the parent
@@ -253,7 +272,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
   }, [samples, searchQuery]);
 
   // Filter user files and folders based on search query
-  // File structure: file: { file_id, file_name, folder_id (nullable), lang_id }
+  // File structure: file: { file_id, item_name, parent_item_id (nullable), lang_id }
   const filteredUserData = useMemo(() => {
     if (!searchQuery.trim()) {
       return { folders: userFolders, files: userFiles };
@@ -261,7 +280,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
     
     const query = searchQuery.toLowerCase();
     const matchesFileSearch = (file) => {
-      const fileName = (file.file_name || '').toLowerCase();
+      const fileName = (file.item_name || '').toLowerCase();
       const languageName = (
         file.lang?.language ||
         languages.find(lang => lang.lang_id === file.lang_id)?.language ||
@@ -278,9 +297,9 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
     };
     
     // Recursively filter folders and their nested content
-    // Folder structure: { folder_id, folder_name, children: [subfolders], files: [files in this folder] }
+    // Folder structure: { folder_id, item_name, children: [subfolders], files: [files in this folder] }
     const filterFolder = (folder) => {
-      const matchesSearch = folder.folder_name?.toLowerCase().includes(query)
+      const matchesSearch = folder.item_name?.toLowerCase().includes(query)
       
       // Filter files in this folder
       const filteredFiles = (folder.files || []).filter(file => 
@@ -309,7 +328,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
       .filter(folder => folder !== null);
     
     const filteredFiles = userFiles.filter(file => 
-      !file.folder_id && matchesFileSearch(file)
+      !file.parent_item_id && matchesFileSearch(file)
     );
     
     return { folders: filteredFolders, files: filteredFiles };
@@ -373,14 +392,14 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
   const handleCreateFolder = async (name, parentId = null) => {
     const checkDuplicateInFolder = (folders, targetParentId) => {
       if (!targetParentId) {
-        // Check root level - compare by folder_name
-        return folders.some(f => (f.folder_name) === name);
+        // Check root level - compare by item_name
+        return folders.some(f => (f.item_name) === name);
       }
       
       // Recursively search for the parent folder
       for (const folder of folders) {
         if (folder.folder_id === targetParentId) {
-          return (folder.children || []).some(f => (f.folder_name) === name);
+          return (folder.children || []).some(f => (f.item_name) === name);
         }
         if (folder.children && folder.children.length > 0) {
           const found = checkDuplicateInFolder(folder.children, targetParentId);
@@ -401,8 +420,8 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          folder_name: name, 
-          parent_folder_id: parentId 
+          item_name: name, 
+          parent_item_id: parentId 
         })
       });
       
@@ -423,10 +442,10 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
   const handleCreateFile = async (name, languageId, folderId = null) => {
     // Check for duplicate file names in the same folder
     const filesInFolder = folderId
-      ? userFiles.filter(f => f.folder_id === folderId)
-      : userFiles.filter(f => !f.folder_id);
+      ? userFiles.filter(f => f.parent_item_id === folderId)
+      : userFiles.filter(f => !f.parent_item_id);
     
-    if (filesInFolder.some(f => f.file_name === name)) {
+    if (filesInFolder.some(f => f.item_name === name)) {
       alert(`A file named "${name}" already exists in this location.`);
       return;
     }
@@ -437,8 +456,8 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          file_name: name,
-          folder_id: folderId,
+          item_name: name,
+          parent_item_id: folderId,
           language_id: languageId,
           content: ''
         })
@@ -480,8 +499,8 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
       : null;
 
     const itemName = contextMenu.type === 'folder'
-      ? (contextMenu.item.folder_name || contextMenu.item.name || 'this folder')
-      : (contextMenu.item.file_name || contextMenu.item.filename || 'this file');
+      ? (contextMenu.item.item_name || contextMenu.item.name || 'this folder')
+      : (contextMenu.item.item_name || contextMenu.item.filename || 'this file');
 
     const confirmed = window.confirm(
       `Are you sure you want to delete ${itemName}?`
@@ -535,8 +554,8 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
         : `${API_URL}/user/files/${item.file_id}`;
       
       const body = itemType === 'folder'
-        ? { folder_name: newName }
-        : { file_name: newName };
+        ? { item_name: newName }
+        : { item_name: newName };
       
       console.log('Rename request:', { endpoint, body });
       
@@ -556,7 +575,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
         if (itemType === 'file' && item.file_id && apiCache.current.userFileContent?.[item.file_id]) {
           apiCache.current.userFileContent[item.file_id] = {
             ...apiCache.current.userFileContent[item.file_id],
-            file_name: newName,
+            item_name: newName,
           };
         }
         loadUserFiles(true, true); // Force silent reload after renaming
@@ -613,7 +632,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
             {loading ? (
               <div style={{ color: '#888', padding: '1rem' }}>Loading samples...</div>
             ) : (
-              <div style={{ marginBottom: '0.5rem' }}>
+              <div style={{ marginBottom: '0.5rem', overflowY: 'auto'}}>
                 <button
                   onClick={() => toggleFileDropdown('samples')}
                   className='folder-button'
@@ -636,7 +655,10 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
                       <div style={{
                         padding: '0.5rem',
                         color: '#888',
-                        fontSize: '14px'
+                        fontSize: '14px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
                       }}>
                         {searchQuery ? `No results for "${searchQuery}"` : 'No samples available'}
                       </div>
@@ -709,11 +731,12 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
               <div style={{ color: '#888', padding: '1rem' }}>Loading files...</div>
             ) : (
               <>
-                <div className="file-tree-scroll-container hidden-scrollbar sidebar-bottom-padding">
+                <div className={`file-tree-scroll-container hidden-scrollbar sidebar-bottom-padding ${isRootDropTarget ? 'drop-target' : ''}`}>
                   <FileTree
                     folders={filteredUserData.folders}
-                    files={filteredUserData.files.filter(f => !f.folder_id)}
+                    files={filteredUserData.files.filter(f => !f.parent_item_id)}
                     onFileClick={handleUserFileClick}
+                    onFileSelect={setSelectedFileId}
                     onFolderClick={() => {}}
                     onContextMenu={handleContextMenu}
                     onMoveFile={handleMoveFile}
@@ -721,10 +744,12 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
                     selectedFileId={selectedFileId}
                     languages={languages}
                     depth={0}
+                    dragContext={dragContext}
+                    setDragContext={setDragContext}
                   />
                 </div>
-                {filteredUserData.folders.length === 0 && filteredUserData.files.filter(f => !f.folder_id).length === 0 && (
-                  <div style={{ color: '#888', padding: '1rem', textAlign: 'center' }}>
+                {filteredUserData.folders.length === 0 && filteredUserData.files.filter(f => !f.parent_item_id).length === 0 && (
+                  <div style={{ color: '#888', padding: '1rem', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {searchQuery ? `No results for "${searchQuery}"` : 'No files yet. Create a folder or file to get started!'}
                   </div>
                 )}
@@ -783,7 +808,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
           }}
           type={modal.type}
           title={modal.type === 'rename' ? `Rename ${modal.itemType === 'folder' ? 'Folder' : 'File'}` : undefined}
-          initialValue={modal.type === 'rename' ? (modal.itemType === 'folder' ? (modal.item.folder_name || modal.item.name) : (modal.item.file_name || modal.item.filename)) : ''}
+          initialValue={modal.type === 'rename' ? (modal.itemType === 'folder' ? (modal.item.item_name || modal.item.name) : (modal.item.item_name || modal.item.filename)) : ''}
           languages={languages}
         />
       )}

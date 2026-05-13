@@ -6,5 +6,5 @@ export const consoleErrorHandling = (error) => {
     if (message_lowered.includes('failed to fetch')) {
         return 'Execution failed: Unable to connect to the server. Please check your network connection and try again.';
     }
-    return `Execution failed: ${message_lowered || 'Unknown error'}`;
+    return `Execution failed: ${error ?? 'Unknown error'}`;
 };

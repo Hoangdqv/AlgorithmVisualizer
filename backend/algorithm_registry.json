@@ -47,6 +47,13 @@
             "description": "New Sort algorithm",
             "explanation_file": "Sorting/new_sort/explanation.txt",
             "await_console_input": false
+          },
+          "newalgorithm": {
+            "file": "Sorting/newalgorithm/python/newalgorithm.py",
+            "name": "Newalgorithm",
+            "description": "Newalgorithm algorithm",
+            "explanation_file": "Sorting/newalgorithm/explanation.txt",
+            "await_console_input": false
           }
         },
         "javascript": {
@@ -91,6 +98,13 @@
             "name": "New Sort",
             "description": "New Sort algorithm",
             "explanation_file": "Sorting/new_sort/explanation.txt",
+            "await_console_input": false
+          },
+          "newalgorithm": {
+            "file": "Sorting/newalgorithm/javascript/newalgorithm.js",
+            "name": "Newalgorithm",
+            "description": "Newalgorithm algorithm",
+            "explanation_file": "Sorting/newalgorithm/explanation.txt",
             "await_console_input": false
           }
         }

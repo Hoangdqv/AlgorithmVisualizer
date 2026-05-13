@@ -24,7 +24,9 @@ export default function AdminPanel() {
   // Editing states
   const [creatingNew, setCreatingNew] = useState(false);
   const [editingExplanation, setEditingExplanation] = useState(false);
-  const [editingCode, setEditingCode] = useState(null); // {language, file_name, content}
+  // editingCode is based on database {langauge, item_name, content}
+  // file(s) is based on frontend rendering name {language, filename, content}
+  const [editingCode, setEditingCode] = useState(null);
   
   // Form states
   const [explanationText, setExplanationText] = useState('');
@@ -167,19 +169,19 @@ export default function AdminPanel() {
     }
   };
 
-  const handleEditCode = async (language, file_name) => {
+  const handleEditCode = async (language, item_name) => {
     if (!selectedAlgorithm) return;
     
     // Fetch the code file content
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/admin/algorithms/${selectedAlgorithm.category}/${selectedAlgorithm.name}/code/${language}/${file_name}`,
+        `${import.meta.env.VITE_API_URL}/admin/algorithms/${selectedAlgorithm.category}/${selectedAlgorithm.name}/code/${language}/${item_name}`,
         { credentials: 'include' }
       );
       
       if (response.ok) {
         const data = await response.json();
-        setEditingCode({ language, file_name, content: data.code });
+        setEditingCode({ language, item_name, content: data.code });
       } else {
         setError('Failed to load code file');
       }
@@ -197,7 +199,7 @@ export default function AdminPanel() {
     
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/admin/algorithms/${selectedAlgorithm.category}/${selectedAlgorithm.name}/code/${editingCode.language}/${editingCode.file_name}`,
+        `${import.meta.env.VITE_API_URL}/admin/algorithms/${selectedAlgorithm.category}/${selectedAlgorithm.name}/code/${editingCode.language}/${editingCode.item_name}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -257,7 +259,7 @@ export default function AdminPanel() {
     }
   };
 
-  const handleCodeFileUpload = async (event, language, file_name) => {
+  const handleCodeFileUpload = async (event, language, item_name) => {
     const file = event.target.files?.[0];
     event.target.value = '';
 
@@ -273,7 +275,7 @@ export default function AdminPanel() {
       const text = await readUploadedText(file);
       setError('');
       setMessage(`Loaded ${file.name} into editor. Click Save to persist.`);
-      setEditingCode({ language, file_name, content: text });
+      setEditingCode({ language, item_name, content: text });
     } catch {
       setError('Failed to read uploaded code file');
     }
@@ -503,14 +505,15 @@ export default function AdminPanel() {
                   <h4>Code Files</h4>
                   
                   {Object.entries(selectedAlgorithm.languages).map(([language, files]) => (
+
                     <div key={language} className="language-section">
                       <h5>{language.charAt(0).toUpperCase() + language.slice(1)}</h5>
                       {files.map((file) => (
-                        <div key={file.file_name} className="code-file">
+                        <div key={file.filename} className="code-file">
                           <div className="file-header">
-                            <span className="file_name">{file.file_name}</span>
+                            <span className="file_name">{file.filename}</span>
                             {(() => {
-                              const refKey = `${language}/${file.file_name}`;
+                              const refKey = `${language}/${file.filename}`;
                               return (
                                 <input
                                   ref={(element) => {
@@ -521,11 +524,11 @@ export default function AdminPanel() {
                                   type="file"
                                   accept={language === 'python' ? '.py,text/x-python' : '.js,text/javascript,application/javascript'}
                                   style={{ display: 'none' }}
-                                  onChange={(event) => handleCodeFileUpload(event, language, file.file_name)}
+                                  onChange={(event) => handleCodeFileUpload(event, language, file.filename)}
                                 />
                               );
                             })()}
-                            {editingCode && editingCode.language === language && editingCode.file_name === file.file_name ? (
+                            {editingCode && editingCode.language === language && editingCode.item_name === file.filename ? (
                               <div className="code-edit-actions">
                                 <button
                                   className="modal-button primary"
@@ -543,7 +546,7 @@ export default function AdminPanel() {
                                 </button>
                                 <button
                                   className="modal-button secondary"
-                                  onClick={() => codeUploadInputRefs.current[`${language}/${file.file_name}`]?.click()}
+                                  onClick={() => codeUploadInputRefs.current[`${language}/${file.filename}`]?.click()}
                                   disabled={loading}
                                 >
                                   Upload a file
@@ -553,20 +556,20 @@ export default function AdminPanel() {
                               <div className="code-edit-actions">
                                 <button
                                   className="modal-button primary"
-                                  onClick={() => handleEditCode(language, file.file_name)}
+                                  onClick={() => handleEditCode(language, file.filename)}
                                 >
                                   Edit Code
                                 </button>
                                 <button
                                   className="modal-button secondary"
-                                  onClick={() => codeUploadInputRefs.current[`${language}/${file.file_name}`]?.click()}
+                                  onClick={() => codeUploadInputRefs.current[`${language}/${file.filename}`]?.click()}
                                 >
                                   Upload a file
                                 </button>
                               </div>
                             )}
                           </div>
-                          {editingCode && editingCode.language === language && editingCode.file_name === file.file_name ? (
+                          {editingCode && editingCode.language === language && editingCode.item_name === file.filename ? (
                             <div className="code-editor-container">
                               <Editor
                                 height="400px"

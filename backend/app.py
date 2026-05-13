@@ -474,10 +474,10 @@ def register():
     
     # Check if user already exists
     if User.query.filter_by(username=username).first():
-        return jsonify({'error': 'Username already exists'}), 400
+        return jsonify({'error': 'This username is already taken. Please try again.'}), 400
     
     if User.query.filter_by(email=email).first():
-        return jsonify({'error': 'Email already exists'}), 400
+        return jsonify({'error': 'This email is already taken. Please try again.'}), 400
     
     # Create new user
     user = User(username=username, email=email)
@@ -759,7 +759,7 @@ def send_reset_email(email, token):
                 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
                     <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
                         <h2 style="color: #667eea;">Password Reset Request</h2>
-                        <p>You requested to reset your password for your Algorithm Visualizer account.</p>
+                        <p>A request was made to reset your password for your Algorithm Visualizer account.</p>
                         <p>Click the button below to reset your password:</p>
                         <div style="text-align: center; margin: 30px 0;">
                             <a href="{reset_link}" 
@@ -811,7 +811,8 @@ def forgot_password():
     token = secrets.token_urlsafe(32)
     
     # Delete any existing tokens for this user
-    ResetTokens.query.filter_by(user_id=user.id).delete()
+    for token_row in list(user.reset_tokens):
+        db.session.delete(token_row)
     
     # Create new reset token
     reset_token = ResetTokens(
@@ -820,7 +821,7 @@ def forgot_password():
         expires_at=_utcnow() + timedelta(minutes=30)
     )
     
-    db.session.add(reset_token)
+    user.reset_tokens.append(reset_token)
     db.session.commit()
     
     # Send email
@@ -1048,13 +1049,13 @@ def update_profile():
     if username != user.username:
         existing_user = User.query.filter_by(username=username).first()
         if existing_user:
-            return jsonify({'error': 'Username already exists'}), 400
+            return jsonify({'error': 'This username is already taken. Please try again.'}), 400
     
     # Check if email is taken by another user
     if email != user.email:
         existing_user = User.query.filter_by(email=email).first()
         if existing_user:
-            return jsonify({'error': 'Email already exists'}), 400
+            return jsonify({'error': 'This email is already taken. Please try again.'}), 400
     
     # Update user
     user.username = username
@@ -1520,18 +1521,18 @@ def create_folder():
         return jsonify({'error': 'User not authenticated'}), 401
     
     data = request.get_json()
-    folder_name = data.get('folder_name')
-    parent_folder_id = data.get('parent_folder_id')  # None for root
+    item_name = data.get('item_name')
+    parent_item_id = data.get('parent_item_id')  # None for root
     
-    if not folder_name:
+    if not item_name:
         return jsonify({'error': 'Folder name is required'}), 400
     
     try:
         new_folder, error = Folder.create_for_user(
-            user_id=user_id,
-            folder_name=folder_name,
-            parent_folder_id=parent_folder_id,
-            folder_type='user-defined',
+            user_account_id=user_id,
+            item_name=item_name,
+            parent_item_id=parent_item_id,
+            item_type='user-defined',
             created_at=datetime.now(),
         )
 
@@ -1558,7 +1559,7 @@ def update_folder(folder_id):
     
     data = request.get_json()
     print(data)
-    new_name = data.get('folder_name')
+    new_name = data.get('item_name')
     
     if not new_name:
         return jsonify({'error': 'Folder name is required'}), 400
@@ -1637,21 +1638,21 @@ def get_user_files():
     if not user_id:
         return jsonify({'error': 'Not authenticated'}), 401
     
-    folder_id = request.args.get('folder_id', type=int)
+    parent_item_id = request.args.get('parent_item_id', type=int)
     
     try:
-        if folder_id:
+        if parent_item_id is not None:
             # Get files in specific folder
             files = File.query.filter_by(
                 user_account_id=user_id,
-                folder_id=folder_id,
-                file_type='user-defined'
+                parent_item_id=parent_item_id,
+                item_type='user-defined'
             ).all()
         else:
             # Get all user files
             files = File.query.filter_by(
                 user_account_id=user_id,
-                file_type='user-defined'
+                item_type='user-defined'
             ).order_by(File.last_updated.desc()).all()
         
         return jsonify({
@@ -1691,21 +1692,21 @@ def create_file():
         return jsonify({'error': 'Not authenticated'}), 401
     data = request.get_json()
     print(data)
-    file_name = data.get('file_name')
-    folder_id = data.get('folder_id')  # None for root level
+    item_name = data.get('item_name')
+    parent_item_id = data.get('parent_item_id')  # None for root level
     language_id = data.get('language_id')
     content = data.get('content', '')
     
-    if not file_name:
+    if not item_name:
         return jsonify({'error': 'File name is required'}), 400
     if language_id is None:
         return jsonify({'error': 'language_id is required'}), 400
     
     try:
         new_file, error = File.create_for_user(
-            user_id=user_id,
-            file_name=file_name,
-            folder_id=folder_id,
+            user_account_id=user_id,
+            item_name=item_name,
+            parent_item_id=parent_item_id,
             language_id=language_id,
             content=content
         )
@@ -1758,16 +1759,16 @@ def upload_user_image_file():
         return jsonify({'error': 'Not authenticated'}), 401
 
     upload = request.files.get('file')
-    file_name = request.form.get('file_name')
-    folder_id_raw = request.form.get('folder_id')
+    item_name = request.form.get('item_name')
+    parent_item_id_raw = request.form.get('parent_item_id')
     language_id_raw = request.form.get('language_id')
 
-    folder_id = int(folder_id_raw) if folder_id_raw not in (None, '', 'null') else None
+    parent_item_id = int(parent_item_id_raw) if parent_item_id_raw not in (None, '', 'null') else None
     language_id = int(language_id_raw) if language_id_raw not in (None, '') else None
 
     if not upload:
         return jsonify({'error': 'Image file is required'}), 400
-    if not file_name:
+    if not item_name:
         return jsonify({'error': 'File name is required'}), 400
     if language_id is None:
         return jsonify({'error': 'language_id is required'}), 400
@@ -1783,9 +1784,9 @@ def upload_user_image_file():
 
     try:
         new_file, error = File.create_image_for_user(
-            user_id=user_id,
-            file_name=file_name,
-            folder_id=folder_id,
+            user_account_id=user_id,
+            item_name=item_name,
+            parent_item_id=parent_item_id,
             language_id=language_id,
             blob_content=blob_content,
             mime_type=mime_type
@@ -1826,7 +1827,7 @@ def get_file_binary(file_id):
         file.content_blob,
         mimetype=file.content_mime or 'application/octet-stream',
         headers={
-            'Content-Disposition': f'inline; filename="{file.file_name}"'
+            'Content-Disposition': f'inline; filename="{file.item_name}"'
         }
     )
 
@@ -1848,8 +1849,17 @@ def delete_file(file_id):
     if not file:
         return jsonify({'error': 'File not found'}), 404
     
+    parent_folder = file.folder
+    file_owner = file.user
     try:
-        db.session.delete(file)
+        if parent_folder is not None:
+            # Remove from folder relationship
+            parent_folder.files.remove(file)
+        elif file_owner is not None:
+            # Root-level files rely on the user
+            file_owner.files.remove(file)
+        else:
+            db.session.delete(file)
         db.session.commit()
         return jsonify({'message': 'File deleted successfully'}), 200
     except Exception as e:

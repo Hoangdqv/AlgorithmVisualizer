@@ -1,5 +1,5 @@
+import base64
 import docker
-import tempfile
 import os
 import json
 from backend_utils.find_root import get_project_root
@@ -10,27 +10,34 @@ class executionService:
 
     def execute_code(self, language, code, cmd, docker_image, file_name=None):
         if len(code) > self.docker_service.max_code_size:
-            return {'success': False, 'error': 'Code exceeds maximum size limit'}
+            return {'success': False, 'stderr': 'Code exceeds maximum size limit'}
 
         if not docker_image:
-            return {'success': False, 'error': f'Language {language} not supported'}
+            return {'success': False, 'stderr': f'Language {language} not supported'}
 
-        ext = 'py' if language == 'python' else 'js'
         container_filename = self.docker_service._build_container_filename(language, file_name)
-        container_path = f'/app/{container_filename}'
+        # Encode code to base64 as a additional layer of security and avoid traceback issues with newlines
+        code_b64 = base64.b64encode(code.encode('utf-8')).decode('ascii')
+        environment = {
+            'CODE_B64': code_b64,
+            'FILENAME': container_filename,
+        }
+        if language == 'python':
+            runner = os.path.abspath(os.path.join(get_project_root(), "sandbox", "python", "runner.py"))
+            runner_path = ('/sandbox/runner.py')  
+        else:
+            runner = os.path.abspath(os.path.join(get_project_root(), "sandbox", "node", "runner.js"))
+            runner_path = ('/sandbox/runner.js')
 
-        cmd = f' {cmd} {container_path}' # python main.py or node main.js
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix=f'.{ext}', delete=False, encoding='utf-8') as f:
-            temp_file = f.name
-            f.write(code)
-        # -u flag on Python disables output buffering
-
+        cmd = f' {cmd} {runner_path}'
+        print(runner)
+        print(runner_path)
         try:
             container = self.docker_service._get_client().containers.run(
                 docker_image,
                 command=cmd,
-                volumes={os.path.abspath(temp_file): {'bind': container_path, 'mode': 'ro'}},
+                environment=environment,
+                volumes={runner: {'bind': runner_path, 'mode': 'ro'}},
                 detach=True,
                 remove=False,
                 network_mode='none',
@@ -50,7 +57,6 @@ class executionService:
             )
 
             result = container.wait(timeout=self.docker_service.execution_timeout)
-
             output = container.logs(stdout=True, stderr=False).decode('utf-8', errors='replace')
             errors = container.logs(stdout=False, stderr=True).decode('utf-8', errors='replace')
 
@@ -80,14 +86,10 @@ class executionService:
         except Exception as e:
             return {
                 'success': False,
-                'error': str(e),
+                'stderr': str(e),
                 'error_file': container_filename
             }
-        finally:
-            try:
-                os.unlink(temp_file)
-            except Exception:
-                pass
+
     def execute_algorithm(self, language, code, cmd, docker_image):
         print(f"\n[CONTAINER] Starting execution for {language}")
         print(f"[CONTAINER] Code length: {len(code)} bytes")
@@ -96,21 +98,17 @@ class executionService:
         is_valid, error_msg = self.docker_service._validate_code(code)
         if not is_valid:
             print(f"[CONTAINER] Validation failed: {error_msg}")
-            return {'success': False, 'error': error_msg}
+            return {'success': False, 'stderr': error_msg}
         
         print(f"[CONTAINER] Code validation passed")
         
         if not docker_image:
             return {
                 'success': False,
-                'error': f'Language {language} not supported'
+                'stderr': f'Language {language} not supported'
             }
         
-        with tempfile.NamedTemporaryFile(mode='w', suffix=f'.{language}', delete=False) as f:
-            temp_file = f.name
-            f.write(code)
         
-        print(f"[CONTAINER] Created temp file: {temp_file}")
         
         # Get tracers directory path
         RUNTIME_DIR_NAME = 'runtime' # CHANGE THIS IF RUNTIME DIR NAME CHANGES
@@ -122,38 +120,47 @@ class executionService:
         print(f"[CONTAINER] Tracers directory: {tracers_dir}")
         print(f"[CONTAINER] Helpers directory: {helpers_dir}")
         
-        try:
-            # Determine file extension and command
-            if language == 'python':
-                container_path = '/app/algorithm.py'
-            else:  # javascript
-                container_path = '/app/algorithm.js'
+        code_b64 = base64.b64encode(code.encode('utf-8')).decode('ascii')
+        if language == 'python':
+            runner = os.path.abspath(os.path.join(get_project_root(), "sandbox", "python", "runner.py"))
+            runner_path = ('/sandbox/algorithm.py')  
+            container_filename = "algorithm.py"
+        else:
+            runner = os.path.abspath(os.path.join(get_project_root(), "sandbox", "node", "runner.js"))
+            runner_path = ('/sandbox/algorithm.js')
+            container_filename = "algorithm.js"
 
-            cmd = f' {cmd} {container_path}' # python algorithm.py or node algorithm.js
-            print(f"[CONTAINER] Using image: {docker_image}")
+        cmd = f' {cmd} {runner_path}'
+
+        environment = {
+            'CODE_B64': code_b64,
+            'FILENAME': container_filename,
+        }
+        try:
             print(f"[CONTAINER] Starting container...")
             
             # Run container with code mounted (don't auto-remove yet)
             container = self.docker_service._get_client().containers.run(
                 docker_image,
                 command=cmd,
+                environment=environment,
                 volumes={
-                    os.path.abspath(temp_file): {
-                        'bind': container_path,
+                    os.path.abspath(runner): {
+                        'bind': runner_path,
                         'mode': 'ro'  # Read-only
                     },
                     # BIND ENTIRE TRACER DIRECTORY AS READ-ONLY
                     os.path.abspath(tracers_dir): {
-                        'bind': f'/app/{RUNTIME_DIR_NAME}',
+                        'bind': f'/sandbox/{RUNTIME_DIR_NAME}',
                         'mode': 'ro'  # Read-only
                     },
                     # BIND FILES ONLY, NOT FOLDERS
                     os.path.abspath(os.path.join(helpers_dir, 'helpers.py')): {
-                        'bind': '/app/helpers.py',
+                        'bind': '/sandbox/helpers.py',
                         'mode': 'ro'
                     },
                     os.path.abspath(os.path.join(helpers_dir, 'helpers.js')): {
-                        'bind': '/app/helpers.js',
+                        'bind': '/sandbox/helpers.js',
                         'mode': 'ro'
                     }
                 },
@@ -239,23 +246,17 @@ class executionService:
             print(f"[CONTAINER] ERROR: Container execution failed: {str(e)}\n")
             return {
                 'success': False,
-                'error': f'Container execution failed: {str(e)}'
+                'stderr': f'Container execution failed: {str(e)}'
             }
         except docker.errors.APIError as e:
             print(f"[CONTAINER] ERROR: Docker API error: {str(e)}\n")
             return {
                 'success': False,
-                'error': f'Docker API error: {str(e)}'
+                'stderr': f'Docker API error: {str(e)}'
             }
         except Exception as e:
             print(f"[CONTAINER] ERROR: Unexpected error: {str(e)}\n")
             return {
                 'success': False,
-                'error': str(e)
+                'stderr': str(e)
             }
-        finally:
-            try:
-                os.unlink(temp_file)
-                print(f"[CONTAINER] Cleaned up temp file")
-            except:
-                pass

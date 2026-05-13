@@ -1,6 +1,21 @@
 import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 
 const SignInForm = ({email, password, onChangeEmail, onChangePassword, onForgotPassword, onSubmit, onError, loading}) => {
+    const [showError, setShowError] = useState(false);
+
+  useEffect(() => {
+    if (onError) {
+      setShowError(true);
+
+      const timer = setTimeout(() => {
+        setShowError(false);
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [onError]);
+
   return (
     <form onSubmit={onSubmit}>
           <div>
@@ -13,7 +28,9 @@ const SignInForm = ({email, password, onChangeEmail, onChangePassword, onForgotP
                 onChange={(e) => onChangeEmail(e.target.value)}
                 required />
           </div>
-          {onError && <div className="error-alert">{onError}</div>}
+          {showError && (
+            <div className="error-alert">{onError}</div>
+          )}
           <div>
             <label htmlFor="password">Password:</label>
             <input 

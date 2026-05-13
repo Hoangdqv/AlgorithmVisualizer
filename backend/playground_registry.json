@@ -3,7 +3,6 @@
   "languages": {
     "python": {
       "display_name": "Python",
-      "piston_name": "python",
       "samples": {
         "helloworld": {
           "file": "python/helloworld.py",
@@ -30,7 +29,6 @@
     },
     "javascript": {
       "display_name": "JavaScript",
-      "piston_name": "javascript",
       "samples": {
         "helloworld": {
           "file": "javascript/bubblesort.js",

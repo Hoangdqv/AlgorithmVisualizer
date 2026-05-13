@@ -1,14 +1,14 @@
 import React, { useMemo } from 'react';
 
 const SortingVisualization = ({ currentState }) => {
-  const arrayData = useMemo(() => currentState?.data || [], [currentState]);
+  const arrayData = useMemo(() => currentState?.data, [currentState]);
   const comparing = useMemo(() => currentState?.comparing || [], [currentState]);
   const swapped = useMemo(() => currentState?.swapped || [], [currentState]);
   const inserted = useMemo(() => currentState?.inserted || [], [currentState]);
   const selected = useMemo(() => currentState?.selected || [], [currentState]);
   const variables = useMemo(() => currentState?.variables || {}, [currentState]);
-  const indexVars = useMemo(() => currentState?.indexVars || null, [currentState]);
-  const pivot = useMemo(() => currentState?.pivot, [currentState]);
+  const indexVars = useMemo(() => currentState?.indexVars || [], [currentState]);
+  const pivot = useMemo(() => currentState?.pivot || null, [currentState]);
   const range = useMemo(() => currentState?.range || null, [currentState]);
 
   // Bucket support

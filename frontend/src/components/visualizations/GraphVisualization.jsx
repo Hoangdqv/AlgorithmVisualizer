@@ -381,7 +381,7 @@ const GraphVisualization = forwardRef(({ currentState, tracerData }, ref) => {
           y="0" 
           width={viewBox.width}
           height={viewBox.height} 
-          fill="none" 
+          fill="#1e1e1e" 
           pointerEvents="none"
         />
         

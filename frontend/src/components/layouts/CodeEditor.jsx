@@ -67,12 +67,6 @@ const CodeEditor = () => {
     return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name || '');
   }, []);
 
-  const compareFileNamesNaturally = useCallback((a, b) => {
-    // Natural sort keeps step-2 before step-10 when browsing captures.
-    const first = (a?.file_name || '').toString();
-    const second = (b?.file_name || '').toString();
-    return first.localeCompare(second, undefined, { numeric: true, sensitivity: 'base' });
-  }, []);
 
   const loadImageBlobUrl = useCallback(async (fileId) => {
     // Reuse object URLs for already-opened images to reduce navigation latency.
@@ -128,22 +122,21 @@ const CodeEditor = () => {
       }
     }
 
-    const activeFolderId = activeFile.folder_id ?? null;
+    const activeFolderId = activeFile.parent_item_id ?? null;
     const imageFiles = (Array.isArray(allFiles) ? allFiles : [])
-      .filter((file) => (file.folder_id ?? null) === activeFolderId)
-      .filter((file) => Boolean(file.has_binary) || isImageFileName(file.file_name))
-      .sort(compareFileNamesNaturally);
+      .filter((file) => (file.parent_item_id ?? null) === activeFolderId)
+      .filter((file) => Boolean(file.has_binary) || isImageFileName(file.item_name));
 
     let imageIndex = imageFiles.findIndex((file) => file.file_id === activeFile.file_id);
 
-    if (imageIndex === -1 && (Boolean(activeFile.has_binary) || isImageFileName(activeFile.file_name))) {
-      const mergedFiles = [...imageFiles, activeFile].sort(compareFileNamesNaturally);
+    if (imageIndex === -1 && (Boolean(activeFile.has_binary) || isImageFileName(activeFile.item_name))) {
+      const mergedFiles = [...imageFiles, activeFile];
       imageIndex = mergedFiles.findIndex((file) => file.file_id === activeFile.file_id);
       return { index: imageIndex, list: mergedFiles };
     }
 
     return { index: imageIndex, list: imageFiles };
-  }, [API_URL, apiCache, isImageFileName, compareFileNamesNaturally]);
+  }, [API_URL, apiCache, isImageFileName]);
 
   // Auto-detect whether user file code reads from stdin
   const _codeNeedsInput = (src, lang) => {
@@ -222,6 +215,10 @@ const CodeEditor = () => {
     // Token for rejecting stale async loads if user navigates quickly.
     const requestId = imageSelectionRequestRef.current + 1;
     imageSelectionRequestRef.current = requestId;
+    if (autoSaveTimeout.current) {
+      clearTimeout(autoSaveTimeout.current);
+      autoSaveTimeout.current = null;
+    }
     forceStopExecution();
 
     if (!file) {
@@ -242,7 +239,7 @@ const CodeEditor = () => {
       : 'Python';
 
     const fileContent = typeof file.content === 'string' ? file.content : '';
-    const imageMode = Boolean(file.has_binary) || isImageFileName(file.file_name);
+    const imageMode = Boolean(file.has_binary) || isImageFileName(file.item_name);
 
     if (imageMode) {
       if (file.has_binary) {
@@ -264,7 +261,7 @@ const CodeEditor = () => {
         setSelectedImageUrl(null);
         setOutput(consoleErrorHandling(new Error('Image file detected but no binary blob is available. Please re-capture to regenerate this file.')));
       }
-      setSelectedImageName(file.file_name || 'snapshot.png');
+      setSelectedImageName(file.item_name || 'snapshot.png');
       setCode('');
       if (file.has_binary) {
         setOutput('Image preview mode');
@@ -355,9 +352,16 @@ const CodeEditor = () => {
         return;
       }
 
-      const targetIndex = currentIndex + offset;
-      if (targetIndex < 0 || targetIndex >= imagePreviewList.length) {
+      if (imagePreviewList.length <= 1) {
         return;
+      }
+      // Loop when the last index is reached in either direction.
+
+      let targetIndex = currentIndex + offset;
+      if (targetIndex < 0) {
+        targetIndex = imagePreviewList.length - 1;
+      } else if (targetIndex >= imagePreviewList.length) {
+        targetIndex = 0;
       }
 
       const targetFile = imagePreviewList[targetIndex];
@@ -502,8 +506,13 @@ const CodeEditor = () => {
     setAwaitConsoleInput(_codeNeedsInput(value || '', currentLanguage.toLowerCase()));
 
     if (selectedUserFile) {
+      const targetFileId = selectedUserFile.file_id;
+      const contentSnapshot = value || '';
       if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current);
-      autoSaveTimeout.current = setTimeout(() => saveUserFile(value || ''), AUTOSAVE_TIMEOUT_MS);
+      autoSaveTimeout.current = setTimeout(
+        () => saveUserFile(targetFileId, contentSnapshot),
+        AUTOSAVE_TIMEOUT_MS
+      );
     }
   };
 
@@ -533,7 +542,7 @@ const CodeEditor = () => {
         if (!res.ok) {
           activeRunRef.current = false;
           setIsRunning(false);
-          setOutput(consoleErrorHandling(body.error || body.stderr));
+          setOutput(consoleErrorHandling(body.stderr || body.error));
           return;
         }
 
@@ -586,15 +595,14 @@ const CodeEditor = () => {
           body: JSON.stringify({
             language: currentLanguage.toLowerCase(),
             code,
-            file_name: selectedUserFile?.file_name ?? executionFileName,
+            file_name: selectedUserFile?.item_name ?? executionFileName,
           }),
         });
         const body = await res.json();
-        setIsRunning(false);
-
         console.log('Execution response:', body);
+        setIsRunning(false);
         if (!body.success) {
-          setOutput(consoleErrorHandling(body.error || body.stderr));
+          setOutput(consoleErrorHandling(body.stderr || body.error));
           return;
         }
 
@@ -632,23 +640,38 @@ const CodeEditor = () => {
   };
 
   // Auto-save
-  const saveUserFile = async (content) => {
-    if (!selectedUserFile) return;
+  const saveUserFile = async (fileId, content) => {
+    if (!fileId) return;
     setAutoSaving(true);
     try {
-      const response = await fetch(`${API_URL}/user/files/${selectedUserFile.file_id}`, {
+      const response = await fetch(`${API_URL}/user/files/${fileId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ content })
       });
-      if (response.ok) console.log('File auto-saved');
+      if (response.ok){
+        console.log('File auto-saved');
+        if (!apiCache.current.userFileContent) {
+          apiCache.current.userFileContent = {};
+        }
+        const cached = apiCache.current.userFileContent[fileId];
+        if (cached) {
+          apiCache.current.userFileContent[fileId] = { ...cached, content };
+        }
+        setSelectedUserFile(prev => (
+          prev && prev.file_id === fileId
+            ? { ...prev, content }
+            : prev
+        ));
+      }
     } catch (error) {
       setOutput(consoleErrorHandling('Error auto-saving file'));
       console.error('Error auto-saving file:', error);
     } finally {
       setTimeout(() => setAutoSaving(false), 1500);
     }
+
   };
 
   // UI toggle handlers
@@ -662,6 +685,7 @@ const CodeEditor = () => {
   };
 
   const languageSelectionKey = currentLanguage;
+  const hasImageNavigation = imagePreviewIndex >= 0 && imagePreviewList.length > 1;
 
   return (
     <EditorComponent
@@ -697,8 +721,8 @@ const CodeEditor = () => {
       selectedImageName={selectedImageName}
       onImagePreviewPrev={() => navigateImagePreview(-1)}
       onImagePreviewNext={() => navigateImagePreview(1)}
-      hasPrevImagePreview={imagePreviewIndex > 0}
-      hasNextImagePreview={imagePreviewIndex >= 0 && imagePreviewIndex < imagePreviewList.length - 1}
+      hasPrevImagePreview={hasImageNavigation}
+      hasNextImagePreview={hasImageNavigation}
       autoSaving={autoSaving}
       initialSidebarTab={hasPendingIncomingFile || selectedUserFile ? 'myfiles' : 'samples'}
 

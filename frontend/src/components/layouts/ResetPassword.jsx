@@ -15,7 +15,7 @@ const ResetPassword = () => {
   const [success, setSuccess] = useState(false);
   const [sessionValid, setSessionValid] = useState(false);
 
-  // Check if reset session exists (cookie is set by confirm-reset)
+  // Check if reset session exists
   useEffect(() => {
     setSessionValid(true);
     setVerifying(false);

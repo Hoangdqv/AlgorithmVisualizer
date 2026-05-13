@@ -428,7 +428,7 @@ const AlgorithmSelect = () => {
     try {
       const formData = new FormData();
       formData.append('file', capture.blob, filename);
-      formData.append('file_name', filename);
+      formData.append('item_name', filename);
       formData.append('language_id', String(languageId));
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/user/files/upload-image`, {

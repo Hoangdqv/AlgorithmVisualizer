@@ -112,7 +112,7 @@ const VisualModule = ({ tracerData, isRunning, currentLanguage, suppressRunningO
   const handleNextManual = () => {
     if (currentStep < displayTotalSteps - 1) {
       setCurrentStep(currentStep + 1);
-      handleFitToScreen();
+      // handleFitToScreen();
       setIsPlaying(false);
     }
   };
@@ -120,7 +120,7 @@ const VisualModule = ({ tracerData, isRunning, currentLanguage, suppressRunningO
   const handlePrevManual = () => {
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
-      handleFitToScreen();
+      // handleFitToScreen();
       setIsPlaying(false);
     }
   };
@@ -155,7 +155,7 @@ const VisualModule = ({ tracerData, isRunning, currentLanguage, suppressRunningO
 
   const handleStepJump = (stepIndex) => {
     setCurrentStep(stepIndex);
-    handleFitToScreen();
+    // handleFitToScreen();
     setIsPlaying(false);
   };
 

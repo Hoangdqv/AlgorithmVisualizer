@@ -41,6 +41,11 @@ export default function UserProfile() {
   const [searchQuery, setSearchQuery] = useState('');
   const [contextMenu, setContextMenu] = useState(null);
   const [modal, setModal] = useState(null);
+  const [dragContext, setDragContext] = useState({
+    dragOverTarget: null,
+    isDragging: false,
+    dragSource: null,
+  });
   const userFilesCacheRef = useRef({
     folders: null,
     files: null,
@@ -90,7 +95,7 @@ export default function UserProfile() {
       if (node.depth === 0) {
         roots.push(nodeMap[node.folder_id]);
       } else {
-        const parentId = node.parent_folder_id;
+        const parentId = node.parent_item_id;
         if (parentId && nodeMap[parentId]) {
           if (!nodeMap[parentId].children.includes(nodeMap[node.folder_id])) {
             nodeMap[parentId].children.push(nodeMap[node.folder_id]);
@@ -109,6 +114,7 @@ export default function UserProfile() {
       return;
     }
 
+    
     if (!silent) {
       setFilesLoading(true);
     }
@@ -117,6 +123,7 @@ export default function UserProfile() {
         credentials: 'include'
       });
 
+      // Get all folders
       let allFolders = [];
       if (foldersResponse.ok) {
         const foldersData = await foldersResponse.json();
@@ -145,8 +152,6 @@ export default function UserProfile() {
         allFolders = trees.filter(t => t !== null);
       }
 
-      setUserFolders(allFolders);
-
       const filesResponse = await fetch(`${API_URL}/user/files`, {
         credentials: 'include'
       });
@@ -157,8 +162,13 @@ export default function UserProfile() {
         allFiles = filesData.files || [];
       }
 
+      setUserFolders(allFolders);
       setUserFiles(allFiles);
-      userFilesCacheRef.current = { folders: allFolders, files: allFiles };
+      userFilesCacheRef.current = { 
+        folders: allFolders, 
+        files: allFiles 
+      };
+
     } catch (loadUserFilesError) {
       console.error('Error loading user files:', loadUserFilesError);
     } finally {
@@ -187,7 +197,7 @@ export default function UserProfile() {
 
     const query = searchQuery.toLowerCase();
     const matchesFileSearch = (file) => {
-      const fileName = (file.file_name || '').toLowerCase();
+      const fileName = (file.item_name || '').toLowerCase();
       const languageName = (
         file.lang?.language ||
         languages.find(lang => lang.lang_id === file.lang_id)?.language ||
@@ -204,7 +214,7 @@ export default function UserProfile() {
     };
 
     const filterFolder = (folder) => {
-      const matchesSearch = folder.folder_name?.toLowerCase().includes(query)
+      const matchesSearch = folder.item_name?.toLowerCase().includes(query)
       const filteredFiles = (folder.files || []).filter(file =>
         matchesFileSearch(file)
       );
@@ -229,11 +239,24 @@ export default function UserProfile() {
       .filter(folder => folder !== null);
 
     const filteredFiles = userFiles.filter(file =>
-      !file.folder_id && matchesFileSearch(file)
+      !file.parent_item_id && matchesFileSearch(file)
     );
 
     return { folders: filteredFolders, files: filteredFiles };
   }, [userFolders, userFiles, searchQuery, languages]);
+
+  const isDragSourceTarget = useCallback(
+    (targetType, targetId) => (
+      dragContext.dragSource
+      && dragContext.dragSource.type === targetType
+      && dragContext.dragSource.id === targetId
+    ),
+    [dragContext.dragSource]
+  );
+
+  const isRootDropTarget =
+    dragContext.dragOverTarget === 'root:root'
+    && !isDragSourceTarget('folder', null);
 
   const handleContextMenu = (e, item, type) => {
     e.preventDefault();
@@ -271,12 +294,12 @@ export default function UserProfile() {
   const handleCreateFolder = async (name, parentId = null) => {
     const checkDuplicateInFolder = (folders, targetParentId) => {
       if (!targetParentId) {
-        return folders.some(f => (f.folder_name) === name);
+        return folders.some(f => (f.item_name) === name);
       }
 
       for (const folder of folders) {
         if (folder.folder_id === targetParentId) {
-          return (folder.children || []).some(f => (f.folder_name) === name);
+          return (folder.children || []).some(f => (f.item_name) === name);
         }
         if (folder.children && folder.children.length > 0) {
           const found = checkDuplicateInFolder(folder.children, targetParentId);
@@ -297,8 +320,8 @@ export default function UserProfile() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          folder_name: name,
-          parent_folder_id: parentId
+          item_name: name,
+          parent_item_id: parentId
         })
       });
 
@@ -317,10 +340,10 @@ export default function UserProfile() {
 
   const handleCreateFile = async (name, languageId, folderId = null) => {
     const filesInFolder = folderId
-      ? userFiles.filter(f => f.folder_id === folderId)
-      : userFiles.filter(f => !f.folder_id);
+      ? userFiles.filter(f => f.parent_item_id === folderId)
+      : userFiles.filter(f => !f.parent_item_id);
 
-    if (filesInFolder.some(f => f.file_name === name)) {
+    if (filesInFolder.some(f => f.item_name === name)) {
       alert(`A file named "${name}" already exists in this location.`);
       return;
     }
@@ -331,8 +354,8 @@ export default function UserProfile() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          file_name: name,
-          folder_id: folderId,
+          item_name: name,
+          parent_item_id: folderId,
           language_id: languageId,
           content: ''
         })
@@ -365,8 +388,8 @@ export default function UserProfile() {
     if (!contextMenu) return;
 
     const itemName = contextMenu.type === 'folder'
-      ? (contextMenu.item.folder_name || contextMenu.item.name || 'this folder')
-      : (contextMenu.item.file_name || contextMenu.item.filename || 'this file');
+      ? (contextMenu.item.item_name || contextMenu.item.name || 'this folder')
+      : (contextMenu.item.item_name || contextMenu.item.filename || 'this file');
 
     const confirmed = window.confirm(
       `Are you sure you want to delete ${itemName}?`
@@ -485,8 +508,8 @@ export default function UserProfile() {
         : `${API_URL}/user/files/${item.file_id}`;
 
       const body = itemType === 'folder'
-        ? { folder_name: newName }
-        : { file_name: newName };
+        ? { item_name: newName }
+        : { item_name: newName };
 
       const response = await fetch(endpoint, {
         method: 'PUT',
@@ -782,7 +805,7 @@ export default function UserProfile() {
                     </div>
                   </div>
                 )}
-          </div>word
+          </div>
         </div>
         <div className="profile-file-storage-management">
           <div className="profile-file-storage-card">
@@ -840,11 +863,12 @@ export default function UserProfile() {
               <div style={{ color: '#888', padding: '1rem' }}>Loading files...</div>
             ) : (
               <>
-                <div className="file-tree-scroll-container profile-file-tree-scroll">
+                <div className={`file-tree-scroll-container profile-file-tree-scroll ${isRootDropTarget ? 'drop-target' : ''}`}>
                   <FileTree
                     folders={filteredUserData.folders}
-                    files={filteredUserData.files.filter(f => !f.folder_id)}
+                    files={filteredUserData.files.filter(f => !f.parent_item_id)}
                     onFileClick={setSelectedFileId}
+                    onFileSelect={setSelectedFileId}
                     onFolderClick={() => {}}
                     onContextMenu={handleContextMenu}
                     onMoveFile={handleMoveFile}
@@ -855,11 +879,13 @@ export default function UserProfile() {
                     onBatchFileToggle={handleBatchFileToggle}
                     languages={languages}
                     depth={0}
+                    dragContext={dragContext}
+                    setDragContext={setDragContext}
                   />
                 </div>
 
-                {filteredUserData.folders.length === 0 && filteredUserData.files.filter(f => !f.folder_id).length === 0 && (
-                  <div style={{ color: '#888', padding: '1rem', textAlign: 'center' }}>
+                {filteredUserData.folders.length === 0 && filteredUserData.files.filter(f => !f.parent_item_id).length === 0 && (
+                  <div style={{ color: '#888', padding: '1rem', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {searchQuery ? `No results for "${searchQuery}"` : 'No files yet. Create a folder or file to get started!'}
                   </div>
                 )}
@@ -914,7 +940,7 @@ export default function UserProfile() {
                 }}
                 type={modal.type}
                 title={modal.type === 'rename' ? `Rename ${modal.itemType === 'folder' ? 'Folder' : 'File'}` : undefined}
-                initialValue={modal.type === 'rename' ? (modal.itemType === 'folder' ? (modal.item.folder_name || modal.item.name) : (modal.item.file_name || modal.item.filename)) : ''}
+                initialValue={modal.type === 'rename' ? (modal.itemType === 'folder' ? (modal.item.item_name || modal.item.name) : (modal.item.item_name || modal.item.filename)) : ''}
               />
             )}
           </div>

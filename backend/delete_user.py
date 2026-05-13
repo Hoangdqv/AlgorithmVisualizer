@@ -1,11 +1,12 @@
 """
 Delete user by username or email
-Usage: python delete_user.py <username_or_email>
+python delete_user.py <username_or_email>
 """
 import sys
 from backend.app import app
 from database import db
-from models import User, File, Folder, ClosureTable
+from models import User, File, Folder
+from closure_table_helpers import delete_folder_cascade
 
 def delete_user(identifier):
     """Delete user by username or email"""
@@ -16,10 +17,9 @@ def delete_user(identifier):
         ).first()
         
         if not user:
-            print(f"❌ User '{identifier}' not found")
+            print(f" User '{identifier}' not found")
             return False
         
-        print(f"\n Found user:")
         print(f"   ID: {user.id}")
         print(f"   Username: {user.username}")
         print(f"   Email: {user.email}")
@@ -28,7 +28,7 @@ def delete_user(identifier):
         
         # Count user's files and folders
         file_count = File.query.filter_by(user_account_id=user.id).count()
-        folder_count = Folder.query.filter_by(user_id=user.id).count()
+        folder_count = Folder.query.filter_by(user_account_id=user.id).count()
         
         print(f"\n User data:")
         print(f"   Files: {file_count}")
@@ -38,35 +38,30 @@ def delete_user(identifier):
         confirm = input(f"\n Delete user '{user.username}' and all associated data? (yes/no): ")
         
         if confirm.lower() != 'yes':
-            print("❌ Deletion cancelled")
+            print("Deletion cancelled")
             return False
         
         try:
-            # Delete user's files
-            deleted_files = File.query.filter_by(user_account_id=user.id).delete()
-            print(f" Deleted {deleted_files} file(s)")
-            
-            # Get user's folder IDs
-            folder_ids = [f.folder_id for f in Folder.query.filter_by(user_id=user.id).all()]
-            
-            # Delete closure table entries for user's folders
-            if folder_ids:
-                deleted_closures = ClosureTable.query.filter(
-                    ClosureTable.descendant.in_(folder_ids)
-                ).delete(synchronize_session=False)
-                print(f"  Deleted {deleted_closures} closure table entry(ies)")
-            
-            # Delete user's folders
-            deleted_folders = Folder.query.filter_by(user_id=user.id).delete()
-            print(f"  Deleted {deleted_folders} folder(s)")
-            
-            # Delete user
+            # Remove root-level files via relationship to trigger delete-orphan.
+            root_files = [f for f in user.files if f.parent_item_id is None]
+            for file in root_files:
+                user.files.remove(file)
+
+            # Delete user's folder tree(s) via helper to respect cascades.
+            deleted_folders = 0
+            root_folders = Folder.query.filter_by(user_account_id=user.id, parent_item_id=None).all()
+            for folder in root_folders:
+                deleted_folders += delete_folder_cascade(folder.folder_id, user.id)
+
+            # Delete user (remaining root files cascade from user.files).
             db.session.delete(user)
             db.session.commit()
-            
+
+            print(f" Deleted {file_count} file(s)")
+            print(f"  Deleted {deleted_folders} folder(s)")
             print(f"\n User '{user.username}' deleted successfully!")
             return True
-            
+
         except Exception as e:
             db.session.rollback()
             print(f"\n❌ Error deleting user: {str(e)}")

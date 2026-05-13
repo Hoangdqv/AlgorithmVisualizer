@@ -377,6 +377,7 @@ button {
   word-break: break-all;
   font-family: inherit;
   font-size: inherit;
+  user-select: text;
 }
 /* Stdin input row — appears at the bottom of the console when a program is running */
 .stdin-row {
@@ -1058,6 +1059,7 @@ button {
   overflow-y: auto;
   overflow-x: hidden;
   min-width: 0;
+  position: relative;
   border: 1px solid #787878;
 }
 
@@ -1101,8 +1103,9 @@ button {
   background-color: rgba(33, 150, 243, 0.18);
 }
 
+/* container highlight */
 .tree-item.drop-target::after,
-.file-tree.drop-target::after {
+.file-tree-scroll-container.drop-target::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -2131,10 +2134,10 @@ footer {
 
 .graph-svg {
   width: 100%;
-  max-width: 300px;
+  max-width: 295px;
   height: auto;
   background-color: #1e1e1e;
-  border: none;
+  border: 1px solid white;
   box-shadow: inset 0 0 0 1px #ccc;
 }
 

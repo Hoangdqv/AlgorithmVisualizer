@@ -62,7 +62,7 @@ class Language(db.Model):
     run_cmd = db.Column(db.String(255), nullable=True)
     
     # Relationships
-    files = db.relationship('File', backref='language_info', lazy=True)
+    files = db.relationship('File', backref='language', lazy=True)
     
     def to_dict(self):
         """Return language as dictionary"""
@@ -130,12 +130,6 @@ class Folder(FileSystemItem):
 
     folder_id = db.Column(db.Integer, db.ForeignKey('filesystem_item.item_id', ondelete='CASCADE'), primary_key=True)
 
-    # Compatibility aliases for existing route/helper naming.
-    folder_name = db.synonym('item_name')
-    folder_type = db.synonym('item_type')
-    user_id = db.synonym('user_account_id')
-    parent_folder_id = db.synonym('parent_item_id')
-
     user = db.relationship('User', backref='folders', foreign_keys='Folder.user_account_id')
     files = db.relationship(
         'File',
@@ -169,12 +163,12 @@ class Folder(FileSystemItem):
         """Return folder as dictionary"""
         result = {
             'folder_id': self.folder_id,
-            'folder_name': self.folder_name,
+            'item_name': self.item_name,
             'path': self.path,
-            'type': self.folder_type,
+            'item_type': self.item_type,
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'user_id': self.user_id,
-            'parent_folder_id': self.parent_folder_id
+            'user_account_id': self.user_account_id,
+            'parent_item_id': self.parent_item_id
         }
 
         if include_files:
@@ -183,40 +177,40 @@ class Folder(FileSystemItem):
         return result
 
     @classmethod
-    def create_for_user(cls, user_id, folder_name, parent_folder_id=None, folder_type='user-defined', created_at=None):
+    def create_for_user(cls, user_account_id, item_name, parent_item_id=None, item_type='user-defined', created_at=None):
         if created_at is None:
             created_at = datetime.now()
 
-        if not FileSystemItem.is_name_available(user_id, parent_folder_id, folder_name):
+        if not FileSystemItem.is_name_available(user_account_id, parent_item_id, item_name):
             return None, {
                 'status': 409,
-                'message': f'An item named "{folder_name}" already exists in this location'
+                'message': f'An item named "{item_name}" already exists in this location'
             }
 
-        if parent_folder_id:
-            parent = Folder.query.get(parent_folder_id)
+        if parent_item_id:
+            parent = Folder.query.get(parent_item_id)
             if not parent:
                 return None, {
                     'status': 404,
                     'message': 'Parent folder not found'
                 }
-            if parent.user_id != user_id:
+            if parent.user_account_id != user_account_id:
                 return None, {
                     'status': 403,
                     'message': 'Access denied'
                 }
-            path = FileSystemItem.build_path(parent.path, folder_name)
+            path = FileSystemItem.build_path(parent.path, item_name)
         else:
-            path = FileSystemItem.build_path(None, folder_name)
+            path = FileSystemItem.build_path(None, item_name)
 
         from closure_table_helpers import create_folder_with_closure
         new_folder = create_folder_with_closure(
-            folder_name=folder_name,
+            item_name=item_name,
             path=path,
-            folder_type=folder_type,
+            item_type=item_type,
             created_at=created_at,
-            user_id=user_id,
-            parent_folder_id=parent_folder_id,
+            user_account_id=user_account_id,
+            parent_item_id=parent_item_id,
         )
 
         return new_folder, None
@@ -232,7 +226,7 @@ class Folder(FileSystemItem):
 
         duplicate = FileSystemItem.query.filter(
             FileSystemItem.user_account_id == user_id,
-            FileSystemItem.parent_item_id == folder.parent_folder_id,
+            FileSystemItem.parent_item_id == folder.parent_item_id,
             FileSystemItem.item_name == new_name,
             FileSystemItem.item_id != folder.folder_id
         ).first()
@@ -244,7 +238,7 @@ class Folder(FileSystemItem):
             }
 
         old_path = folder.path
-        folder.folder_name = new_name
+        folder.item_name = new_name
 
         path_parts = old_path.rsplit('/', 1)
         parent_path = path_parts[0] if len(path_parts) > 1 else None
@@ -276,11 +270,6 @@ class File(FileSystemItem):
     content_mime = db.Column(db.String(100), nullable=True)
     lang_id = db.Column(db.Integer, db.ForeignKey('language.lang_id'), nullable=False)
 
-    # Compatibility aliases for existing route/helper naming.
-    file_name = db.synonym('item_name')
-    file_type = db.synonym('item_type')
-    folder_id = db.synonym('parent_item_id')
-
     folder = db.relationship(
         'Folder',
         primaryjoin='File.parent_item_id == remote(Folder.item_id)',
@@ -298,10 +287,10 @@ class File(FileSystemItem):
         """Return file as dictionary"""
         result = {
             'file_id': self.file_id,
-            'file_name': self.file_name,
-            'folder_id': self.folder_id,
+            'item_name': self.item_name,
+            'parent_item_id': self.parent_item_id,
             'path': self.path,
-            'file_type': self.file_type,
+            'item_type': self.item_type,
             'user_account_id': self.user_account_id,
             'lang_id': self.lang_id,
             'has_binary': self.content_blob is not None,
@@ -328,7 +317,7 @@ class File(FileSystemItem):
         return self
 
     @classmethod
-    def create_for_user(cls, user_id, file_name, folder_id, language_id, content=''):
+    def create_for_user(cls, user_account_id, item_name, parent_item_id, language_id, content=''):
         language = Language.query.get(language_id)
         if not language:
             return None, {
@@ -336,35 +325,38 @@ class File(FileSystemItem):
                 'message': 'Invalid language_id'
             }
 
-        if not FileSystemItem.is_name_available(user_id, folder_id, file_name):
+        if not FileSystemItem.is_name_available(user_account_id, parent_item_id, item_name):
             return None, {
                 'status': 409,
-                'message': f'An item named "{file_name}" already exists in this location'
+                'message': f'An item named "{item_name}" already exists in this location'
             }
 
-        if folder_id:
-            folder = Folder.query.get(folder_id)
+        folder = None
+        owner = None
+        if parent_item_id:
+            folder = Folder.query.get(parent_item_id)
             if not folder:
                 return None, {
                     'status': 404,
                     'message': 'Folder not found'
                 }
-            if folder.user_id != user_id:
+            if folder.user_account_id != user_account_id:
                 return None, {
                     'status': 403,
                     'message': 'Access denied'
                 }
-            path = FileSystemItem.build_path(folder.path, file_name)
+            path = FileSystemItem.build_path(folder.path, item_name)
         else:
-            path = FileSystemItem.build_path(None, file_name)
+            path = FileSystemItem.build_path(None, item_name)
+            owner = User.query.get(user_account_id)
 
         now = datetime.now()
         new_file = File(
-            file_name=file_name,
-            folder_id=folder_id,
+            item_name=item_name,
+            parent_item_id=parent_item_id,
             path=path,
-            file_type='user-defined',
-            user_account_id=user_id,
+            item_type='user-defined',
+            user_account_id=user_account_id,
             content=content,
             content_blob=None,
             content_mime=None,
@@ -373,7 +365,12 @@ class File(FileSystemItem):
             last_updated=now
         )
 
-        db.session.add(new_file)
+        if folder is not None:
+            folder.files.append(new_file)
+        elif owner is not None:
+            owner.files.append(new_file)
+        else:
+            db.session.add(new_file)
         db.session.commit()
         return new_file, None
 
@@ -390,27 +387,27 @@ class File(FileSystemItem):
                 'message': 'File not found'
             }
 
-        target_folder_id = file.folder_id
-        if 'folder_id' in data:
-            target_folder_id = data.get('folder_id')
-            if target_folder_id is not None:
-                target_folder = Folder.query.get(target_folder_id)
+        target_parent_id = file.parent_item_id
+        if 'parent_item_id' in data:
+            target_parent_id = data.get('parent_item_id')
+            if target_parent_id is not None:
+                target_folder = Folder.query.get(target_parent_id)
                 if not target_folder:
                     return None, {
                         'status': 404,
                         'message': 'Destination folder not found'
                     }
-                if target_folder.user_id != user_id:
+                if target_folder.user_account_id != user_id:
                     return None, {
                         'status': 403,
                         'message': 'Access denied'
                     }
 
-        new_name = data.get('file_name', file.file_name)
+        new_name = data.get('item_name', file.item_name)
 
         if not FileSystemItem.is_name_available(
             user_id,
-            target_folder_id,
+            target_parent_id,
             new_name,
             exclude_item_id=file.file_id
         ):
@@ -422,10 +419,10 @@ class File(FileSystemItem):
         if 'content' in data:
             file.set_content(data['content'])
 
-        file.file_name = new_name
-        file.folder_id = target_folder_id
-        if target_folder_id is not None:
-            target_folder = Folder.query.get(target_folder_id)
+        file.item_name = new_name
+        file.parent_item_id = target_parent_id
+        if target_parent_id is not None:
+            target_folder = Folder.query.get(target_parent_id)
             file.path = FileSystemItem.build_path(target_folder.path, new_name)
         else:
             file.path = FileSystemItem.build_path(None, new_name)
@@ -435,7 +432,7 @@ class File(FileSystemItem):
         return file, None
 
     @classmethod
-    def create_image_for_user(cls, user_id, file_name, folder_id, language_id, blob_content, mime_type):
+    def create_image_for_user(cls, user_account_id, item_name, parent_item_id, language_id, blob_content, mime_type):
         language = Language.query.get(language_id)
         if not language:
             return None, {
@@ -443,35 +440,38 @@ class File(FileSystemItem):
                 'message': 'Invalid language_id'
             }
 
-        if not FileSystemItem.is_name_available(user_id, folder_id, file_name):
+        if not FileSystemItem.is_name_available(user_account_id, parent_item_id, item_name):
             return None, {
                 'status': 409,
-                'message': f'An item named "{file_name}" already exists in this location'
+                'message': f'An item named "{item_name}" already exists in this location'
             }
 
-        if folder_id:
-            folder = Folder.query.get(folder_id)
+        folder = None
+        owner = None
+        if parent_item_id:
+            folder = Folder.query.get(parent_item_id)
             if not folder:
                 return None, {
                     'status': 404,
                     'message': 'Folder not found'
                 }
-            if folder.user_id != user_id:
+            if folder.user_account_id != user_account_id:
                 return None, {
                     'status': 403,
                     'message': 'Access denied'
                 }
-            path = FileSystemItem.build_path(folder.path, file_name)
+            path = FileSystemItem.build_path(folder.path, item_name)
         else:
-            path = FileSystemItem.build_path(None, file_name)
+            path = FileSystemItem.build_path(None, item_name)
+            owner = User.query.get(user_account_id)
 
         now = datetime.now()
         new_file = File(
-            file_name=file_name,
-            folder_id=folder_id,
+            item_name=item_name,
+            parent_item_id=parent_item_id,
             path=path,
-            file_type='user-defined',
-            user_account_id=user_id,
+            item_type='user-defined',
+            user_account_id=user_account_id,
             content=None,
             content_blob=blob_content,
             content_mime=mime_type,
@@ -480,7 +480,12 @@ class File(FileSystemItem):
             last_updated=now,
         )
 
-        db.session.add(new_file)
+        if folder is not None:
+            folder.files.append(new_file)
+        elif owner is not None:
+            owner.files.append(new_file)
+        else:
+            db.session.add(new_file)
         db.session.commit()
         return new_file, None
 

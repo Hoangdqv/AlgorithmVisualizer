@@ -1,7 +1,8 @@
+import base64
 import docker
-import tempfile
 import os
 import re
+import tempfile
 
 class dockerExecutionService:
     def __init__(self):
@@ -82,7 +83,7 @@ class dockerExecutionService:
         attaching to it via attach_socket().
 
         Returns (container, temp_file_path) so the caller can clean up the
-        temp file when the session ends.
+        temp file when session ends.
         """
         if len(code) > self.max_code_size:
             raise ValueError('Code exceeds maximum size limit')
@@ -90,19 +91,37 @@ class dockerExecutionService:
         if not docker_image:
             raise ValueError(f'Language {language} not supported')
 
-        ext = 'py' if language == 'python' else 'js'
         container_filename = self._build_container_filename(language, file_name)
-        container_path = f'/app/{container_filename}'
-
-        with tempfile.NamedTemporaryFile(mode='w', suffix=f'.{ext}', delete=False, encoding='utf-8') as f:
-            temp_file = f.name
-            f.write(code)
-        
-        cmd = f'{cmd} {container_path}'
+        cmd = list(cmd) if isinstance(cmd, (list, tuple)) else (cmd or '').split()
+        volumes = None
+        temp_file = None
+        code_b64 = base64.b64encode(code.encode('utf-8')).decode('ascii')
+        environment = {
+            'CODE_B64': code_b64,
+            'FILENAME': container_filename,
+        }
+        if language == 'python':
+            exec_code = (
+                "import base64,os;"
+                "code=base64.b64decode(os.environ.get('CODE_B64','')).decode('utf-8');"
+                "filename=os.environ.get('FILENAME','main.py');"
+                "globals_dict={'__name__':'__main__','__file__':filename,'__builtins__':__builtins__};"
+                "exec(compile(code, filename, 'exec'), globals_dict)"
+            )
+            command = cmd + ['-c', exec_code]
+        else:
+            exec_code = (
+                "const code=Buffer.from(process.env.CODE_B64||'', 'base64').toString('utf8');"
+                " const filename=process.env.FILENAME||'main.js';"
+                " const vm=require('vm');"
+                " new vm.Script(code, { filename }).runInThisContext();"
+            )
+            command = cmd + ['-e', exec_code]
         container = self._get_client().containers.create(
             docker_image,
-            command=cmd,
-            volumes={os.path.abspath(temp_file): {'bind': container_path, 'mode': 'ro'}},
+            command=command,
+            environment=environment,
+            volumes=volumes,
             stdin_open=True,   # keep stdin pipe open
             tty=True,          # allocate a PTY → raw byte stream (no 8-byte mux headers)
             detach=True,

@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useImperativeHandle, forwardRef, useCallba
 
 const TreeVisualization = forwardRef(({ currentState }, ref) => {
 
-  const treeData = useMemo(() => currentState?.tree || [], [currentState?.tree]);
-  const visited = currentState?.visited || [];
+  const treeData = useMemo(() => currentState?.tree, [currentState?.tree]);
+  const visited = currentState?.visited;
   const current = currentState?.current;
   const depth = currentState?.depth;
   const message = currentState?.message;
@@ -40,13 +40,13 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
     const childrenMap = {};
     const nodeMap = {};
     nodes.forEach(node => {
-      childrenMap[node.id] = (node.children || []).filter(id => id !== null && id !== undefined);
+      childrenMap[node.id] = (node.children).filter(id => id !== null && id !== undefined);
       nodeMap[node.id] = node;
     });
 
     // Find root node
     const allChildren = new Set(
-      nodes.flatMap(n => (n.children || []).filter(id => id !== null && id !== undefined))
+      nodes.flatMap(n => (n.children).filter(id => id !== null && id !== undefined))
     );
     const root = nodes.find(n => !allChildren.has(n.id));
 
@@ -63,7 +63,7 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
     const subtreeWidths = {};
 
     const calculateWidth = (nodeId) => {
-      const children = childrenMap[nodeId] || [];
+      const children = childrenMap[nodeId];
       if (children.length === 0) {
         subtreeWidths[nodeId] = 1; // Leaf node has width of 1
         return 1;
@@ -91,7 +91,7 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
       positions[nodeId] = { x, y };
 
       // Position children left-to-right under this node
-      const children = childrenMap[nodeId] || [];
+      const children = childrenMap[nodeId];
       let currentLeft = leftBound;
 
       children.forEach(childId => {
@@ -114,7 +114,7 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
   const treeStructure = useMemo(() => {
     return treeData.map(node => ({ 
         id: node.id, 
-        children: (node.children || []).filter(childId => childId !== null && childId !== undefined)
+        children: (node.children).filter(childId => childId !== null && childId !== undefined)
       }))
   }, [treeData]);
 
@@ -398,7 +398,7 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
       // Render edges (parent to children)
       const edges = [];
       treeData.forEach((node) => {
-        const children = node.children || [];
+        const children = node.children;
         children.forEach(childId => {
           if (childId && nodePositions[node.id] && nodePositions[childId]) {
             // Draw edge from node to child
