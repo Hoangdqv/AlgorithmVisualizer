@@ -2,7 +2,6 @@
 from runtime.tracer import Tracer
 from helpers import swap
 
-# [ALGORITHM]
 def quick_sort_hoare(arr, tracer, low=0, high=None):
     if high is None:
         high = len(arr) - 1
@@ -62,7 +61,6 @@ def partition_hoare(arr, tracer, low, high):
     
     return j
 
-# [TEST]
 if __name__ == "__main__":
     # [PARAMS]
     original_arr = [92, 14, 461, 1122, 235, 9, 127]

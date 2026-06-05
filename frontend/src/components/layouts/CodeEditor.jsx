@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import EditorComponent from '../EditorComponent';
-import { consoleErrorHandling } from '../../script_utils/consoleErrorHandling';
+import { consoleErrorHandling, stripAnsi } from '../../script_utils/consoleErrorHandling';
 
 const CodeEditor = () => {
   const location = useLocation();
@@ -559,7 +559,7 @@ const CodeEditor = () => {
             const data = JSON.parse(event.data);
             if (data.output) {
               setContainerReady(true);
-              setOutput(prev => prev + data.output);
+              setOutput(prev => prev + stripAnsi(data.output));
             }
           } catch { /* ignore */ }
         };
@@ -606,7 +606,7 @@ const CodeEditor = () => {
           return;
         }
 
-        setOutput(body.output);
+        setOutput(stripAnsi(body.output));
       } catch (err) {
         setIsRunning(false);
         setOutput(consoleErrorHandling(err.message));

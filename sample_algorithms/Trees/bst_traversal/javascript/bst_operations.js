@@ -16,7 +16,6 @@ import {
     buildTreeOnly,
 } from './helpers.js';
 
-// [ALGORITHM]
 function bstOperations(treeNodes, rootId, operation, tracer, target = null) {
     /**
      * Perform various Binary Search Tree operations.
@@ -52,7 +51,6 @@ function bstOperations(treeNodes, rootId, operation, tracer, target = null) {
     return operations[operation]();
 }
 
-// [TEST]
 // [PARAMS]
 const treeNodes = [
     { id: 1, value: 10, children: [2, 3] },

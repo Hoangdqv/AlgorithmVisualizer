@@ -389,15 +389,15 @@ def execute_algorithm():
         cmd = language_row.get_run_cmd() if language_row else None
         docker_image = language_row.get_docker_image() if language_row else None
 
+        if params_block is not None:
+            code = inject_params_block(code, language, params_block)
+
         execution_data = {
             'language': language,
             'code': code,
             'cmd': cmd,
             'docker_image': docker_image
         }
-
-        if params_block is not None:
-            code = inject_params_block(code, language, params_block)
 
         print(f"\n{'='*60}")
         print(f"[API] Received execution request for {language}")
@@ -1362,11 +1362,11 @@ def create_algorithm():
         # Create placeholder files
         python_file = os.path.join(algorithm_path, 'python', f'{algorithm_name}.py')
         with open(python_file, 'w', encoding='utf-8') as f:
-            f.write(f'# {algorithm_name.replace("_", " ").title()}\n\nfrom tracers.tracer import Tracer\n\n#[ALGORITHM]\n    # Add algorithm implementation here\n\nif __name__ == "__main__":\n#[PARAMS]\n    # Add parameters here\n#[PARAMS]\n    main()\n')
+            f.write(f'# {algorithm_name.replace("_", " ").title()}\n\nfrom tracers.tracer import Tracer\n# Add algorithm implementation here\n\nif __name__ == "__main__":\n#[PARAMS]\n    # Add parameters here\n#[PARAMS]\n    main()\n')
         
         javascript_file = os.path.join(algorithm_path, 'javascript', f'{algorithm_name}.js')
         with open(javascript_file, 'w', encoding='utf-8') as f:
-            f.write(f"// {algorithm_name.replace("_", " ").title()}\n\nimport Tracer from './runtime/tracer.js';\n\n//[ALGORITHM]\n    // Add algorithm implementation here\n//[PARAMS]\n    // Add parameters here\n//[PARAMS] \n\ntracer.finalize();\n")
+            f.write(f"// {algorithm_name.replace("_", " ").title()}\n\nimport Tracer from './runtime/tracer.js';\n// Add algorithm implementation here\n//[PARAMS]\n    // Add parameters here\n//[PARAMS] \n\ntracer.finalize();\n")
 
         # Add algorithm to config
         display_name = f'{algorithm_name.replace("_", " ").title()}'
@@ -1964,7 +1964,7 @@ def _read_container_output(run_id, raw_sock, stop_event, output_q):
             text = data.decode('utf-8', errors='replace')
             output_q.put(('output', text))
             if output_bytes >= output_cap:
-                output_q.put(('output', '\n[Output truncated at 50 KB]'))
+                output_q.put(('output', '\n[Output truncated due to size exceeding limit]\n'))
                 break
         except OSError:
             with active_runs_lock:

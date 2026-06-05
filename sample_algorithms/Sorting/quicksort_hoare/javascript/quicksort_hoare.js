@@ -1,7 +1,6 @@
 import Tracer from './runtime/tracer.js';
 import { swap } from './helpers.js';
 
-// [ALGORITHM]
 function quickSortHoare(arr, tracer, low = 0, high = arr.length - 1) {
   if (low < high) {
     // Partition and get the pivot index
@@ -94,7 +93,6 @@ function partitionHoare(arr, tracer, low, high) {
   return j;
 }
 
-// [TEST]
 // [PARAMS]
 const originalArr = [92, 14, 461, 1122, 235, 9, 127];
 // [/PARAMS]

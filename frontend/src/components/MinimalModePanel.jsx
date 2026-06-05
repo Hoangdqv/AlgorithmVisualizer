@@ -10,6 +10,7 @@ const MinimalModePanel = ({ category, algorithmKey, onRun, onRunContinue, isRunn
   );
   const shouldShowResetLabel = category === 'trees' && hasTreeSession;
   
+  console.log('MinimalModePanel render', { category, algorithmKey, formValues });
   // Reset form to defaults when the algorithm or category changes
   useEffect(() => {
     if (!schema?.params) return;
@@ -35,7 +36,7 @@ const MinimalModePanel = ({ category, algorithmKey, onRun, onRunContinue, isRunn
           .split(',')
           .map((s) => parseInt(s.trim(), 10))
           .filter((n) => !isNaN(n));
-      } else if (param.type === 'number' || param.type === 'number-optional') {
+      } else if (param.type === 'number' || param.type === 'number-required') {
         if (raw === '' || raw === null || raw === undefined) {
           parsed[param.key] = null;
           return;
@@ -105,6 +106,7 @@ const MinimalModePanel = ({ category, algorithmKey, onRun, onRunContinue, isRunn
           className="minimal-panel-input"
         />
       ) : param.type === 'select' ? (
+        // Select input for dropdown options
         <select
           id={`param-${param.key}`}
           value={formValues[param.key] ?? ''}
@@ -118,9 +120,12 @@ const MinimalModePanel = ({ category, algorithmKey, onRun, onRunContinue, isRunn
           ))}
         </select>
       ) : (
+        // Default to text input for 'string', 'array-int', 'number-required', etc.
         <input
           id={`param-${param.key}`}
-          type="text"
+          type="number"
+          
+          required={param.required}
           value={formValues[param.key] ?? ''}
           onChange={(e) => handleChange(param.key, e.target.value)}
           placeholder={param.placeholder}
@@ -144,7 +149,9 @@ const MinimalModePanel = ({ category, algorithmKey, onRun, onRunContinue, isRunn
             <button
               type="button"
               className="minimal-panel-run-btn"
-              disabled={isRunning || !hasTreeSession}
+              disabled={isRunning || !hasTreeSession 
+                || formValues.operation === 'build'
+                || (['insert', 'delete', 'search'].includes(formValues.operation) && (!formValues.target || formValues.target.length === 0))}
               onClick={handleContinueRun}
             >
               ⟳ Run Next Operation

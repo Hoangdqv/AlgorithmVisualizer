@@ -1,7 +1,6 @@
 # Simple Insertion Sort in Python
 from runtime.tracer import Tracer
 
-# [ALGORITHM]
 def insertion_sort(arr, tracer):
     n = len(arr)
     
@@ -43,7 +42,6 @@ def insertion_sort(arr, tracer):
     tracer.add_state(arr.copy())
     return arr, tracer
 
-# [TEST]
 if __name__ == "__main__":
     # [PARAMS]
     original_arr = [92, 14, 461, 1122, 235, 9, 127]

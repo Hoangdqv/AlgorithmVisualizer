@@ -1,6 +1,5 @@
 from runtime.tracer import Tracer
 
-# [ALGORITHM]
 def dfs(graph, start_node, tracer):
     """
     Depth-First Search traversal on a graph represented as adjacency matrix.
@@ -66,7 +65,6 @@ def dfs(graph, start_node, tracer):
     
     return visited_order, tracer
 
-# [TEST]
 if __name__ == '__main__':
     # [PARAMS]
     adjacency_matrix = [

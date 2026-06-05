@@ -7,7 +7,7 @@ import MinimalModePanel from './MinimalModePanel';
 import 'monaco-editor/esm/vs/editor/contrib/hover/browser/hoverContribution.js';
 import 'monaco-editor/esm/vs/editor/editor.api';
 import CompileBtn from './buttons/CompileBtn';
-import ToggleDropdownBtn from './ToggleDropdownBtn';
+import ToggleDropdownBtn from './buttons/ToggleDropdownBtn';
 import ToggleSideBarBtn from './buttons/ToggleSideBarBtn';
 import BackBtn from './buttons/BackBtn';
 

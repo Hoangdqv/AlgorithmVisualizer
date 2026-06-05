@@ -1,7 +1,6 @@
 from runtime.tracer import Tracer
 from helpers import swap
 
-# [ALGORITHM]
 def bubble_sort(arr, tracer):
     n = len(arr)
     for i in range(n):
@@ -29,7 +28,6 @@ def bubble_sort(arr, tracer):
     tracer.add_state(arr.copy()) #Complete state
     return arr, tracer
 
-# [TEST]
 if __name__ == "__main__":
     # [PARAMS]
     original_arr = [92, 14, 461, 1122, 235, 9, 127]

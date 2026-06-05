@@ -136,7 +136,8 @@ export const algorithmParams = {
       {
         key: 'target',
         label: 'Target Value',
-        type: 'number-optional',
+        type: 'number-required',
+        required: true,
         enabledWhen: (values) =>
           !['build', 'preorder', 'inorder', 'postorder'].includes(values.operation),
         default: '',

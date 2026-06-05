@@ -1,6 +1,5 @@
 BREADTH-FIRST SEARCH (BFS) - Algorithm Explanation
 ====================================================
-I updated the content of BFS through admin panel!
 What is BFS?
 ---------------
 Breadth-First Search (BFS) is a graph traversal algorithm that explores nodes level by level. Think of it like ripples spreading out in water - you visit all nodes at distance 1 from the starting point, then all nodes at distance 2, and so on.

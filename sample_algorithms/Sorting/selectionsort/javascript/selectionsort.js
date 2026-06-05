@@ -1,7 +1,6 @@
 import Tracer from './runtime/tracer.js';
 import { swap } from './helpers.js';
 
-// [ALGORITHM]
 function selectionSort(arr, tracer) {
     const n = arr.length;
     
@@ -30,7 +29,6 @@ function selectionSort(arr, tracer) {
     return [arr, tracer];
 }
 
-// [TEST]
 // [PARAMS]
 const originalArr = [64, 34, 25, 12, 22, 11, 90];
 // [/PARAMS]

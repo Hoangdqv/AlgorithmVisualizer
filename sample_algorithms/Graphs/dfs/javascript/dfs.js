@@ -1,6 +1,5 @@
 import Tracer from './runtime/tracer.js';
-//this is updated from the admin panel
-// [ALGORITHM]
+
 function dfs(graph, startNode, tracer) {
     /**
      * Depth-First Search traversal on a graph represented as adjacency matrix.
@@ -68,7 +67,6 @@ function dfs(graph, startNode, tracer) {
     return { visitedOrder, tracer };
 }
 
-// [TEST]
 // [PARAMS]
 const adjacencyMatrix = [
     [0, 1, 1, 0, 0, 0],

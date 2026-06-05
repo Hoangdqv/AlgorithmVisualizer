@@ -1,6 +1,5 @@
 import Tracer from './runtime/tracer.js';
 
-// [ALGORITHM]
 function sortByDigit(arr, exp, tracer) {
     const n = arr.length;
     const buckets = Array.from({ length: 10 }, () => []);  // one bucket per digit 0-9
@@ -57,9 +56,8 @@ function radixSort(arr, tracer) {
     return [arr, tracer];
 }
 
-// [TEST]
 // [PARAMS]
-const originalArr = [92, 14, 461, 1122, 235, 9, 127];
+const originalArr = [91, 452, 45, 123, 234, 25, 128];
 // [/PARAMS]
 const tracer = new Tracer('sorting');
 const [sortedArr] = radixSort([...originalArr], tracer);

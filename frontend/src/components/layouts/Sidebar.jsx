@@ -1,7 +1,7 @@
 // Sidebar.jsx
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import getFileExtension from '../../scripts/getFileExtension';
-import { useAuth } from '../../context/useAuth';
+import { useAuth } from '../../auth/useAuth';
 import SearchBar from '../SearchBar';
 import FileTree from '../FileTree';
 import FileContextMenu from '../FileContextMenu';
@@ -727,11 +727,19 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
               <div style={{ color: '#888', padding: '1rem', textAlign: 'center' }}>
                 Please log in to access your files
               </div>
-            ) : loading ? (
-              <div style={{ color: '#888', padding: '1rem' }}>Loading files...</div>
             ) : (
               <>
                 <div className={`file-tree-scroll-container hidden-scrollbar sidebar-bottom-padding ${isRootDropTarget ? 'drop-target' : ''}`}>
+                  {loading && (
+                    <div style={{ color: '#888', padding: '1rem', textAlign: 'center' }}>
+                      Loading files...
+                    </div>
+                  )}
+                  {filteredUserData.folders.length === 0 && filteredUserData.files.filter(f => !f.parent_item_id).length === 0 && searchQuery && !loading && (
+                    <div style={{ color: '#888', padding: '1rem', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {searchQuery ? `No results for "${searchQuery}"` : 'No files yet. Create a folder or file to get started!'}
+                    </div>
+                  )}
                   <FileTree
                     folders={filteredUserData.folders}
                     files={filteredUserData.files.filter(f => !f.parent_item_id)}
@@ -748,11 +756,6 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
                     setDragContext={setDragContext}
                   />
                 </div>
-                {filteredUserData.folders.length === 0 && filteredUserData.files.filter(f => !f.parent_item_id).length === 0 && (
-                  <div style={{ color: '#888', padding: '1rem', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {searchQuery ? `No results for "${searchQuery}"` : 'No files yet. Create a folder or file to get started!'}
-                  </div>
-                )}
               </>
             )}
           </>

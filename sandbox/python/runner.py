@@ -15,6 +15,9 @@ excluding_keywords = [
     "/sandbox/runner", 
     "/sandbox/algorithm", 
     "compiled = compile",
+    "import base64",
+    "import os",
+    "import traceback",
 ]
 try:
     compiled = compile(code, filename, 'exec')

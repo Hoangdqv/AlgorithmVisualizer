@@ -2,11 +2,11 @@ import { useState, useEffect, useRef, useImperativeHandle, forwardRef, useCallba
 
 const TreeVisualization = forwardRef(({ currentState }, ref) => {
 
-  const treeData = useMemo(() => currentState?.tree, [currentState?.tree]);
-  const visited = currentState?.visited;
-  const current = currentState?.current;
-  const depth = currentState?.depth;
-  const message = currentState?.message;
+  const treeData = useMemo(() => currentState?.tree || [], [currentState?.tree]);
+  const visited = currentState?.visited || [];
+  const current = currentState?.current || null;
+  const depth = currentState.current !== null && currentState.current !== undefined ? currentState?.depth : null;
+  const message = currentState?.message || '';
 
   const [nodePositions, updateNodePositions] = useState({});
   const [dragState, setDragState] = useState({ nodeId: null, offset: [0, 0] });
@@ -21,6 +21,7 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
   const isPanningRef = useRef(false);
   const previousStructureSignatureRef = useRef('');
 
+  console.log('Current State:', currentState);
   const viewBox = useMemo(() => ({
     minX: 0,
     minY: 0,
@@ -500,20 +501,18 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
                   {current !== null && current !== undefined ? getNodeValueById(current) : '-'}
                 </div>
               </div>
+              {/* {message && ( */}
               <div className="tree-info-item">
-                  <>
-                    <div className="tree-info-label">Status:</div>
-                    <div className="tree-info-value message" style={{ fontStyle: 'italic', color: '#ffa500' }}>
-                      {message || '-'}
-                    </div>
-                  </>
-              </div>
-              {depth !== null && depth !== undefined && (
-                <div className="tree-info-item">
-                  <div className="tree-info-label">Depth:</div>
-                  <div className="tree-info-value">{depth}</div>
+                <div className="tree-info-label">Status:</div>
+                <div className="tree-info-value message" style={{ fontStyle: 'italic', color: '#ffa500' }}>
+                  {message || '-'}
                 </div>
-              )}
+              </div>
+              {/* )} */}
+              <div className="tree-info-item">
+                <div className="tree-info-label">Depth:</div>
+                <div className="tree-info-value">{depth !== null && depth !== undefined ? depth : '-'}</div>
+              </div>
               <div className="tree-info-item">
                 <div className="tree-info-label">Visited Nodes:</div>
                 <div className="tree-info-value tree-info-visited">

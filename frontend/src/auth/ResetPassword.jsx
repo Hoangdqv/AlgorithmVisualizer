@@ -1,8 +1,8 @@
     // ResetPassword.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { validatePassword, validatePasswordMatch } from '../../script_utils/credentialsValidation';
-import ResetPasswordForm from '../ResetPasswordForm';
+import { validatePassword, validatePasswordMatch } from '../script_utils/credentialsValidation';
+import ResetPasswordForm from './form/ResetPasswordForm';
 
 const ResetPassword = () => {
   const navigate = useNavigate();

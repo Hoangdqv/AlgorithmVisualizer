@@ -30,8 +30,6 @@ class executionService:
             runner_path = ('/sandbox/runner.js')
 
         cmd = f' {cmd} {runner_path}'
-        print(runner)
-        print(runner_path)
         try:
             container = self.docker_service._get_client().containers.run(
                 docker_image,
@@ -62,10 +60,10 @@ class executionService:
 
             # Cap output to prevent flooding
             if len(output) > self.docker_service.max_output_bytes:
-                output = output[:self.docker_service.max_output_bytes] + '\n[Output truncated at 10 KB]'
+                output = output[:self.docker_service.max_output_bytes] + '\n[Output truncated due to size exceeding limit]'
 
             try:
-                container.remove()
+                self.docker_service.cleanup_container(container)
             except Exception:
                 pass
 
@@ -84,6 +82,7 @@ class executionService:
                 }
 
         except Exception as e:
+            self.docker_service.cleanup_container(container)
             return {
                 'success': False,
                 'stderr': str(e),
@@ -191,8 +190,7 @@ class executionService:
             errors = container.logs(stdout=False, stderr=True).decode('utf-8')
 
             try:
-                container.remove()
-                print(f"[CONTAINER] Container removed")
+                self.docker_service.cleanup_container(container)
             except:
                 pass
             
@@ -260,3 +258,9 @@ class executionService:
                 'success': False,
                 'stderr': str(e)
             }
+        finally:
+            try:
+                self.docker_service.cleanup_container(container)
+            except:
+                pass
+            

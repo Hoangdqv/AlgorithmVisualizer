@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider } from './auth/AuthContext';
 import ScrollToTop from "./scripts/ScrollToTop";
 import CodeEditor from './components/layouts/CodeEditor';
 import NavBar from './components/NavBar';
@@ -8,13 +8,13 @@ import Error from './components/layouts/Error';
 import SignIn from './components/layouts/SignIn';
 import SignUp from './components/layouts/SignUp';
 import About from './components/layouts/About';
-import ResetPassword from './components/layouts/ResetPassword';
-import ConfirmReset from './components/layouts/ConfirmReset';
+import ResetPassword from './auth/ResetPassword';
+import ConfirmReset from './auth/ConfirmReset';
 import AlgorithmGrid from './components/layouts/CategoryGrid';
 import AlgorithmSelect from './components/layouts/AlgorithmSelect';
 import UserProfile from './components/layouts/UserProfile';
 import AdminPanel from './components/layouts/AdminPanel';
-import { PublicOnlyRoute, ProtectedRoute, AdminRoute } from './context/RouteGuards';
+import { PublicOnlyRoute, ProtectedRoute, AdminRoute } from './auth/RouteGuards';
 
 const AppRoutes = () => {
   return (

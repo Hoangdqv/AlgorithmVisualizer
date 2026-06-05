@@ -1,7 +1,6 @@
 // Simple Insertion Sort in JavaScript
 import Tracer from './runtime/tracer.js';
 
-// [ALGORITHM]
 function insertionSort(arr, tracer) {
     const n = arr.length;
     
@@ -43,7 +42,6 @@ function insertionSort(arr, tracer) {
     return { arr, tracer };
 }
 
-// [TEST]
 // [PARAMS]
 const originalArr = [92, 14, 461, 1122, 235, 9, 127];
 // [/PARAMS]

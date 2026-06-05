@@ -1,6 +1,5 @@
 from runtime.tracer import Tracer
 
-# [ALGORITHM]
 def sort_by_digit(arr, exp, tracer):
     """Sort arr by the digit at position exp (1, 10, 100, ...)"""
     n = len(arr)
@@ -32,8 +31,6 @@ def sort_by_digit(arr, exp, tracer):
                              indexVars=[],
                              variables={'pass': f'{exp}', 'placing': val, 'from_bucket': digit})
 
-
-
 def radix_sort(arr, tracer):
     if not arr:
         return arr, tracer
@@ -48,11 +45,9 @@ def radix_sort(arr, tracer):
     tracer.add_state(arr.copy(), indexVars=[], variables={'status': 'sorted'})
     return arr, tracer
 
-
-# [TEST]
 if __name__ == "__main__":
     # [PARAMS]
-    original_arr = [92, 14, 461, 1122, 235, 9, 127]
+    original_arr = [91, 452, 45, 123, 234, 25, 128]
     # [/PARAMS]
     sorted_arr, tracer = radix_sort(original_arr.copy(), Tracer(category='sorting'))
     print(f'Original array: {original_arr}')

@@ -1,6 +1,5 @@
 import Tracer from './runtime/tracer.js';
 
-// [ALGORITHM]
 function bfs(graph, startNode, tracer) {
     /**
      * Breadth-First Search traversal on a graph represented as adjacency matrix.
@@ -64,7 +63,6 @@ function bfs(graph, startNode, tracer) {
     return { visitedOrder, tracer };
 }
 
-// [TEST]
 // [PARAMS]
 const adjacencyMatrix = [
     [0, 1, 1, 0, 0, 0],

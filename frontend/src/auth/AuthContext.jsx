@@ -1,4 +1,4 @@
-// src/context/AuthContext.jsx
+// src/auth/AuthContext.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from './useAuth';

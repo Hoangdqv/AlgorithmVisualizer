@@ -16,7 +16,6 @@ from helpers import (
     build_tree_only,
 )
 
-# [ALGORITHM]
 def bst_operations(tree_nodes, root_id, operation, tracer, target=None):
     """
     Perform various Binary Search Tree operations.
@@ -51,8 +50,6 @@ def bst_operations(tree_nodes, root_id, operation, tracer, target=None):
     
     return operations[operation]()
 
-
-# [TEST]
 if __name__ == "__main__":
     # [PARAMS]
     tree_nodes = [

@@ -39,7 +39,6 @@ class ContainerHandler:
             return False, 'Code exceeds maximum size limit'
         
         dangerous_patterns = [
-            'import os',
             'import subprocess',
             '__import__',
             'eval(',
@@ -124,7 +123,7 @@ class ContainerHandler:
 
             # Cap output to prevent flooding
             if len(output) > self.max_output_bytes:
-                output = output[:self.max_output_bytes] + '\n[Output truncated at 10 KB]'
+                output = output[:self.max_output_bytes] + '\n[Output truncated due to size exceeding limit]'
 
             try:
                 container.remove()

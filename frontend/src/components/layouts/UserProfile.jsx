@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
-import { useAuth } from '../../context/useAuth';
+import { useAuth } from '../../auth/useAuth';
 import SearchBar from '../SearchBar';
 import FileTree from '../FileTree';
 import FileContextMenu from '../FileContextMenu';
@@ -858,12 +858,18 @@ export default function UserProfile() {
               </div>
             )}
             <hr style={{ borderColor: '#333', margin: '1rem 0' }} />
-
-            {filesLoading ? (
-              <div style={{ color: '#888', padding: '1rem' }}>Loading files...</div>
-            ) : (
               <>
                 <div className={`file-tree-scroll-container profile-file-tree-scroll ${isRootDropTarget ? 'drop-target' : ''}`}>
+                  {filesLoading && (
+                    <div style={{ color: '#888', padding: '1rem', textAlign: 'center' }}>
+                      Loading files...
+                    </div>
+                  )}
+                  {filteredUserData.folders.length === 0 && filteredUserData.files.filter(f => !f.parent_item_id).length === 0 && searchQuery && !filesLoading && (
+                    <div style={{ color: '#888', padding: '1rem', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {searchQuery ? `No results for "${searchQuery}"` : 'No files yet. Create a folder or file to get started!'}
+                    </div>
+                  )}
                   <FileTree
                     folders={filteredUserData.folders}
                     files={filteredUserData.files.filter(f => !f.parent_item_id)}
@@ -883,14 +889,7 @@ export default function UserProfile() {
                     setDragContext={setDragContext}
                   />
                 </div>
-
-                {filteredUserData.folders.length === 0 && filteredUserData.files.filter(f => !f.parent_item_id).length === 0 && (
-                  <div style={{ color: '#888', padding: '1rem', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {searchQuery ? `No results for "${searchQuery}"` : 'No files yet. Create a folder or file to get started!'}
-                  </div>
-                )}
               </>
-            )}
 
             {contextMenu && (
               <FileContextMenu

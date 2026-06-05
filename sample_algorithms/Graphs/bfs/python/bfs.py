@@ -1,7 +1,6 @@
 from runtime.tracer import Tracer
 from collections import deque
 # This is updated from admin side
-# [ALGORITHM]
 def bfs(graph, start_node, tracer):
     """
     Breadth-First Search traversal on a graph represented as adjacency matrix.
@@ -66,7 +65,6 @@ def bfs(graph, start_node, tracer):
     
     return visited_order, tracer
 
-# [TEST]
 if __name__ == "__main__":
     # [PARAMS]
     adjacency_matrix = [

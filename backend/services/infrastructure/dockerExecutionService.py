@@ -2,7 +2,7 @@ import base64
 import docker
 import os
 import re
-import tempfile
+from backend_utils.find_root import get_project_root
 
 class dockerExecutionService:
     def __init__(self):
@@ -92,8 +92,6 @@ class dockerExecutionService:
             raise ValueError(f'Language {language} not supported')
 
         container_filename = self._build_container_filename(language, file_name)
-        cmd = list(cmd) if isinstance(cmd, (list, tuple)) else (cmd or '').split()
-        volumes = None
         temp_file = None
         code_b64 = base64.b64encode(code.encode('utf-8')).decode('ascii')
         environment = {
@@ -101,27 +99,19 @@ class dockerExecutionService:
             'FILENAME': container_filename,
         }
         if language == 'python':
-            exec_code = (
-                "import base64,os;"
-                "code=base64.b64decode(os.environ.get('CODE_B64','')).decode('utf-8');"
-                "filename=os.environ.get('FILENAME','main.py');"
-                "globals_dict={'__name__':'__main__','__file__':filename,'__builtins__':__builtins__};"
-                "exec(compile(code, filename, 'exec'), globals_dict)"
-            )
-            command = cmd + ['-c', exec_code]
+            runner = os.path.abspath(os.path.join(get_project_root(), "sandbox", "python", "runner.py"))
+            runner_path = ('/sandbox/runner.py')  
         else:
-            exec_code = (
-                "const code=Buffer.from(process.env.CODE_B64||'', 'base64').toString('utf8');"
-                " const filename=process.env.FILENAME||'main.js';"
-                " const vm=require('vm');"
-                " new vm.Script(code, { filename }).runInThisContext();"
-            )
-            command = cmd + ['-e', exec_code]
+            runner = os.path.abspath(os.path.join(get_project_root(), "sandbox", "node", "runner.js"))
+            runner_path = ('/sandbox/runner.js')
+
+        cmd = f' {cmd} {runner_path}'
+
         container = self._get_client().containers.create(
             docker_image,
-            command=command,
+            command=cmd,
             environment=environment,
-            volumes=volumes,
+            volumes={runner: {'bind': runner_path, 'mode': 'ro'}},
             stdin_open=True,   # keep stdin pipe open
             tty=True,          # allocate a PTY → raw byte stream (no 8-byte mux headers)
             detach=True,

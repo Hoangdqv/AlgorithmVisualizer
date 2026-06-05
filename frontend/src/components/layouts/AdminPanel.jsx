@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useAuth } from '../../context/useAuth';
+import { useAuth } from '../../auth/useAuth';
 import Editor from '@monaco-editor/react';
 
 export default function AdminPanel() {
@@ -390,6 +390,23 @@ export default function AdminPanel() {
                 >
                   + New
                 </button>
+              </div>
+              <div className="search-bar-container">
+                  <input
+                    name="search-bar-input"
+                    className="search-bar-input"
+                    type="text"
+                    placeholder="Search algorithms..."
+                    onChange={(e) => {
+                      const query = e.target.value.toLowerCase();
+                      const filtered = apiCache.current.algorithms.filter(algo =>
+                        algo.name.toLowerCase().includes(query) ||
+                        algo.display_name.toLowerCase().includes(query) ||
+                        algo.category.toLowerCase().includes(query)
+                      );
+                      setAlgorithms(filtered);
+                    }}
+                  />
               </div>
             <div className="admin-sidebar">
               

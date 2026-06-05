@@ -1,7 +1,7 @@
 # Quick Sort in Python
 from runtime.tracer import Tracer
 from helpers import swap
-# [ALGORITHM]
+
 def quick_sort(arr, tracer, low=0, high=None):
     if high is None:
         high = len(arr) - 1
@@ -46,7 +46,6 @@ def partition(arr, tracer, low, high):
     
     return i + 1
 
-# [TEST]
 if __name__ == "__main__":
     # [PARAMS]
     original_arr = [92, 14, 461, 1122, 235, 9, 127]

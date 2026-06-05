@@ -125,6 +125,13 @@
             "name": "Depth-First Search",
             "description": "DFS traversal using adjacency matrix",
             "explanation_file": "Graphs/dfs/explanation.txt"
+          },
+          "newgraph_algorithm": {
+            "file": "Graphs/newgraph_algorithm/python/newgraph_algorithm.py",
+            "name": "Newgraph Algorithm",
+            "description": "Newgraph Algorithm algorithm",
+            "explanation_file": "Graphs/newgraph_algorithm/explanation.txt",
+            "await_console_input": false
           }
         },
         "javascript": {
@@ -139,6 +146,13 @@
             "name": "Depth-First Search",
             "description": "DFS traversal using adjacency matrix",
             "explanation_file": "Graphs/dfs/explanation.txt"
+          },
+          "newgraph_algorithm": {
+            "file": "Graphs/newgraph_algorithm/javascript/newgraph_algorithm.js",
+            "name": "Newgraph Algorithm",
+            "description": "Newgraph Algorithm algorithm",
+            "explanation_file": "Graphs/newgraph_algorithm/explanation.txt",
+            "await_console_input": false
           }
         }
       }
