@@ -11,7 +11,7 @@
 // to create interactive command-line applications.
 
 // Generate random number between 1 and 100
-const readline = require('readline');
+import * as readline from 'node:readline/promises';
 // output: null suppresses readline's ANSI terminal control sequences (cursor
 // positioning, echo) that appear as artefacts when running inside a PTY container.
 const rl = readline.createInterface({ input: process.stdin, output: null });
@@ -21,16 +21,20 @@ let attempts = 0;
 
 console.log("Welcome to the Number Guessing Game!");
 console.log("I'm thinking of a number between 1 and 100.");
+console.log("Try to guess it!");
 
 // readline is async/callback-based — use recursion instead of a while loop.
 // Each call to askGuess() waits for one line of input, then calls itself again.
 function askGuess() {
-  process.stdout.write("Enter your guess: ");
+  process.stdout.write("> Enter your guess: | 0 to stop\n");
   rl.once("line", (answer) => {
     const guess = Number(answer);
     attempts++;
 
-    if (isNaN(guess) || answer.trim() === '') {
+    if (guess === 0) {
+      console.log(`Game stopped. The secret number was ${secretNumber}.`);
+      rl.close();
+    } else if (isNaN(guess) || answer.trim() === '') {
       console.log("Please enter a valid number.");
       askGuess();
     } else if (guess > secretNumber) {

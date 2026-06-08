@@ -47,13 +47,6 @@
             "description": "New Sort algorithm",
             "explanation_file": "Sorting/new_sort/explanation.txt",
             "await_console_input": false
-          },
-          "newalgorithm": {
-            "file": "Sorting/newalgorithm/python/newalgorithm.py",
-            "name": "Newalgorithm",
-            "description": "Newalgorithm algorithm",
-            "explanation_file": "Sorting/newalgorithm/explanation.txt",
-            "await_console_input": false
           }
         },
         "javascript": {
@@ -99,13 +92,6 @@
             "description": "New Sort algorithm",
             "explanation_file": "Sorting/new_sort/explanation.txt",
             "await_console_input": false
-          },
-          "newalgorithm": {
-            "file": "Sorting/newalgorithm/javascript/newalgorithm.js",
-            "name": "Newalgorithm",
-            "description": "Newalgorithm algorithm",
-            "explanation_file": "Sorting/newalgorithm/explanation.txt",
-            "await_console_input": false
           }
         }
       }
@@ -125,13 +111,6 @@
             "name": "Depth-First Search",
             "description": "DFS traversal using adjacency matrix",
             "explanation_file": "Graphs/dfs/explanation.txt"
-          },
-          "newgraph_algorithm": {
-            "file": "Graphs/newgraph_algorithm/python/newgraph_algorithm.py",
-            "name": "Newgraph Algorithm",
-            "description": "Newgraph Algorithm algorithm",
-            "explanation_file": "Graphs/newgraph_algorithm/explanation.txt",
-            "await_console_input": false
           }
         },
         "javascript": {
@@ -146,13 +125,6 @@
             "name": "Depth-First Search",
             "description": "DFS traversal using adjacency matrix",
             "explanation_file": "Graphs/dfs/explanation.txt"
-          },
-          "newgraph_algorithm": {
-            "file": "Graphs/newgraph_algorithm/javascript/newgraph_algorithm.js",
-            "name": "Newgraph Algorithm",
-            "description": "Newgraph Algorithm algorithm",
-            "explanation_file": "Graphs/newgraph_algorithm/explanation.txt",
-            "await_console_input": false
           }
         }
       }

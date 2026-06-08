@@ -37,8 +37,8 @@ const originalArr = [64, 34, 25, 12, 22, 11, 90];
 const tracer = new Tracer('sorting'); // Tracer instance
 const [sortedArr] = bubbleSort([...originalArr], tracer);
 
-console.log('Original array:', originalArr);
-console.log('Sorted array:', sortedArr);
+console.log(`Original array: [${originalArr.join(", ")}]`);
+console.log(`Sorted array: [${sortedArr.join(", ")}]`);
 
 // Output tracer data for visualization
 tracer.finalize();

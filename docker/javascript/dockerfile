@@ -1,0 +1,7 @@
+FROM node22-alpine
+
+WORKDIR /sandbox
+
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir -r requirements.txt

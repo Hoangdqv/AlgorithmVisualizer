@@ -41,6 +41,7 @@ const AlgorithmSelect = () => {
     lists: {},  // Cache by category+language
     code: {}    // Cache by algorithmKey
   });
+  const preferredAlgorithmKeyRef = useRef(null);
 
   const tracerGuide = useMemo(() => {
     return getTracerGuideWithDetection(category, currentLanguage.toLowerCase(), code);
@@ -48,6 +49,7 @@ const AlgorithmSelect = () => {
 
   // File selection handlers
   const handleFileSelect = useCallback(async (algorithmKey) => {
+    preferredAlgorithmKeyRef.current = algorithmKey;
     setSelectedAlgorithmKey((prevKey) => {
       if (prevKey && prevKey !== algorithmKey) {
         setTreeSession(null);
@@ -144,6 +146,11 @@ const AlgorithmSelect = () => {
   useEffect(() => {
     // example cacheKey format is "sorting_python" or "graphs_javascript"
     const cacheKey = `${category}_${currentLanguage}`;
+    const preferredAlgorithmKey = preferredAlgorithmKeyRef.current;
+    const getAlgorithmToLoad = (algorithms) => (
+      algorithms.find((algorithm) => algorithm.key === preferredAlgorithmKey)
+      || algorithms[0]
+    );
 
     setSelectedAlgorithmName('Loading...');
     setSelectedAlgorithmKey(null);
@@ -152,7 +159,7 @@ const AlgorithmSelect = () => {
     if (apiCache.current.lists[cacheKey]) {
       const cached = apiCache.current.lists[cacheKey];
       if (cached.length > 0) {
-        handleFileSelect(cached[0].key);
+        handleFileSelect(getAlgorithmToLoad(cached).key);
       }
       return;
     }
@@ -173,8 +180,7 @@ const AlgorithmSelect = () => {
         if (data.algorithms && data.algorithms.length > 0) {
           // Cache the algorithm list
           apiCache.current.lists[cacheKey] = data.algorithms;
-          // Auto-load first algorithm
-          handleFileSelect(data.algorithms[0].key);
+          handleFileSelect(getAlgorithmToLoad(data.algorithms).key);
         } else {
           apiCache.current.lists[cacheKey] = [];
           setCode(`// No ${currentLanguage} algorithms available in ${category} category`);

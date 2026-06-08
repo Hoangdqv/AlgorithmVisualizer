@@ -66,6 +66,10 @@ def _persist_algorithm_registry():
     _save_json_file(ALGORITHM_REGISTRY_FILE, ALGORITHM_REGISTRY)
 
 
+def _persist_playground_registry():
+    _save_json_file(PLAYGROUND_REGISTRY_FILE, PLAYGROUND_REGISTRY)
+
+
 def _normalize_category_key(category):
     category_lower = (category or '').lower()
 
@@ -115,3 +119,66 @@ def remove_algorithm_config(category, key):
 
     ALGORITHM_REGISTRY['categories'] = ALGORITHM_MAP
     _persist_algorithm_registry()
+
+
+def add_sample_config(language, key, name, file, description='', await_console_input=False):
+    lang_key = (language or '').lower()
+    lang_config = LANGUAGE_MAP.get(lang_key)
+
+    if not lang_config:
+        return False
+
+    samples = lang_config.setdefault('samples', {})
+    if key in samples:
+        return False
+
+    samples[key] = {
+        'file': file,
+        'name': name,
+        'description': description,
+        'await_console_input': bool(await_console_input)
+    }
+
+    PLAYGROUND_REGISTRY['languages'] = LANGUAGE_MAP
+    _persist_playground_registry()
+    return True
+
+
+def remove_sample_config(language, key):
+    lang_key = (language or '').lower()
+    lang_config = LANGUAGE_MAP.get(lang_key)
+
+    if not lang_config:
+        return False
+
+    samples = lang_config.get('samples', {})
+    if key not in samples:
+        return False
+
+    samples.pop(key, None)
+    PLAYGROUND_REGISTRY['languages'] = LANGUAGE_MAP
+    _persist_playground_registry()
+    return True
+
+
+def update_sample_config(language, key, name=None, description=None, await_console_input=None):
+    lang_key = (language or '').lower()
+    lang_config = LANGUAGE_MAP.get(lang_key)
+
+    if not lang_config:
+        return False
+
+    sample = lang_config.get('samples', {}).get(key)
+    if not sample:
+        return False
+
+    if name is not None:
+        sample['name'] = name
+    if description is not None:
+        sample['description'] = description
+    if await_console_input is not None:
+        sample['await_console_input'] = bool(await_console_input)
+
+    PLAYGROUND_REGISTRY['languages'] = LANGUAGE_MAP
+    _persist_playground_registry()
+    return True

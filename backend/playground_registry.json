@@ -7,7 +7,8 @@
         "helloworld": {
           "file": "python/helloworld.py",
           "name": "Hello World",
-          "description": "Basic print statement"
+          "description": "Basic print statement",
+          "await_console_input": false
         },
         "fibonacci": {
           "file": "python/fibonacci.py",

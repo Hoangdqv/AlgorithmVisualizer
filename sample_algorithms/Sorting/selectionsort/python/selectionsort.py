@@ -17,7 +17,7 @@ def selection_sort(arr, tracer):
                 min_index = j
         
         # If minIndex changed, update the selected position
-        tracer.add_state(arr.copy(), selected=[i, min_index], indexVars=['i', 'min_index'], variables={'i': i, 'min_index': min_index})
+        tracer.add_state(arr.copy(), comparing=[i, min_index], indexVars=['i', 'min_index'], variables={'i': i, 'min_index': min_index})
         # Swap the minimum element with the first element of unsorted portion
         if min_index != i:
             swap(arr, i, min_index)

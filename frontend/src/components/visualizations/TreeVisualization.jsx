@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useImperativeHandle, forwardRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useImperativeHandle, forwardRef, useCallback, useMemo } from 'react';
 
 const TreeVisualization = forwardRef(({ currentState }, ref) => {
 
@@ -21,7 +21,6 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
   const isPanningRef = useRef(false);
   const previousStructureSignatureRef = useRef('');
 
-  console.log('Current State:', currentState);
   const viewBox = useMemo(() => ({
     minX: 0,
     minY: 0,
@@ -131,7 +130,7 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
     // Output is a string like "1:2,3|2:4|3:5,6|4:|5:|6:" representing the tree structure
   }, [treeStructure]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     updateNodePositions(prev => {
       if (graphState) {
         resetGraphState(false);
@@ -156,7 +155,6 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
           setAutoFit(true);
         }
         // Structure changed/new nodes/first render - recalculate positions
-        setAutoFit(true);
         return calculateTreePositions(treeStructure);
       } else {
         // Keep existing positions, just remove deleted nodes
@@ -401,7 +399,7 @@ const TreeVisualization = forwardRef(({ currentState }, ref) => {
       treeData.forEach((node) => {
         const children = node.children;
         children.forEach(childId => {
-          if (childId && nodePositions[node.id] && nodePositions[childId]) {
+          if (childId !== null && childId !== undefined && nodePositions[node.id] && nodePositions[childId]) {
             // Draw edge from node to child
             edges.push(
               <line

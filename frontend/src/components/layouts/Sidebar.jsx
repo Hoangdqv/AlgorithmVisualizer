@@ -735,8 +735,8 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
                       Loading files...
                     </div>
                   )}
-                  {filteredUserData.folders.length === 0 && filteredUserData.files.filter(f => !f.parent_item_id).length === 0 && searchQuery && !loading && (
-                    <div style={{ color: '#888', padding: '1rem', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {filteredUserData.folders.length === 0 && filteredUserData.files.filter(f => !f.parent_item_id).length === 0 && !loading && (
+                    <div style={{ color: '#888', padding: '1rem', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis'}}>
                       {searchQuery ? `No results for "${searchQuery}"` : 'No files yet. Create a folder or file to get started!'}
                     </div>
                   )}
@@ -754,7 +754,7 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
                     depth={0}
                     dragContext={dragContext}
                     setDragContext={setDragContext}
-                  />
+                    />
                 </div>
               </>
             )}

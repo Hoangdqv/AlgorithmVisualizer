@@ -99,7 +99,6 @@ class executionService:
             print(f"[CONTAINER] Validation failed: {error_msg}")
             return {'success': False, 'stderr': error_msg}
         
-        print(f"[CONTAINER] Code validation passed")
         
         if not docker_image:
             return {
@@ -118,6 +117,7 @@ class executionService:
         
         print(f"[CONTAINER] Tracers directory: {tracers_dir}")
         print(f"[CONTAINER] Helpers directory: {helpers_dir}")
+        print(code)
         
         code_b64 = base64.b64encode(code.encode('utf-8')).decode('ascii')
         if language == 'python':

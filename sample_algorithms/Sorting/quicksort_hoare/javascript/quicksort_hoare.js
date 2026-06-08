@@ -99,8 +99,8 @@ const originalArr = [92, 14, 461, 1122, 235, 9, 127];
 const tracer = new Tracer('sorting'); // Tracer instance
 const [sortedArr] = quickSortHoare([...originalArr], tracer);
 
-console.log('Original array:', originalArr);
-console.log('Sorted array:', sortedArr);
+console.log(`Original array: [${originalArr.join(", ")}]`);
+console.log(`Sorted array: [${sortedArr.join(", ")}]`);
 
 // Output tracer data for visualization
 tracer.finalize();

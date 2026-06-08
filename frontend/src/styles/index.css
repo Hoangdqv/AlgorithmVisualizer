@@ -564,7 +564,6 @@ button {
   font-size: 0.8rem;
   color: #ce9178;
   background: #2b2b2b;
-  cursor: help;
 }
 
 .tracer-guide-floating-tooltip {
@@ -2034,7 +2033,8 @@ footer {
   flex-direction: column;
   align-items: center;
   gap: 0.2rem;
-  min-width: 3rem;
+  min-width: 3.4rem;
+  max-width: 8rem;
 }
 
 .visual-module-bucket-label {
@@ -2050,20 +2050,32 @@ footer {
 
 .visual-module-bucket-items {
   display: flex;
-  flex-direction: column-reverse;
-  align-items: center;
+  flex-direction: row-reverse;
+  align-content: flex-start;
+  align-items: flex-start;
+  justify-content: center;
+  flex-wrap: wrap-reverse;
   gap: 0.15rem;
+  max-height: 8.5rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.15rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .visual-module-bucket-item {
   background-color: #4167ff;
   color: white;
   font-weight: bold;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   border-radius: 0.3rem;
-  padding: 0.25rem 0.5rem;
-  min-width: 2.4rem;
+  padding: 0.22rem 0.35rem;
+  min-width: 2.2rem;
+  max-width: 3.6rem;
   text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
   transition: all 0.3s;
 }
@@ -2976,8 +2988,32 @@ input::-webkit-inner-spin-button {
   font-size: 1.8rem;
 }
 
+.admin-mode-toggle {
+  display: inline-flex;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+  padding: 0.25rem;
+  background: #252525;
+  border: 1px solid #444;
+  border-radius: 6px;
+}
+
+.admin-mode-button {
+  padding: 0.5rem 0.85rem;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #ccc;
+  cursor: pointer;
+}
+
+.admin-mode-button.active {
+  background: #0e639c;
+  color: #fff;
+}
+
 .info-and-messages {
-  display: grid;
+  /* display: grid; */
   grid-template-columns: 300px 1fr;
   gap: 2rem;
   margin-bottom: 1.5rem;
@@ -3178,6 +3214,24 @@ input::-webkit-inner-spin-button {
   margin: 0;
 }
 
+.sample-code-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.sample-code-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #ddd;
+}
+
+.sample-code-details {
+  display: grid;
+  gap: 0.5rem;
+  color: #ddd;
+}
+
 .explanation-preview {
   background: #1e1e1e;
   border: 1px solid #444;
@@ -3333,4 +3387,3 @@ input::-webkit-inner-spin-button {
   background: rgba(255, 255, 255, 0.3);
   border-color: rgba(255, 255, 255, 0.5);
 }
-

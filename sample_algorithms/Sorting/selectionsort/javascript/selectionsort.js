@@ -18,7 +18,7 @@ function selectionSort(arr, tracer) {
         }
         
         // If minIndex changed, update the selected position
-        tracer.add_state([...arr], { selected: [i, minIndex], indexVars: ['i', 'minIndex'], variables: { i, minIndex } });
+        tracer.add_state([...arr], { comparing: [i, minIndex], indexVars: ['i', 'minIndex'], variables: { i, minIndex } });
         // Swap the minimum element with the first element of unsorted portion
         if (minIndex !== i) {
             swap(arr, i, minIndex);
@@ -35,8 +35,8 @@ const originalArr = [64, 34, 25, 12, 22, 11, 90];
 const tracer = new Tracer('sorting'); // Tracer instance
 const [sortedArr] = selectionSort([...originalArr], tracer);
 
-console.log('Original array:', originalArr);
-console.log('Sorted array:', sortedArr);
+console.log(`Original array: [${originalArr.join(", ")}]`);
+console.log(`Sorted array: [${sortedArr.join(", ")}]`);
 
 // Output tracer data for visualization
 tracer.finalize();

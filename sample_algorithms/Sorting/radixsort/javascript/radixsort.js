@@ -61,6 +61,6 @@ const originalArr = [91, 452, 45, 123, 234, 25, 128];
 // [/PARAMS]
 const tracer = new Tracer('sorting');
 const [sortedArr] = radixSort([...originalArr], tracer);
-console.log('Original array:', originalArr);
-console.log('Sorted array:', sortedArr);
+console.log(`Original array: [${originalArr.join(", ")}]`);
+console.log(`Sorted array: [${sortedArr.join(", ")}]`);
 tracer.finalize();

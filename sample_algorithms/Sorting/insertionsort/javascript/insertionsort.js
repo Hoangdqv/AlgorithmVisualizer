@@ -9,9 +9,9 @@ function insertionSort(arr, tracer) {
         let j = i - 1;
         
         tracer.add_state([...arr], {   
-            selected: [i],
-            indexVars: ['i'],
-            variables: { i: i } 
+            comparing: [j, j+1],
+            indexVars: ['i', 'j', 'key'],
+            variables: { i: i, j: j, key: key } 
         });
         arr[i] = null;
         
@@ -20,8 +20,8 @@ function insertionSort(arr, tracer) {
             // Comparing (yellow)
             tracer.add_state([...arr], {
                 comparing: [j, j + 1],
-                indexVars: ['i', 'j'],
-                variables: { i: i, j: j } 
+                indexVars: ['i', 'j', 'key'],
+                variables: { i: i, j: j, key: key } 
             });
             arr[j + 1] = arr[j];
             arr[j] = null;
@@ -29,8 +29,8 @@ function insertionSort(arr, tracer) {
             // Shifted (green)
             tracer.add_state([...arr], { 
                 swapped: [j, j + 1],
-                indexVars: ['i', 'j'],
-                variables: { i: i, j: j } 
+                indexVars: ['i', 'j', 'key'],
+                variables: { i: i, j: j, key: key } 
             });
             j--;
         }
@@ -39,7 +39,7 @@ function insertionSort(arr, tracer) {
     }
     
     tracer.add_state([...arr]);
-    return { arr, tracer };
+    return [arr, tracer];
 }
 
 // [PARAMS]
@@ -47,10 +47,10 @@ const originalArr = [92, 14, 461, 1122, 235, 9, 127];
 // [/PARAMS]
 const tracer = new Tracer('sorting');
 
-const { arr: sortedArr, tracer: finalTracer } = insertionSort([...originalArr], tracer);
+const [sortedArr] = insertionSort([...originalArr], tracer);
 
-console.log(`Original array: [${originalArr}]`);
-console.log(`Sorted array: [${sortedArr}]`);
+console.log(`Original array: [${originalArr.join(", ")}]`);
+console.log(`Sorted array: [${sortedArr.join(", ")}]`);
 
 // Output tracer data for visualization
-finalTracer.finalize();
+tracer.finalize();

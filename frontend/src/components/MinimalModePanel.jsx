@@ -123,8 +123,7 @@ const MinimalModePanel = ({ category, algorithmKey, onRun, onRunContinue, isRunn
         // Default to text input for 'string', 'array-int', 'number-required', etc.
         <input
           id={`param-${param.key}`}
-          type="number"
-          
+          type="text"
           required={param.required}
           value={formValues[param.key] ?? ''}
           onChange={(e) => handleChange(param.key, e.target.value)}

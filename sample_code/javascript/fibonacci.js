@@ -5,7 +5,7 @@ function fibonacci(n) {
     }
     return fibonacci(n - 1) + fibonacci(n - 2);
 }
-term = 6;
+const term = 6;
 console.log(`Fibonacci number for term ${term}: `, fibonacci(term)); // Number of terms, change as needed here
 //Or we can print up until a specified number
 function printFibonacci(n) {
