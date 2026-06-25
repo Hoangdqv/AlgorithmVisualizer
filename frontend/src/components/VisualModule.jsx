@@ -20,7 +20,6 @@ const VisualModule = ({ tracerData, isRunning, currentLanguage, suppressRunningO
   const captureMenuRef = useRef(null);
 
   const [displayData, setDisplayData] = useState(tracerData);
-  // console.log('Current displayData:', displayData);
   const displayStates = displayData?.states || [];
   const displayTotalSteps = displayStates.length;
   const currentState = displayStates[currentStep];

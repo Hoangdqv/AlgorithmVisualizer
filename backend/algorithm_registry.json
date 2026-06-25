@@ -40,13 +40,6 @@
             "name": "Radix Sort",
             "description": "Non-comparison sort that processes digits from least to most significant",
             "explanation_file": "Sorting/radixsort/explanation.txt"
-          },
-          "new_sort": {
-            "file": "Sorting/new_sort/python/new_sort.py",
-            "name": "New Sort",
-            "description": "New Sort algorithm",
-            "explanation_file": "Sorting/new_sort/explanation.txt",
-            "await_console_input": false
           }
         },
         "javascript": {
@@ -85,13 +78,6 @@
             "name": "Radix Sort",
             "description": "Non-comparison sort that processes digits from least to most significant",
             "explanation_file": "Sorting/radixsort/explanation.txt"
-          },
-          "new_sort": {
-            "file": "Sorting/new_sort/javascript/new_sort.js",
-            "name": "New Sort",
-            "description": "New Sort algorithm",
-            "explanation_file": "Sorting/new_sort/explanation.txt",
-            "await_console_input": false
           }
         }
       }

@@ -18,6 +18,10 @@ excluding_keywords = [
     "import base64",
     "import os",
     "import traceback",
+    "~^",
+    "^",
+    "exec(compiled, globals_dict)",
+    "<module>",
 ]
 try:
     compiled = compile(code, filename, 'exec')

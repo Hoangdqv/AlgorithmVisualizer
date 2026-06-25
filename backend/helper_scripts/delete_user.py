@@ -5,8 +5,7 @@ python delete_user.py <username_or_email>
 import sys
 from backend.app import app
 from database import db
-from models import User, File, Folder
-from closure_table_helpers import delete_folder_cascade
+from models import User, File, Folder, ClosureTable
 
 def delete_user(identifier):
     """Delete user by username or email"""
@@ -51,7 +50,7 @@ def delete_user(identifier):
             deleted_folders = 0
             root_folders = Folder.query.filter_by(user_account_id=user.id, parent_item_id=None).all()
             for folder in root_folders:
-                deleted_folders += delete_folder_cascade(folder.folder_id, user.id)
+                deleted_folders += ClosureTable.delete_entry(folder.folder_id, user.id)
 
             # Delete user (remaining root files cascade from user.files).
             db.session.delete(user)
@@ -64,7 +63,7 @@ def delete_user(identifier):
 
         except Exception as e:
             db.session.rollback()
-            print(f"\n❌ Error deleting user: {str(e)}")
+            print(f"\n Error deleting user: {str(e)}")
             return False
 
 if __name__ == '__main__':

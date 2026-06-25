@@ -638,26 +638,13 @@ def execute_algorithm():
             'cmd': cmd,
             'docker_image': docker_image
         }
-
-        print(f"\n{'='*60}")
-        print(f"[API] Received execution request for {language}")
-        print(f"{'='*60}")
         
         if not code:
             return jsonify({'error': 'No code provided'}), 400
         
 
         result = execution_service.execute_algorithm(**execution_data)
-        
-        print(f"\n[API] Result: {'SUCCESS' if result.get('success') else 'FAILED'}")
-        if result.get('success'):
-            print(f"[API] Output length: {len(result.get('output', ''))} chars")
-            if 'states' in result:
-                print(f"[API] States count: {len(result['states'].get('states', []))}")
-        else:
-            print(f"[API] Error: {result.get('error')}")
-        print(f"{'='*60}\n")
-        
+                
         if not result.get('success'):
             return jsonify({
                 'success': False,
@@ -1696,15 +1683,14 @@ def get_languages():
 @app.route('/api/user/folders', methods=['GET'])
 def get_user_folders():
     """Get all root folders for current user"""
-    from models import Folder
-    from closure_table_helpers import get_root_folders
+    from models import ClosureTable
     
     user_id = session.get('user_id')
     if not user_id:
         return jsonify({'error': 'Not authenticated'}), 401
     
     try:
-        root_folders = get_root_folders(user_id, 'user-defined')
+        root_folders = ClosureTable.get_root_folders(user_id, 'user-defined')
         return jsonify({
             'folders': [f.to_dict() for f in root_folders]
         }), 200
@@ -1729,17 +1715,16 @@ def get_user_folders():
 
 
 @app.route('/api/user/folders/<int:folder_id>/tree', methods=['GET'])
-def get_folder_tree_route(folder_id):
+def get_hierarchy_route(folder_id):
     """Get entire folder tree from specified folder"""
-    from models import Folder, File
-    from closure_table_helpers import get_folder_tree
+    from models import Folder, File, ClosureTable
     
     user_id = session.get('user_id')
     if not user_id:
         return jsonify({'error': 'Not authenticated'}), 401
     
     try:
-        tree_data = get_folder_tree(folder_id, user_id)
+        tree_data = ClosureTable.get_hierarchy(folder_id, user_id)
         
         # Build hierarchical structure
         result = []
@@ -1755,7 +1740,7 @@ def get_folder_tree_route(folder_id):
 
 
 @app.route('/api/user/folders', methods=['POST'])
-def create_folder():
+def add_entry():
     """Create a new folder"""
     from models import Folder
 
@@ -1802,7 +1787,6 @@ def update_folder(folder_id):
         return jsonify({'error': 'Not authenticated'}), 401
     
     data = request.get_json()
-    print(data)
     new_name = data.get('item_name')
     
     if not new_name:
@@ -1826,14 +1810,14 @@ def update_folder(folder_id):
 @app.route('/api/user/folders/<int:folder_id>', methods=['DELETE'])
 def delete_folder(folder_id):
     """Delete a folder and all its contents"""
-    from closure_table_helpers import delete_folder_cascade
+    from models import ClosureTable
     
     user_id = session.get('user_id')
     if not user_id:
         return jsonify({'error': 'Not authenticated'}), 401
     
     try:
-        deleted_count = delete_folder_cascade(folder_id, user_id)
+        deleted_count = ClosureTable.delete_entry(folder_id, user_id)
         return jsonify({
             'message': f'Deleted {deleted_count} folder(s) successfully'
         }), 200
@@ -1843,7 +1827,7 @@ def delete_folder(folder_id):
 
 
 @app.route('/api/user/folders/<int:folder_id>/move', methods=['POST'])
-def move_folder(folder_id):
+def move_entry(folder_id):
     """Move folder to a new parent"""
     from models import Folder
     
@@ -1935,7 +1919,6 @@ def create_file():
     if not user_id:
         return jsonify({'error': 'Not authenticated'}), 401
     data = request.get_json()
-    print(data)
     item_name = data.get('item_name')
     parent_item_id = data.get('parent_item_id')  # None for root level
     language_id = data.get('language_id')

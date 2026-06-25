@@ -278,7 +278,6 @@ const AlgorithmSelect = () => {
           setTreeSession(null);
         }
       } else {
-        console.log('Execution error:', data.stderr);
         setOutput(consoleErrorHandling(data.stderr));
       }
     } catch (error) {
@@ -428,7 +427,7 @@ const AlgorithmSelect = () => {
     if (!languageId) {
       downloadCapture(capture.blob, filename);
       setOutput('Could not resolve a language id for file storage, snapshot downloaded locally instead.');
-      return false;
+      return true;
     }
 
     try {
@@ -451,18 +450,18 @@ const AlgorithmSelect = () => {
       if (response.status === 401) {
         downloadCapture(capture.blob, filename);
         setOutput('You are not logged in, so the snapshot was downloaded locally.');
-        return false;
+        return true;
       }
 
       const errorData = await response.json().catch(() => ({}));
       setOutput(`Failed to save snapshot to My Files (${errorData.error || response.statusText}). Downloaded locally instead.`);
       downloadCapture(capture.blob, filename);
-      return false;
+      return true;
     } catch (error) {
       console.error('Failed to persist visualization capture:', error);
       setOutput(`Failed to save snapshot online (${error.message}). Downloaded locally instead.`);
       downloadCapture(capture.blob, filename);
-      return false;
+      return true;
     }
   }, [currentLanguage, languageData, downloadCapture, selectedAlgorithmName]);
 

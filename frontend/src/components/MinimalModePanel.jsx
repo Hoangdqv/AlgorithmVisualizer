@@ -10,7 +10,6 @@ const MinimalModePanel = ({ category, algorithmKey, onRun, onRunContinue, isRunn
   );
   const shouldShowResetLabel = category === 'trees' && hasTreeSession;
   
-  console.log('MinimalModePanel render', { category, algorithmKey, formValues });
   // Reset form to defaults when the algorithm or category changes
   useEffect(() => {
     if (!schema?.params) return;

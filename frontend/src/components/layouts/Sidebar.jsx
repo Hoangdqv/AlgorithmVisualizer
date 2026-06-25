@@ -542,12 +542,9 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
 
   const handleRename = async (newName, item, itemType) => {
     if (!item || !itemType) {
-      console.log('Missing item or itemType');
       return;
     }
-    
-    console.log('Renaming:', { newName, item, itemType });
-    
+        
     try {
       const endpoint = itemType === 'folder'
         ? `${API_URL}/user/folders/${item.folder_id}`
@@ -556,21 +553,15 @@ const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, on
       const body = itemType === 'folder'
         ? { item_name: newName }
         : { item_name: newName };
-      
-      console.log('Rename request:', { endpoint, body });
-      
+            
       const response = await fetch(endpoint, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(body)
       });
-      
-      console.log('Rename response:', response.status, response.ok);
-      
+            
       if (response.ok) {
-        const data = await response.json();
-        console.log('Rename success:', data);
         apiCache.current.userFilesData = { folders: null, files: null };
         if (itemType === 'file' && item.file_id && apiCache.current.userFileContent?.[item.file_id]) {
           apiCache.current.userFileContent[item.file_id] = {

@@ -90,9 +90,7 @@ class executionService:
             }
 
     def execute_algorithm(self, language, code, cmd, docker_image):
-        print(f"\n[CONTAINER] Starting execution for {language}")
-        print(f"[CONTAINER] Code length: {len(code)} bytes")
-        
+
         # Validation
         is_valid, error_msg = self.docker_service._validate_code(code)
         if not is_valid:
@@ -106,18 +104,13 @@ class executionService:
                 'stderr': f'Language {language} not supported'
             }
         
-        
-        
+    
         # Get tracers directory path
         RUNTIME_DIR_NAME = 'runtime' # CHANGE THIS IF RUNTIME DIR NAME CHANGES
         HELPERS_DIR_NAME = 'sample_algorithms' # CHANGE THIS IF HELPERS DIR NAME CHANGES
         root_dir = get_project_root()
         tracers_dir = os.path.join(root_dir, RUNTIME_DIR_NAME)
         helpers_dir = os.path.join(root_dir, HELPERS_DIR_NAME)
-        
-        print(f"[CONTAINER] Tracers directory: {tracers_dir}")
-        print(f"[CONTAINER] Helpers directory: {helpers_dir}")
-        print(code)
         
         code_b64 = base64.b64encode(code.encode('utf-8')).decode('ascii')
         if language == 'python':
@@ -135,9 +128,7 @@ class executionService:
             'CODE_B64': code_b64,
             'FILENAME': container_filename,
         }
-        try:
-            print(f"[CONTAINER] Starting container...")
-            
+        try:        
             # Run container with code mounted (don't auto-remove yet)
             container = self.docker_service._get_client().containers.run(
                 docker_image,
@@ -182,10 +173,7 @@ class executionService:
             )
             
             # Wait for container to finish
-            print(f"[CONTAINER] Waiting for execution (timeout: {self.docker_service.execution_timeout}s)...")
-            result = container.wait(timeout=self.docker_service.execution_timeout)
-            print(f"[CONTAINER] Execution completed with exit code: {result['StatusCode']}")
-                
+            result = container.wait(timeout=self.docker_service.execution_timeout)                
             logs = container.logs(stdout=True, stderr=False).decode('utf-8')
             errors = container.logs(stdout=False, stderr=True).decode('utf-8')
 
@@ -212,16 +200,12 @@ class executionService:
             end_marker = '--- TRACER_JSON_END ---'
             
             if start_marker in logs and end_marker in logs:
-                print(f"[CONTAINER] Found JSON markers, extracting tracer data...")
                 start_idx = logs.find(start_marker) + len(start_marker)
                 end_idx = logs.find(end_marker)
                 json_data = logs[start_idx:end_idx].strip()
                 
                 states = json.loads(json_data)
                 user_output = logs[:logs.find(start_marker)].strip()
-                
-                print(f"[CONTAINER] Extracted {len(states.get('states', []))} trace states")
-                print(f"[CONTAINER] Execution successful\n")
                 
                 return {
                     'success': True,
@@ -231,8 +215,6 @@ class executionService:
                     'exit_code': result['StatusCode']
                 }
             else:
-                print(f"[CONTAINER] No JSON markers found, returning raw output")
-                print(f"[CONTAINER] Execution successful\n")
                 return {
                     'success': True,
                     'output': logs,

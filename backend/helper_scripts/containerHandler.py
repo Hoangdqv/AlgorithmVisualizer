@@ -218,17 +218,12 @@ class ContainerHandler:
             pass
     
     def execute_algorithm(self, language, code):
-        print(f"\n[CONTAINER] Starting execution for {language}")
-        print(f"[CONTAINER] Code length: {len(code)} bytes")
-        
         # Validation
         is_valid, error_msg = self._validate_code(code)
         if not is_valid:
             print(f"[CONTAINER] Validation failed: {error_msg}")
             return {'success': False, 'error': error_msg}
-        
-        print(f"[CONTAINER] Code validation passed")
-        
+            
         docker_image = self.docker_images.get(language)
         if not docker_image:
             return {
@@ -239,16 +234,11 @@ class ContainerHandler:
         with tempfile.NamedTemporaryFile(mode='w', suffix=f'.{language}', delete=False) as f:
             temp_file = f.name
             f.write(code)
-        
-        print(f"[CONTAINER] Created temp file: {temp_file}")
-        
+            
         # Get tracers directory path
         backend_dir = os.path.dirname(os.path.abspath(__file__))
         tracers_dir = os.path.join(os.path.dirname(backend_dir), 'tracers')
         helpers_dir = os.path.join(os.path.dirname(backend_dir), 'sample_algorithms')
-        
-        print(f"[CONTAINER] Tracers directory: {tracers_dir}")
-        print(f"[CONTAINER] Helpers directory: {helpers_dir}")
         
         try:
             # Determine file extension and command
@@ -258,10 +248,6 @@ class ContainerHandler:
             else:  # javascript
                 container_path = '/app/algorithm.js'
                 cmd = ['node', container_path]
-            
-            print(f"[CONTAINER] Using image: {docker_image}")
-            print(f"[CONTAINER] Command: {' '.join(cmd)}")
-            print(f"[CONTAINER] Starting container...")
             
             # Run container with code mounted (don't auto-remove yet)
             container = self._get_client().containers.run(
@@ -304,10 +290,7 @@ class ContainerHandler:
             )
             
             # Wait for container to finish
-            print(f"[CONTAINER] Waiting for execution (timeout: {self.execution_timeout}s)...")
-            result = container.wait(timeout=self.execution_timeout)
-            print(f"[CONTAINER] Execution completed with exit code: {result['StatusCode']}")
-            
+            result = container.wait(timeout=self.execution_timeout)            
             logs = container.logs(stdout=True, stderr=False).decode('utf-8')
             errors = container.logs(stdout=False, stderr=True).decode('utf-8')
 
@@ -316,10 +299,6 @@ class ContainerHandler:
                 print(f"[CONTAINER] Container removed")
             except:
                 pass
-            
-            print(f"[CONTAINER] ===== STDOUT =====")
-            print(logs)
-            print(f"[CONTAINER] ===== END STDOUT =====")
             
             if errors:
                 print(f"[CONTAINER] ===== STDERR =====")
@@ -330,16 +309,12 @@ class ContainerHandler:
             end_marker = '--- TRACER_JSON_END ---'
             
             if start_marker in logs and end_marker in logs:
-                print(f"[CONTAINER] Found JSON markers, extracting tracer data...")
                 start_idx = logs.find(start_marker) + len(start_marker)
                 end_idx = logs.find(end_marker)
                 json_data = logs[start_idx:end_idx].strip()
                 
                 states = json.loads(json_data)
                 user_output = logs[:logs.find(start_marker)].strip()
-                
-                print(f"[CONTAINER] Extracted {len(states.get('states', []))} trace states")
-                print(f"[CONTAINER] Execution successful\n")
                 
                 return {
                     'success': True,
@@ -349,8 +324,6 @@ class ContainerHandler:
                     'exit_code': result['StatusCode']
                 }
             else:
-                print(f"[CONTAINER] No JSON markers found, returning raw output")
-                print(f"[CONTAINER] Execution successful\n")
                 return {
                     'success': True,
                     'output': logs,

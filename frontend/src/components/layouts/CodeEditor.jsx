@@ -599,7 +599,6 @@ const CodeEditor = () => {
           }),
         });
         const body = await res.json();
-        console.log('Execution response:', body);
         setIsRunning(false);
         if (!body.success) {
           setOutput(consoleErrorHandling(body.stderr || body.error));
@@ -651,7 +650,6 @@ const CodeEditor = () => {
         body: JSON.stringify({ content })
       });
       if (response.ok){
-        console.log('File auto-saved');
         if (!apiCache.current.userFileContent) {
           apiCache.current.userFileContent = {};
         }

@@ -203,8 +203,7 @@ class Folder(FileSystemItem):
         else:
             path = FileSystemItem.build_path(None, item_name)
 
-        from closure_table_helpers import create_folder_with_closure
-        new_folder = create_folder_with_closure(
+        new_folder = ClosureTable.add_entry(
             item_name=item_name,
             path=path,
             item_type=item_type,
@@ -249,9 +248,8 @@ class Folder(FileSystemItem):
 
     @classmethod
     def move_for_user(cls, folder_id, new_parent_id, user_id):
-        from closure_table_helpers import move_folder
         try:
-            success = move_folder(folder_id, new_parent_id, user_id)
+            success = ClosureTable.move_entry(folder_id, new_parent_id, user_id)
         except ValueError as exc:
             return False, {
                 'status': 400,
@@ -498,6 +496,204 @@ class ClosureTable(db.Model):
     descendant = db.Column(db.Integer, db.ForeignKey('filesystem_item.item_id', ondelete='CASCADE'), 
                           primary_key=True, nullable=False)
     depth = db.Column(db.Integer, nullable=False)
+
+    @classmethod
+    def owned_query(cls, user_account_id):
+        """Scope closure rows to descendants owned by the given user."""
+        return cls.query.join(
+            FileSystemItem,
+            cls.descendant == FileSystemItem.item_id
+        ).filter(
+            FileSystemItem.user_account_id == user_account_id
+        )
+
+    @classmethod
+    def add_entry(cls, item_name, path, user_account_id, parent_item_id=None, item_type='user-defined', created_at=None):
+        """
+        Create a folder and insert its closure table entries.
+        """
+        if created_at is None:
+            created_at = datetime.now()
+
+        new_folder = Folder(
+            item_name=item_name,
+            path=path,
+            item_type=item_type,
+            created_at=created_at,
+            user_account_id=user_account_id,
+            parent_item_id=parent_item_id
+        )
+
+        if parent_item_id:
+            parent_folder = Folder.query.get(parent_item_id)
+            if parent_folder is not None:
+                parent_folder.children.append(new_folder)
+        else:
+            db.session.add(new_folder)
+
+        db.session.flush()
+
+        existing_self_ref = cls.query.filter_by(
+            ancestor=new_folder.folder_id,
+            descendant=new_folder.folder_id
+        ).first()
+
+        if not existing_self_ref:
+            new_folder.ancestors.append(cls(
+                ancestor=new_folder.folder_id,
+                depth=0
+            ))
+
+        if parent_item_id:
+            parent_ancestors = cls.owned_query(user_account_id).filter(
+                cls.descendant == parent_item_id
+            ).all()
+
+            for ancestor_entry in parent_ancestors:
+                new_folder.ancestors.append(cls(
+                    ancestor=ancestor_entry.ancestor,
+                    depth=ancestor_entry.depth + 1
+                ))
+
+        db.session.commit()
+        return new_folder
+
+    @classmethod
+    def get_hierarchy(cls, root_folder_id, user_account_id):
+        return db.session.query(Folder, cls.depth).join(
+            cls, Folder.folder_id == cls.descendant
+        ).filter(
+            cls.ancestor == root_folder_id,
+            Folder.user_account_id == user_account_id
+        ).order_by(cls.depth, Folder.item_name).all()
+
+    @classmethod
+    def get_all_descendants(cls, folder_id, user_account_id):
+        descendants = cls.owned_query(user_account_id).filter(
+            cls.ancestor == folder_id,
+            cls.depth > 0
+        ).all()
+
+        return [d.descendant for d in descendants]
+
+    @classmethod
+    def is_descendant(cls, ancestor_id, descendant_id, user_account_id):
+        entry = cls.owned_query(user_account_id).filter(
+            cls.ancestor == ancestor_id,
+            cls.descendant == descendant_id
+        ).first()
+
+        return entry is not None
+
+    @classmethod
+    def delete_entry(cls, folder_id, user_account_id):
+        folder = Folder.query.filter_by(folder_id=folder_id, user_account_id=user_account_id).first()
+        if not folder:
+            return 0
+
+        descendant_ids = cls.get_all_descendants(folder_id, user_account_id)
+        deleted_count = len(descendant_ids) + 1
+
+        parent_folder = folder.parent
+        if parent_folder is not None:
+            parent_folder.children.remove(folder)
+        else:
+            db.session.delete(folder)
+
+        db.session.commit()
+        return deleted_count
+
+    @classmethod
+    def get_root_folders(cls, user_account_id, item_type='user-defined'):
+        return Folder.query.filter_by(
+            user_account_id=user_account_id,
+            item_type=item_type,
+            parent_item_id=None
+        ).all()
+
+    @classmethod
+    def move_entry(cls, folder_id, new_parent_id, user_account_id):
+        folder = Folder.query.filter_by(folder_id=folder_id, user_account_id=user_account_id).first()
+        if not folder:
+            raise ValueError('Folder not found')
+
+        if new_parent_id == folder_id:
+            raise ValueError('Cannot move folder into itself')
+
+        if new_parent_id is not None:
+            new_parent = Folder.query.filter_by(folder_id=new_parent_id, user_account_id=user_account_id).first()
+            if not new_parent:
+                raise ValueError('Destination folder not found')
+            if cls.is_descendant(folder_id, new_parent_id, user_account_id):
+                raise ValueError('Cannot move folder into its descendant')
+        else:
+            new_parent = None
+
+        subtree_entries = cls.owned_query(user_account_id).filter(
+            cls.ancestor == folder_id
+        ).all()
+        descendant_ids = [entry.descendant for entry in subtree_entries]
+
+        old_ancestors = cls.owned_query(user_account_id).filter(
+            cls.descendant == folder_id,
+            cls.ancestor != folder_id
+        ).all()
+        old_ancestor_ids = [entry.ancestor for entry in old_ancestors]
+
+        if old_ancestor_ids:
+            old_entries = cls.query.filter(
+                cls.ancestor.in_(old_ancestor_ids),
+                cls.descendant.in_(descendant_ids)
+            ).all()
+            for entry in old_entries:
+                if entry.descendant_folder is not None:
+                    entry.descendant_folder.ancestors.remove(entry)
+                elif entry.ancestor_folder is not None:
+                    entry.ancestor_folder.descendants.remove(entry)
+                else:
+                    db.session.delete(entry)
+
+        if new_parent is not None:
+            new_ancestors = cls.owned_query(user_account_id).filter(
+                cls.descendant == new_parent_id
+            ).all()
+
+            for ancestor_entry in new_ancestors:
+                for subtree_entry in subtree_entries:
+                    new_depth = ancestor_entry.depth + 1 + subtree_entry.depth
+                    db.session.add(cls(
+                        ancestor=ancestor_entry.ancestor,
+                        descendant=subtree_entry.descendant,
+                        depth=new_depth
+                    ))
+
+        old_path = folder.path
+        if new_parent is not None:
+            new_path = f"{new_parent.path}/{folder.item_name}"
+        else:
+            new_path = f"/{folder.item_name}"
+
+        folder.parent_item_id = new_parent_id
+        folder.path = new_path
+
+        if descendant_ids:
+            descendant_folders = Folder.query.filter(
+                Folder.folder_id.in_(descendant_ids)
+            ).all()
+            for descendant in descendant_folders:
+                if descendant.folder_id == folder_id:
+                    continue
+                descendant.path = descendant.path.replace(old_path, new_path, 1)
+
+            descendant_files = File.query.filter(
+                File.parent_item_id.in_(descendant_ids),
+                File.user_account_id == user_account_id
+            ).all()
+            for file in descendant_files:
+                file.path = file.path.replace(old_path, new_path, 1)
+
+        db.session.commit()
+        return True
     
     def to_dict(self):
         """Return closure entry as dictionary"""
