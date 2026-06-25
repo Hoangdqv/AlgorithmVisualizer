@@ -59,7 +59,7 @@ const ConfirmReset = () => {
             <h2>Error</h2>
             <p>{error}</p>
             <button 
-              onClick={() => navigate('/forgot-password')}
+              onClick={() => navigate('/login')}
               className="btn btn-primary"
             >
               Request a new reset link

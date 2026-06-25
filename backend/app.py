@@ -466,32 +466,6 @@ def delete_admin_sample_code(language, sample_key):
 # EDUCATIONAL ALGORITHMS ROUTES
 # ============================================
 
-# @app.route('/api/algorithms', methods=['GET'])
-# def get_all_algorithm_categories():
-#     """Get all algorithm categories"""
-#     categories = [
-#         {
-#             'key': key,
-#             'name': config['display_name'],
-#             'languages': list(config['algorithms'].keys())
-#         }
-#         for key, config in ALGORITHM_MAP.items()
-#     ]
-#     return jsonify({'categories': categories})
-
-# @app.route('/api/algorithms/<category>', methods=['GET'])
-# def get_category_info(category):
-#     """Get category info with all algorithms across all languages"""
-#     category_config = ALGORITHM_MAP.get(category.lower())
-    
-#     if not category_config:
-#         return jsonify({'error': 'Category not found'}), 404
-    
-#     return jsonify({
-#         'category': category_config['display_name'],
-#         'algorithms': category_config['algorithms']
-#     })
-
 @app.route('/api/algorithms/<category>/<language>', methods=['GET'])
 def get_category_algorithms(category, language):
     """Get algorithms for a specific category and language"""
@@ -654,35 +628,8 @@ def execute_algorithm():
         return jsonify(result)
             
     except Exception as e:
-        print(f"[API] EXCEPTION: {str(e)}\n")
+        app.logger.exception("Algorithm execution failed")
         return jsonify({'success': False, 'error': str(e)}), 500
-
-# @app.route('/process', methods=['POST'])
-# def process_json():
-#     data = request.get_json()
-#     if not data:
-#         return jsonify({"error": "Invalid or missing JSON payload"}), 400
-
-#     try:
-#         states = data.get("states", [])
-#         if not states:
-#             return jsonify({"error": "No states found in data"}), 400
-        
-#         processed_data = []
-#         for step_data in states:
-#             if isinstance(step_data, dict):
-#                 step_info = {
-#                     "step": step_data.get("step", None),
-#                     "state": step_data.get("data", [])  # Changed from "array" to "data"
-#                 }
-#                 processed_data.append(step_info)
-#             else:
-#                 return jsonify({"error": "Data should consist of one pair of state and step."}), 400
-        
-#         return jsonify({"processed_data": processed_data}), 200
-
-#     except Exception as e:
-#         return jsonify({"error": str(e)}), 500
 
 
 # ============================================
@@ -848,7 +795,7 @@ def google_login():
         return jsonify({'error': 'Invalid Google token'}), 401
     except Exception as e:
         db.session.rollback()
-        print(f"Google OAuth error: {str(e)}")
+        app.logger.exception("Google OAuth failed")
         return jsonify({'error': 'Authentication failed'}), 500
 
 
@@ -909,7 +856,7 @@ def link_google_account():
         return jsonify({'error': 'Invalid Google token'}), 401
     except Exception as e:
         db.session.rollback()
-        print(f"Google link error: {str(e)}")
+        app.logger.exception("Google account linking failed")
         return jsonify({'error': 'Failed to link Google account'}), 500
 
 
@@ -930,26 +877,6 @@ def check_session():
         return jsonify({'authenticated': False}), 200
     
     return jsonify({'authenticated': True, 'user': user.to_dict()}), 200
-
-
-# @app.route('/api/auth/me', methods=['GET'])
-# def get_current_user():
-#     """Get current logged-in user"""
-#     from models import User
-    
-#     user_id = session.get('user_id')
-    
-#     if not user_id:
-#         return jsonify({'error': 'Not authenticated'}), 401
-    
-#     user = User.query.get(user_id)
-    
-#     if not user:
-#         session.clear()
-#         return jsonify({'error': 'User not found'}), 404
-    
-#     return jsonify({'user': user.to_dict()}), 200
-
 
 # ============================================
 # PASSWORD RESET ROUTES
@@ -1017,8 +944,8 @@ def send_reset_email(email, token):
         
         mail.send(msg)
         return True
-    except Exception as e:
-        print(f"Error sending email: {str(e)}")
+    except Exception:
+        app.logger.exception("Failed to send reset email")
         return False
 @app.route('/api/auth/forgot-password', methods=['POST'])
 def forgot_password():
@@ -1125,68 +1052,6 @@ def confirm_reset():
     return response, 200
 
 
-# @app.route('/api/auth/verify-reset-token', methods=['POST'])
-# def verify_reset_token():
-#     """Verify reset token and create a reset session"""
-#     from models import ResetTokens
-#     import uuid
-    
-#     data = request.get_json()
-#     token = data.get('token')
-    
-#     if not token:
-#         return jsonify({'error': 'Token is required'}), 400
-    
-#     reset_token = ResetTokens.query.filter_by(token=token).first()
-    
-#     if not reset_token:
-#         return jsonify({'error': 'Invalid or expired token'}), 400
-    
-#     # Check if token is expired
-#     token_expires_at = _to_aware_datetime(reset_token.expires_at)
-#     if not token_expires_at or _utcnow() > token_expires_at:
-#         db.session.delete(reset_token)
-#         db.session.commit()
-#         return jsonify({'error': 'Token has expired'}), 400
-    
-#     # Token is valid - create a reset session
-#     # Generate session ID for this reset attempt
-#     reset_session_id = str(uuid.uuid4())
-    
-#     # Store session data (valid for 15 minutes)
-#     reset_session = {
-#         'user_id': reset_token.user_id,
-#         'created_at': _utcnow().isoformat(),
-#         'expires_at': (_utcnow() + timedelta(minutes=15)).isoformat()
-#     }
-    
-#     # Store in Flask session
-#     session[f'reset_{reset_session_id}'] = reset_session
-    
-#     # Delete the token immediately after verification (single use)
-#     db.session.delete(reset_token)
-#     db.session.commit()
-    
-#     # Return session ID (not the token)
-#     response = jsonify({
-#         'valid': True,
-#         'message': 'Token verified. You can now reset your password.',
-#         'session_id': reset_session_id
-#     })
-    
-#     # Set secure session cookie
-#     response.set_cookie(
-#         'reset_session',
-#         reset_session_id,
-#         max_age=900,  # 15 minutes
-#         secure=app.config.get('SESSION_COOKIE_SECURE', False),
-#         httponly=True,  # Not accessible via JavaScript
-#         samesite='Lax'
-#     )
-    
-#     return response, 200
-
-
 @app.route('/api/auth/reset-password', methods=['POST'])
 def reset_password():
     """Reset password using valid reset session (from HttpOnly cookie)"""
@@ -1236,25 +1101,9 @@ def reset_password():
     
     return response, 200
 
-
 # ============================================
 # USER PROFILE ROUTES
 # ============================================
-
-# @app.route('/api/user/profile', methods=['GET'])
-# @login_required
-# def get_profile():
-#     """Get current user profile"""
-#     from models import User
-    
-#     user_id = session.get('user_id')
-#     user = User.query.get(user_id)
-    
-#     if not user:
-#         return jsonify({'error': 'User not found'}), 404
-    
-#     return jsonify({'user': user.to_dict()}), 200
-
 
 @app.route('/api/user/profile', methods=['PUT'])
 @login_required
@@ -1698,26 +1547,10 @@ def get_user_folders():
         return jsonify({'error': str(e)}), 500
 
 
-# @app.route('/api/user/folders/<int:folder_id>', methods=['GET'])
-# def get_folder_details(folder_id):
-#     """Get folder details including files"""
-#     from models import Folder
-    
-#     user_id = session.get('user_id')
-#     if not user_id:
-#         return jsonify({'error': 'Not authenticated'}), 401
-    
-#     folder = Folder.query.get(folder_id)
-#     if not folder:
-#         return jsonify({'error': 'Folder not found'}), 404
-    
-#     return jsonify({'folder': folder.to_dict(include_files=True)}), 200
-
-
 @app.route('/api/user/folders/<int:folder_id>/tree', methods=['GET'])
 def get_hierarchy_route(folder_id):
     """Get entire folder tree from specified folder"""
-    from models import Folder, File, ClosureTable
+    from models import ClosureTable
     
     user_id = session.get('user_id')
     if not user_id:
@@ -2092,41 +1925,6 @@ def delete_file(file_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
-
-
-# ============================================
-# SAMPLE FILES ROUTES (READ-ONLY)
-# ============================================
-
-# @app.route('/api/samples/folders', methods=['GET'])
-# def get_sample_folders():
-#     """Get sample folder tree (read-only)"""
-#     from models import Folder
-    
-#     try:
-#         sample_folders = Folder.query.filter_by(folder_type='sample').all()
-#         return jsonify({
-#             'folders': [f.to_dict(include_files=True) for f in sample_folders]
-#         }), 200
-#     except Exception as e:
-#         return jsonify({'error': str(e)}), 500
-
-
-# @app.route('/api/samples/files/<int:file_id>', methods=['GET'])
-# def get_sample_file(file_id):
-#     """Get sample file content (read-only)"""
-#     from models import File
-    
-#     file = File.query.filter_by(
-#         file_id=file_id,
-#         file_type='sample'
-#     ).first()
-    
-#     if not file:
-#         return jsonify({'error': 'Sample file not found'}), 404
-    
-#     return jsonify({'file': file.to_dict(include_content=True)}), 200
-
 
 # ============================================
 # INTERACTIVE EXECUTION — SSE (Server-Sent Events)

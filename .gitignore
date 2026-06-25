@@ -62,6 +62,10 @@ Thumbs.db
 .env.local
 .env.*.local
 
+# Local SQLite database
+backend/instance/*.db
+backend/instance/*.db-*
+
 # Testing
 coverage/
 .nyc_output/

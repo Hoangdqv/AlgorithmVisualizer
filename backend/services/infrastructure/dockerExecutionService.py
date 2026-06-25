@@ -2,7 +2,7 @@ import base64
 import docker
 import os
 import re
-from backend_utils.find_root import get_project_root
+from utils.find_root import get_project_root
 
 class dockerExecutionService:
     def __init__(self):

@@ -33,11 +33,7 @@ git clone <your-repo-url>
 cd <project-folder>
 ```
 
-Install the root npm dependencies:
-
-```bash
-npm install
-```
+The root `package.json` only provides convenience scripts for starting the frontend and backend. There are no root-level app dependencies to install.
 
 Install frontend dependencies:
 
@@ -90,7 +86,15 @@ MAIL_DEFAULT_SENDER=your-email@gmail.com
 
 # Optional: Google OAuth
 GOOGLE_CLIENT_ID=your-google-client-id
+
+# Optional: seed an admin account
+SEED_ADMIN=false
+SEED_ADMIN_USERNAME=admin
+SEED_ADMIN_EMAIL=admin@example.com
+SEED_ADMIN_PASSWORD=change-this-password
 ```
+
+Flask loads this file automatically when running the backend because `python-dotenv` is included in `backend/requirements.txt`. The database seed script also reads this same file.
 
 Create `frontend/.env`:
 
@@ -103,14 +107,15 @@ Google OAuth and email reset features are optional. Normal username/password log
 
 ## 3. Build Docker Execution Images
 
-The backend executes user code inside Docker containers. Build the images from the project root:
+The backend executes user code inside Docker containers. Prepare the runtime images from the project root:
 
 ```bash
 docker build -t python:3.13-alpine -f docker/python/dockerfile docker/python
 docker pull node:22-alpine
 ```
 
-If you want to use the local JavaScript Dockerfile, check `docker/javascript/dockerfile` first. It currently uses `FROM node22-alpine`; most Docker setups expect the official image name `node:22-alpine`.
+The Python image is built locally so the packages in `docker/python/requirements.txt` are available inside executed Python code.
+The JavaScript runtime uses the official `node:22-alpine` image.
 
 ## 4. Database Setup
 
@@ -120,7 +125,16 @@ The backend uses SQLite at:
 backend/instance/algorithm_visualizer.db
 ```
 
-Tables are created automatically when the Flask app starts because `backend/database.py` calls `db.create_all()`.
+Tables are created automatically when the Flask app or seed script starts because `backend/database.py` calls `db.create_all()`.
+
+Seed the default language runtime rows:
+
+```bash
+python backend/helper_scripts/seed_database.py
+```
+
+This creates or updates the default `python` and `javascript` rows used by code execution.
+The seed script imports the Flask app configuration, so it writes to the same SQLite database used by the backend: `backend/instance/algorithm_visualizer.db`.
 
 If you need migration support, run commands from the `backend` folder:
 
@@ -130,20 +144,13 @@ flask db upgrade
 cd ..
 ```
 
-To create the included test admin account:
+To seed an optional admin account, set `SEED_ADMIN=true` in `backend/.env`, choose your admin username/email/password, and run the same seed command again:
 
 ```bash
-python backend/helper_scripts/create_admin.py
+python backend/helper_scripts/seed_database.py
 ```
 
-Default admin credentials from that script:
-
-```text
-username: admin
-password: adminpassword
-```
-
-Change these before using the project outside local development.
+Use your own password before using the project outside local development.
 
 ## 5. Run the Project
 
@@ -202,6 +209,7 @@ flask run --debug
 - The frontend also uses `VITE_API_URL`, so keep it set to `http://localhost:5000/api`.
 - Docker must be running for `/api/execute`, `/api/execute/run`, and algorithm execution routes.
 - The execution service reads Docker image names and run commands from the `language` table in SQLite.
+- The SQLite database is local runtime state and should not be committed.
 - Sample algorithms are registered in `backend/algorithm_registry.json`.
 - Simple playground samples are registered in `backend/playground_registry.json`.
 
@@ -222,13 +230,13 @@ If code execution fails:
 docker images
 ```
 
-- Confirm the `language` table has rows for Python and JavaScript with valid Docker images and run commands.
+- Run `python backend/helper_scripts/seed_database.py` to create the default `language` rows.
 - Expected Docker images are usually `python:3.13-alpine` and `node:22-alpine`.
 
 If admin pages are blocked:
 
 - Log in with an account whose `role` is `admin`.
-- You can create the test admin with `python backend/helper_scripts/create_admin.py`.
+- Set `SEED_ADMIN=true` and `SEED_ADMIN_PASSWORD=...` in `backend/.env`, then rerun `python backend/helper_scripts/seed_database.py`.
 
 If password reset email does not send:
 

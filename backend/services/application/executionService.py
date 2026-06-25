@@ -2,7 +2,7 @@ import base64
 import docker
 import os
 import json
-from backend_utils.find_root import get_project_root
+from utils.find_root import get_project_root
 
 class executionService:
     def __init__(self, docker_service):
@@ -30,6 +30,7 @@ class executionService:
             runner_path = ('/sandbox/runner.js')
 
         cmd = f' {cmd} {runner_path}'
+        container = None
         try:
             container = self.docker_service._get_client().containers.run(
                 docker_image,
@@ -82,7 +83,8 @@ class executionService:
                 }
 
         except Exception as e:
-            self.docker_service.cleanup_container(container)
+            if container is not None:
+                self.docker_service.cleanup_container(container)
             return {
                 'success': False,
                 'stderr': str(e),
@@ -94,7 +96,6 @@ class executionService:
         # Validation
         is_valid, error_msg = self.docker_service._validate_code(code)
         if not is_valid:
-            print(f"[CONTAINER] Validation failed: {error_msg}")
             return {'success': False, 'stderr': error_msg}
         
         
@@ -128,6 +129,7 @@ class executionService:
             'CODE_B64': code_b64,
             'FILENAME': container_filename,
         }
+        container = None
         try:        
             # Run container with code mounted (don't auto-remove yet)
             container = self.docker_service._get_client().containers.run(
@@ -179,17 +181,10 @@ class executionService:
 
             try:
                 self.docker_service.cleanup_container(container)
-            except:
+            except Exception:
                 pass
-            
-            print(f"[CONTAINER] ===== STDOUT =====")
-            print(logs)
-            print(f"[CONTAINER] ===== END STDOUT =====")
-            
+
             if errors:
-                print(f"[CONTAINER] ===== STDERR =====")
-                print(errors)
-                print(f"[CONTAINER] ===== END STDERR =====")
                 return {
                     'success': False,
                     'stderr': errors,
@@ -223,26 +218,24 @@ class executionService:
                 }
                 
         except docker.errors.ContainerError as e:
-            print(f"[CONTAINER] ERROR: Container execution failed: {str(e)}\n")
             return {
                 'success': False,
                 'stderr': f'Container execution failed: {str(e)}'
             }
         except docker.errors.APIError as e:
-            print(f"[CONTAINER] ERROR: Docker API error: {str(e)}\n")
             return {
                 'success': False,
                 'stderr': f'Docker API error: {str(e)}'
             }
         except Exception as e:
-            print(f"[CONTAINER] ERROR: Unexpected error: {str(e)}\n")
             return {
                 'success': False,
                 'stderr': str(e)
             }
         finally:
-            try:
-                self.docker_service.cleanup_container(container)
-            except:
-                pass
+            if container is not None:
+                try:
+                    self.docker_service.cleanup_container(container)
+                except Exception:
+                    pass
             
