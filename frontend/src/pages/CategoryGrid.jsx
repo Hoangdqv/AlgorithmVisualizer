@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { algorithmCategories } from '../../data/algorithmCategories';
-import '../../styles/index.css';
+import { algorithmCategories } from '../data/algorithmCategories';
+import '../styles/index.css';
 import { useNavigate } from 'react-router-dom';
 
 const CategoryGrid = () => {

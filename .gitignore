@@ -66,6 +66,9 @@ Thumbs.db
 backend/instance/*.db
 backend/instance/*.db-*
 
+# Local migration files
+backend/migrations/
+
 # Testing
 coverage/
 .nyc_output/

@@ -1,4 +1,4 @@
-# Python Sample Code
+# Python Sample Code (changes from admin)
 def hello_world():
     print("Hello, World!")
 

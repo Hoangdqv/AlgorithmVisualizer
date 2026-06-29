@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../auth/useAuth';
-import { validateEmail, isUsernameEmpty,validatePassword, validatePasswordMatch } from '../../script_utils/credentialsValidation';
-import SignUpForm from '../../auth/form/SignUpForm';
+import { useAuth } from '../auth/useAuth';
+import { validateEmail, isUsernameEmpty,validatePassword, validatePasswordMatch } from '../utils/credentialsValidation';
+import SignUpForm from '../auth/form/SignUpForm';
 
 export default function SignUp() {
     const [username, setUsername] = useState('');

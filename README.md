@@ -17,8 +17,13 @@ Make sure Docker Desktop is running before using code execution features.
 ## Project Structure
 
 ```text
-backend/             Flask API, database models, auth, admin routes
+backend/             Flask app setup, database models, and config
+backend/routes/      Flask blueprints grouped by API area
+backend/scripts/     Local maintenance scripts
 frontend/            React + Vite client
+frontend/src/hooks/  Shared React state/effect hooks
+frontend/src/pages/  Route-level screens
+frontend/src/utils/  Shared frontend utility functions
 docker/              Docker image definitions for sandboxed code execution
 runtime/             Tracer utilities used by sample algorithms
 sandbox/             Python and Node runners mounted into execution containers
@@ -43,7 +48,7 @@ npm install
 cd ..
 ```
 
-Create and activate a Python virtual environment:
+Create and activate a Python virtual environment for the Flask backend:
 
 ```bash
 python -m venv .venv
@@ -67,6 +72,8 @@ Install backend dependencies:
 pip install -r backend/requirements.txt
 ```
 
+The virtual environment is not a separate app requirement, but it is recommended so the backend packages stay isolated from your system Python. If you skip it, install `backend/requirements.txt` into whichever Python environment will run the Flask commands.
+
 ## 2. Configure Environment Variables
 
 Create `backend/.env`:
@@ -87,14 +94,14 @@ MAIL_DEFAULT_SENDER=your-email@gmail.com
 # Optional: Google OAuth
 GOOGLE_CLIENT_ID=your-google-client-id
 
-# Optional: seed an admin account
-SEED_ADMIN=false
-SEED_ADMIN_USERNAME=admin
-SEED_ADMIN_EMAIL=admin@example.com
-SEED_ADMIN_PASSWORD=change-this-password
+# Optional: generate an admin account
+GENERATE_ADMIN=false
+GENERATE_ADMIN_USERNAME=admin
+GENERATE_ADMIN_EMAIL=admin@example.com
+GENERATE_ADMIN_PASSWORD=change-this-password
 ```
 
-Flask loads this file automatically when running the backend because `python-dotenv` is included in `backend/requirements.txt`. The database seed script also reads this same file.
+Flask loads this file automatically when running the backend because `python-dotenv` is included in `backend/requirements.txt`. The database generation script also reads this same file.
 
 Create `frontend/.env`:
 
@@ -125,32 +132,21 @@ The backend uses SQLite at:
 backend/instance/algorithm_visualizer.db
 ```
 
-Tables are created automatically when the Flask app or seed script starts because `backend/database.py` calls `db.create_all()`.
+Tables are created automatically when the Flask app or database generation script starts because `backend/database.py` calls `db.create_all()`.
 
-Seed the default language runtime rows:
+Generate the default language runtime rows:
 
 ```bash
-python backend/helper_scripts/seed_database.py
+python backend/scripts/generate_database.py
 ```
 
 This creates or updates the default `python` and `javascript` rows used by code execution.
-The seed script imports the Flask app configuration, so it writes to the same SQLite database used by the backend: `backend/instance/algorithm_visualizer.db`.
 
-If you need migration support, run commands from the `backend` folder:
-
-```bash
-cd backend
-flask db upgrade
-cd ..
-```
-
-To seed an optional admin account, set `SEED_ADMIN=true` in `backend/.env`, choose your admin username/email/password, and run the same seed command again:
+To generate an optional admin account, set `GENERATE_ADMIN=true` in `backend/.env`, choose your admin username/email/password, and run the same command again:
 
 ```bash
-python backend/helper_scripts/seed_database.py
+python backend/scripts/generate_database.py
 ```
-
-Use your own password before using the project outside local development.
 
 ## 5. Run the Project
 
@@ -208,8 +204,6 @@ flask run --debug
 - `frontend/vite.config.js` proxies `/api` requests to `http://localhost:5000`.
 - The frontend also uses `VITE_API_URL`, so keep it set to `http://localhost:5000/api`.
 - Docker must be running for `/api/execute`, `/api/execute/run`, and algorithm execution routes.
-- The execution service reads Docker image names and run commands from the `language` table in SQLite.
-- The SQLite database is local runtime state and should not be committed.
 - Sample algorithms are registered in `backend/algorithm_registry.json`.
 - Simple playground samples are registered in `backend/playground_registry.json`.
 
@@ -230,13 +224,13 @@ If code execution fails:
 docker images
 ```
 
-- Run `python backend/helper_scripts/seed_database.py` to create the default `language` rows.
+- Run `python backend/scripts/generate_database.py` to create the default `language` rows.
 - Expected Docker images are usually `python:3.13-alpine` and `node:22-alpine`.
 
 If admin pages are blocked:
 
 - Log in with an account whose `role` is `admin`.
-- Set `SEED_ADMIN=true` and `SEED_ADMIN_PASSWORD=...` in `backend/.env`, then rerun `python backend/helper_scripts/seed_database.py`.
+- Set `GENERATE_ADMIN=true` and `GENERATE_ADMIN_PASSWORD=...` in `backend/.env`, then rerun `python backend/scripts/generate_database.py`.
 
 If password reset email does not send:
 

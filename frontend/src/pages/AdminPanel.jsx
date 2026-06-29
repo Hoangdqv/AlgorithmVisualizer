@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useAuth } from '../../auth/useAuth';
+import { useAuth } from '../auth/useAuth';
 import Editor from '@monaco-editor/react';
 
 export default function AdminPanel() {

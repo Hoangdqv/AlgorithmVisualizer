@@ -1,19 +1,19 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthContext';
-import ScrollToTop from "./scripts/ScrollToTop";
-import CodeEditor from './components/layouts/CodeEditor';
+import ScrollToTop from "./utils/ScrollToTop";
+import CodeEditor from './pages/CodeEditor';
 import NavBar from './components/NavBar';
-import Home from './components/layouts/Home';
-import Error from './components/layouts/Error';
-import SignIn from './components/layouts/SignIn';
-import SignUp from './components/layouts/SignUp';
-import About from './components/layouts/About';
+import Home from './pages/Home';
+import Error from './pages/Error';
+import SignIn from './pages/SignIn';
+import SignUp from './pages/SignUp';
+import About from './pages/About';
 import ResetPassword from './auth/ResetPassword';
 import ConfirmReset from './auth/ConfirmReset';
-import AlgorithmGrid from './components/layouts/CategoryGrid';
-import AlgorithmSelect from './components/layouts/AlgorithmSelect';
-import UserProfile from './components/layouts/UserProfile';
-import AdminPanel from './components/layouts/AdminPanel';
+import AlgorithmGrid from './pages/CategoryGrid';
+import AlgorithmSelect from './pages/AlgorithmSelect';
+import UserProfile from './pages/UserProfile';
+import AdminPanel from './pages/AdminPanel';
 import { PublicOnlyRoute, ProtectedRoute, AdminRoute } from './auth/RouteGuards';
 
 const AppRoutes = () => {

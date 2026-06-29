@@ -1,12 +1,12 @@
 // Sidebar.jsx
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import getFileExtension from '../../scripts/getFileExtension';
-import { useAuth } from '../../auth/useAuth';
-import SearchBar from '../SearchBar';
-import FileTree from '../FileTree';
-import FileContextMenu from '../FileContextMenu';
-import NewItemModal from '../NewItemModal';
-import useFileTreeMoveHandlers from '../../hooks/useFileTreeMoveHandlers';
+import getFileExtension from '../utils/getFileExtension';
+import { useAuth } from '../auth/useAuth';
+import SearchBar from './SearchBar';
+import FileTree from './FileTree';
+import FileContextMenu from './FileContextMenu';
+import NewItemModal from './NewItemModal';
+import useFileTreeMoveHandlers from '../hooks/useFileTreeMoveHandlers';
 
 const Sidebar = ({ onFileSelect, selectedLanguage: currentLanguage, apiCache, onUserFileSelect, initialTab = 'samples', selectedUserFileId = null }) => {
   const { user } = useAuth();

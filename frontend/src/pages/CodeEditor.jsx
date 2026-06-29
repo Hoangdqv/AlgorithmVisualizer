@@ -1,7 +1,9 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import EditorComponent from '../EditorComponent';
-import { consoleErrorHandling, stripAnsi } from '../../script_utils/consoleErrorHandling';
+import EditorComponent from '../components/EditorComponent';
+import useAvailableLanguages from '../hooks/useAvailableLanguages';
+import useCodeExecution from '../hooks/useCodeExecution';
+import { consoleErrorHandling } from '../utils/consoleErrorHandling';
 
 const CodeEditor = () => {
   const location = useLocation();
@@ -9,10 +11,8 @@ const CodeEditor = () => {
   const hasPendingIncomingFile = Boolean(location.state?.openUserFile);
 
   // State declarations
-  const [currentLanguage, setCurrentLanguage] = useState('Python');
   const [output, setOutput] = useState('Loading console...');
   const [code, setCode] = useState('// Loading...');
-  const [isRunning, setIsRunning] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -23,17 +23,13 @@ const CodeEditor = () => {
   const [imagePreviewIndex, setImagePreviewIndex] = useState(-1);
   const [imagePreviewList, setImagePreviewList] = useState([]);
   const [autoSaving, setAutoSaving] = useState(false);
-  const [languageData, setLanguageData] = useState([]);
-  const [stdinValue, setStdinValue] = useState('');
   const [awaitConsoleInput, setAwaitConsoleInput] = useState(false);
-  const [containerReady, setContainerReady] = useState(false);
-
-  const languages = useMemo(() => {
-    return languageData.map(lang => {
-      const name = lang.language;
-      return name.charAt(0).toUpperCase() + name.slice(1);
-    });
-  }, [languageData]);
+  const {
+    currentLanguage,
+    setCurrentLanguage,
+    languageData,
+    languages,
+  } = useAvailableLanguages('Python', { preferFirst: true });
 
   const apiCache = useRef({
     lists: {},
@@ -42,11 +38,7 @@ const CodeEditor = () => {
   });
   const autoSaveTimeout = useRef(null);
   const AUTOSAVE_TIMEOUT_MS = 3000; // 3s
-  const runIdRef = useRef(null);
-  const eventSourceRef = useRef(null);
   const preferredSampleKeyRef = useRef(null);
-  
-  const activeRunRef = useRef(false);
   // Image preview performance/state refs:
   // - cache blob URLs so arrow navigation does not refetch previous images
   // - track latest request so stale async responses cannot override current selection
@@ -56,6 +48,23 @@ const CodeEditor = () => {
   const queuedImageNavigationOffsetRef = useRef(0);
 
   const API_URL = import.meta.env.VITE_API_URL;
+  const {
+    isRunning,
+    stdinValue,
+    setStdinValue,
+    containerReady,
+    forceStopExecution,
+    runCode,
+    stopExecution,
+    sendStdin,
+  } = useCodeExecution({
+    API_URL,
+    code,
+    currentLanguage,
+    awaitConsoleInput,
+    selectedUserFile,
+    setOutput,
+  });
 
   const getLanguageTemplate = useCallback((language) => {
     const lang = (language || '').toLowerCase();
@@ -143,34 +152,6 @@ const CodeEditor = () => {
     if (lang === 'python') return /\binput\s*\(/.test(src);
     return /readline|process\.stdin|prompt\s*\(/.test(src);
   };
-
-  const getDefaultExeFileName = useCallback(() => {
-    const ext = currentLanguage.toLowerCase() === 'python' ? 'py' : 'js';
-    return `playground.${ext}`;
-  }, [currentLanguage]);
-
-  // SSE Cleanup check
-  const closeStream = useCallback(() => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
-  }, []);
-
-  // Silent stop used on file/language change
-  const forceStopExecution = useCallback(() => {
-    if (!activeRunRef.current) return;
-    const rid = runIdRef.current;
-    activeRunRef.current = false;
-    setIsRunning(false);
-    setStdinValue('');
-    setContainerReady(false);
-    closeStream();
-    if (rid) {
-      fetch(`${API_URL}/execute/${rid}/stop`, { method: 'POST' }).catch(() => {});
-      runIdRef.current = null;
-    }
-  }, [API_URL, closeStream]);
 
   // File selection handlers
   const handleFileSelect = useCallback(async (sampleKey) => {
@@ -275,7 +256,7 @@ const CodeEditor = () => {
     setCode(fileContent.trim().length > 0 ? fileContent : getLanguageTemplate(langName));
     setOutput('');
     setCurrentLanguage(langName);
-  }, [forceStopExecution, languageData, getLanguageTemplate, currentLanguage, isImageFileName, clearImagePreview, loadImageBlobUrl]);
+  }, [forceStopExecution, languageData, getLanguageTemplate, currentLanguage, isImageFileName, clearImagePreview, loadImageBlobUrl, setCurrentLanguage]);
 
   useEffect(() => {
     const imageUrlCache = imageObjectUrlCacheRef.current;
@@ -418,26 +399,6 @@ const CodeEditor = () => {
     setCode(getLanguageTemplate(currentLanguage));
   }, [isBlankEditorMode, currentLanguage, getLanguageTemplate]);
 
-  // Effects
-  useEffect(() => {
-    const fetchLanguages = async () => {
-      try {
-        const response = await fetch(`${API_URL}/languages`, { credentials: 'include' });
-        if (response.ok) {
-          const data = await response.json();
-          setLanguageData(data.languages || []);
-          if (data.languages && data.languages.length > 0) {
-            const firstLang = data.languages[0].language;
-            setCurrentLanguage(firstLang.charAt(0).toUpperCase() + firstLang.slice(1));
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching languages:', error);
-      }
-    };
-    fetchLanguages();
-  }, [API_URL]);
-
   useEffect(() => {
     const incomingFile = location.state?.openUserFile;
     if (!incomingFile || languageData.length === 0) return;
@@ -514,128 +475,6 @@ const CodeEditor = () => {
         AUTOSAVE_TIMEOUT_MS
       );
     }
-  };
-
-  // Code execution handler
-  const runCode = async () => {
-    setIsRunning(true);
-    setOutput('');
-    setStdinValue('');
-    setContainerReady(false);
-    const executionFileName = getDefaultExeFileName();
-
-    if (awaitConsoleInput) {
-      // Interactive mode — use SSE streaming so stdin can be sent
-      activeRunRef.current = true;
-      try {
-        const res = await fetch(`${API_URL}/execute/run`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            language: currentLanguage.toLowerCase(),
-            code,
-            file_name: executionFileName,
-          }),
-        });
-        const body = await res.json();
-
-        if (!res.ok) {
-          activeRunRef.current = false;
-          setIsRunning(false);
-          setOutput(consoleErrorHandling(body.stderr || body.error));
-          return;
-        }
-
-        const rid = body.run_id;
-        runIdRef.current = rid;
-
-        // Open SSE stream — native browser API
-        const source = new EventSource(`${API_URL}/execute/${rid}/stream`);
-        eventSourceRef.current = source;
-
-        source.onmessage = (event) => {
-          if (!activeRunRef.current) return;
-          try {
-            const data = JSON.parse(event.data);
-            if (data.output) {
-              setContainerReady(true);
-              setOutput(prev => prev + stripAnsi(data.output));
-            }
-          } catch { /* ignore */ }
-        };
-
-        source.addEventListener('done', (event) => {
-          if (!activeRunRef.current) { closeStream(); return; }
-          activeRunRef.current = false;
-          setIsRunning(false);
-          setContainerReady(false);
-          closeStream();
-          try {
-            const data = JSON.parse(event.data);
-            if (data.exit_code !== 0 && data.exit_code !== null) {
-              setOutput(prev => prev + `\n[Process exited with code ${data.exit_code}]`);
-            }
-          } catch { /* ignore */ }
-        });
-
-        source.onerror = () => {
-          if (!activeRunRef.current) closeStream();
-        };
-      } catch (err) {
-        activeRunRef.current = false;
-        setIsRunning(false);
-        setOutput(consoleErrorHandling(err.message));
-      }
-    } else {
-      // Non-interactive mode — simple POST
-      try {
-        const res = await fetch(`${API_URL}/execute`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            language: currentLanguage.toLowerCase(),
-            code,
-            file_name: selectedUserFile?.item_name ?? executionFileName,
-          }),
-        });
-        const body = await res.json();
-        setIsRunning(false);
-        if (!body.success) {
-          setOutput(consoleErrorHandling(body.stderr || body.error));
-          return;
-        }
-
-        setOutput(stripAnsi(body.output));
-      } catch (err) {
-        setIsRunning(false);
-        setOutput(consoleErrorHandling(err.message));
-      }
-    }
-  };
-
-  const stopExecution = () => {
-    const rid = runIdRef.current;
-    activeRunRef.current = false;
-    setIsRunning(false);
-    setContainerReady(false);
-    setOutput(prev => prev + '\n[Execution stopped by user]');
-    closeStream();
-    if (rid) {
-      fetch(`${API_URL}/execute/${rid}/stop`, { method: 'POST' }).catch(() => {});
-      runIdRef.current = null;
-    }
-  };
-
-  // Send a line of stdin to the running container
-  const sendStdin = (text) => {
-    const rid = runIdRef.current;
-    if (!rid || !isRunning) return;
-    setOutput(prev => prev + text + '\n');
-    fetch(`${API_URL}/execute/${rid}/stdin`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: text }),
-    }).catch(() => {});
   };
 
   // Auto-save

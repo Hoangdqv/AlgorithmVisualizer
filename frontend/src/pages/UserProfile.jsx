@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
-import { useAuth } from '../../auth/useAuth';
-import SearchBar from '../SearchBar';
-import FileTree from '../FileTree';
-import FileContextMenu from '../FileContextMenu';
-import NewItemModal from '../NewItemModal';
-import getFileExtension from '../../scripts/getFileExtension';
-import useFileTreeMoveHandlers from '../../hooks/useFileTreeMoveHandlers';
+import { useAuth } from '../auth/useAuth';
+import SearchBar from '../components/SearchBar';
+import FileTree from '../components/FileTree';
+import FileContextMenu from '../components/FileContextMenu';
+import NewItemModal from '../components/NewItemModal';
+import getFileExtension from '../utils/getFileExtension';
+import useFileTreeMoveHandlers from '../hooks/useFileTreeMoveHandlers';
 
 export default function UserProfile() {
   const { user, checkAuth } = useAuth();

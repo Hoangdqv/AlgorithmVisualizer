@@ -1,10 +1,10 @@
-"""Seed default local-development database records.
+"""Generate default local-development database records.
 
 Run from the project root:
-    python backend/helper_scripts/seed_database.py
+    python backend/scripts/generate_database.py
 
 Optional admin account:
-    Add SEED_ADMIN=true and SEED_ADMIN_PASSWORD=change-me to backend/.env.
+    Add GENERATE_ADMIN=true and GENERATE_ADMIN_PASSWORD=change-me to backend/.env.
 """
 
 import os
@@ -38,7 +38,7 @@ DEFAULT_LANGUAGES = {
 }
 
 
-def seed_languages():
+def generate_languages():
     for language_name, config in DEFAULT_LANGUAGES.items():
         language = Language.query.filter_by(language=language_name).first()
 
@@ -50,16 +50,16 @@ def seed_languages():
         language.run_cmd = config["run_cmd"]
 
 
-def seed_admin():
-    if os.environ.get("SEED_ADMIN", "").lower() not in {"1", "true", "yes"}:
+def generate_admin():
+    if os.environ.get("GENERATE_ADMIN", "").lower() not in {"1", "true", "yes"}:
         return
 
-    username = os.environ.get("SEED_ADMIN_USERNAME", "admin")
-    email = os.environ.get("SEED_ADMIN_EMAIL", "admin@example.com")
-    password = os.environ.get("SEED_ADMIN_PASSWORD")
+    username = os.environ.get("GENERATE_ADMIN_USERNAME", "admin")
+    email = os.environ.get("GENERATE_ADMIN_EMAIL", "admin@example.com")
+    password = os.environ.get("GENERATE_ADMIN_PASSWORD")
 
     if not password:
-        raise RuntimeError("Set SEED_ADMIN_PASSWORD before seeding an admin account.")
+        raise RuntimeError("Set GENERATE_ADMIN_PASSWORD before generating an admin account.")
 
     admin = User.query.filter(
         (User.username == username) | (User.email == email)
@@ -78,10 +78,10 @@ def seed_admin():
 def main():
     with app.app_context():
         db.create_all()
-        seed_languages()
-        seed_admin()
+        generate_languages()
+        generate_admin()
         db.session.commit()
-        print("Database seed completed.")
+        print("Database generation completed.")
 
 
 if __name__ == "__main__":

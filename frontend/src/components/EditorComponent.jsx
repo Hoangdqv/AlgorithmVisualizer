@@ -1,7 +1,7 @@
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { useRef, useEffect, useState } from 'react';
 import Editor from '@monaco-editor/react';
-import Sidebar from './layouts/Sidebar';
+import Sidebar from './Sidebar';
 import VisualModule from './VisualModule';
 import MinimalModePanel from './MinimalModePanel';
 import 'monaco-editor/esm/vs/editor/contrib/hover/browser/hoverContribution.js';

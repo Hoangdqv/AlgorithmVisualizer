@@ -1,9 +1,16 @@
 """
 Delete user by username or email
-python delete_user.py <username_or_email>
+python backend/scripts/delete_user.py <username_or_email>
 """
 import sys
-from backend.app import app
+from pathlib import Path
+
+
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
+from app import app
 from database import db
 from models import User, File, Folder, ClosureTable
 

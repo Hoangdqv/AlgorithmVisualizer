@@ -1,6 +1,6 @@
 // FileTree.jsx - Recursive tree component for folders and files
 import { useRef, useState } from 'react';
-import getFileExtension from '../scripts/getFileExtension';
+import getFileExtension from '../utils/getFileExtension';
 
 const FileTree = ({ 
   folders = [], 

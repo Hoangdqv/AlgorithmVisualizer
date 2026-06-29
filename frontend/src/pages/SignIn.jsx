@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
-import { useAuth } from '../../auth/useAuth';
-import SignInForm from '../../auth/form/SignInForm';
-import { isEmailEmpty, validateEmail } from '../../script_utils/credentialsValidation';
+import { useAuth } from '../auth/useAuth';
+import SignInForm from '../auth/form/SignInForm';
+import { isEmailEmpty, validateEmail } from '../utils/credentialsValidation';
 
 export default function SignIn() {
     const [email, setEmail] = useState('');

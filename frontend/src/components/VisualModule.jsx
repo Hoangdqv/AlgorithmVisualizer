@@ -6,7 +6,7 @@ import {
   captureVisualizationFrame,
   saveVisualizationCapture,
   waitForCaptureStability,
-} from '../script_utils/visualCapture';
+} from '../utils/visualCapture';
 
 const VisualModule = ({ tracerData, isRunning, currentLanguage, suppressRunningOverlay = false, onSaveVisualizationCapture }) => {
   const [currentStep, setCurrentStep] = useState(1);

@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import EditorComponent from '../EditorComponent';
-import { buildParamsBlock } from '../../data/algorithmParams';
-import { getTracerGuideWithDetection } from '../../data/tracerGuideTemplates';
-import { consoleErrorHandling } from '../../script_utils/consoleErrorHandling';
+import EditorComponent from '../components/EditorComponent';
+import { buildParamsBlock } from '../data/algorithmParams';
+import { getTracerGuideWithDetection } from '../data/tracerGuideTemplates';
+import useAlgorithmTreeSession from '../hooks/useAlgorithmTreeSession';
+import useAvailableLanguages from '../hooks/useAvailableLanguages';
+import { consoleErrorHandling } from '../utils/consoleErrorHandling';
 
 const AlgorithmSelect = () => {
   // Router hooks
@@ -12,7 +14,6 @@ const AlgorithmSelect = () => {
   const category = searchParams.get('category') || 'sorting';
 
   // State declarations
-  const [currentLanguage, setCurrentLanguage] = useState('Python');
   const [output, setOutput] = useState('Select an algorithm to run...');
   const [code, setCode] = useState('// Loading algorithms...');
   const [explanation, setExplanation] = useState(''); // Store algorithm explanation
@@ -25,17 +26,20 @@ const AlgorithmSelect = () => {
   const [viewMode, setViewMode] = useState('detailed');
   const [selectedAlgorithmKey, setSelectedAlgorithmKey] = useState(null);
   const [selectedAlgorithmName, setSelectedAlgorithmName] = useState('Loading...');
-  const [languageData, setLanguageData] = useState([]);
-  const [treeSession, setTreeSession] = useState(null);
   const [isLiveAppendingRun, setIsLiveAppendingRun] = useState(false);
-
-  // Fetch languages
-  const languages = useMemo(() => {
-    return languageData.map(lang => {
-      const name = lang.language;
-      return name.charAt(0).toUpperCase() + name.slice(1);
-    });
-  }, [languageData]);
+  const {
+    currentLanguage,
+    setCurrentLanguage,
+    languageData,
+    languages,
+  } = useAvailableLanguages('Python');
+  const {
+    treeSession,
+    setTreeSession,
+    inferRootId,
+    getLatestTreeSnapshot,
+    hasTreeSession,
+  } = useAlgorithmTreeSession(category, currentLanguage);
 
   const apiCache = useRef({
     lists: {},  // Cache by category+language
@@ -102,7 +106,7 @@ const AlgorithmSelect = () => {
     } finally {
       setLoading(false);
     }
-  }, [category, currentLanguage]);
+  }, [category, currentLanguage, setTreeSession]);
 
   const handleViewModeChange = useCallback((newMode) => {
     // When switching to minimal mode, restore original code from cache
@@ -115,33 +119,6 @@ const AlgorithmSelect = () => {
     }
     setViewMode(newMode);
   }, [category, currentLanguage, selectedAlgorithmKey]);
-
-  // Fetch languages ONCE on mount
-  useEffect(() => {
-    const fetchLanguages = async () => {
-      try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/languages`, {
-          credentials: 'include'
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setLanguageData(data.languages || []);
-          if (data.languages && data.languages.length > 0) {
-            const langNames = data.languages.map(lang => {
-              const name = lang.language;
-              return name.charAt(0).toUpperCase() + name.slice(1);
-            });
-            if (!langNames.includes(currentLanguage)) {
-              setCurrentLanguage(langNames[0]);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching languages:', error);
-      }
-    };
-    fetchLanguages();
-  }, [currentLanguage]); // Run once on mount or if currentLanguage changes
 
   useEffect(() => {
     // example cacheKey format is "sorting_python" or "graphs_javascript"
@@ -196,43 +173,10 @@ const AlgorithmSelect = () => {
     fetchAlgorithms();
   }, [category, currentLanguage, handleFileSelect]);
 
-  useEffect(() => {
-    // Reset session when language/category context changes.
-    setTreeSession(null);
-  }, [category, currentLanguage]);
-
   const handleEditorChange = (value) => {
     const cleaned = (value || '').replace(/\\?\$\{?0\}?/g, '');
     setCode(cleaned);
   };
-
-  const inferRootId = useCallback((nodes, fallback = 1) => {
-    if (!Array.isArray(nodes) || nodes.length === 0) return fallback;
-
-    const allIds = new Set(nodes.map(node => node.id));
-    const childIds = new Set();
-
-    nodes.forEach(node => {
-      (node.children || []).forEach(childId => {
-        if (childId !== null && childId !== undefined) {
-          childIds.add(childId);
-        }
-      });
-    });
-
-    const rootCandidate = [...allIds].find(id => !childIds.has(id));
-    return rootCandidate ?? fallback;
-  }, []);
-
-  const getLatestTreeSnapshot = useCallback((statesPayload) => {
-    const states = statesPayload?.states || [];
-    for (let i = states.length - 1; i >= 0; i -= 1) {
-      if (Array.isArray(states[i]?.tree) && states[i].tree.length > 0) {
-        return states[i].tree;
-      }
-    }
-    return null;
-  }, []);
 
   // Code execution
   const runCode = useCallback(async () => {
@@ -285,7 +229,7 @@ const AlgorithmSelect = () => {
     } finally {
       setIsRunning(false);
     }
-  }, [currentLanguage, code, category, getLatestTreeSnapshot, inferRootId]);
+  }, [currentLanguage, code, category, getLatestTreeSnapshot, inferRootId, setTreeSession]);
 
   const runMinimalInternal = useCallback(async (params, continueSession = false) => {
     const baseTreeNodes = treeSession?.nodes?.length ? treeSession.nodes : null;
@@ -366,7 +310,7 @@ const AlgorithmSelect = () => {
       setIsRunning(false);
       setIsLiveAppendingRun(false);
     }
-  }, [code, category, currentLanguage, treeSession, tracerData, getLatestTreeSnapshot, inferRootId]);
+  }, [code, category, currentLanguage, treeSession, tracerData, getLatestTreeSnapshot, inferRootId, setTreeSession]);
 
   const runMinimal = useCallback(async (params) => {
     await runMinimalInternal(params, false);
@@ -505,7 +449,7 @@ const AlgorithmSelect = () => {
       setViewMode={handleViewModeChange}
       runMinimal={runMinimal}
       runMinimalContinue={runMinimalContinue}
-      hasTreeSession={Boolean(treeSession?.nodes?.length)}
+      hasTreeSession={hasTreeSession}
       explanation={explanation}
       tracerData={tracerData}
       tracerGuide={tracerGuide}
